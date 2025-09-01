@@ -1,0 +1,115 @@
+<div class="qrcode-container">
+  <h2>微信登录</h2>
+  <p> <%= @protocol_label %> 协议</p>
+
+  <div class="qrcode-image">
+    <% if @qrcode_data[:qrcode_url].present? %>
+      <img src="<%= @qrcode_data[:qrcode_url] %>" alt="微信登录二维码">
+    <% elsif @qrcode_data[:qrcode_base64].present? %>
+      <img src="<%= @qrcode_data[:qrcode_base64] %>" alt="微信登录二维码">
+    <% else %>
+      <div class="error">无法显示二维码</div>
+    <% end %>
+  </div>
+
+  <p class="instructions">请使用微信扫描上方二维码登录</p>
+
+  <div id="login-status">等待扫描...</div>
+
+  <div class="qr-info">
+    <p>二维码将在 <span id="countdown">300</span> 秒后过期</p>
+  </div>
+</div>
+
+<script>
+  // 定期检查登录状态
+  function checkLoginStatus() {
+    fetch('http://127.0.0.1:8059/api/Login/LoginCheckQR?uuid=<%= @qrcode_data[:uuid] %>', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+        .then(response => response.json())
+        .then(data => {
+          // 等待扫码
+          if (data.Success && data.Data && data.Data.status === 0) {
+            document.getElementById('login-status').innerHTML = '等待扫描...';
+            document.getElementById('countdown').innerHTML = data.Data.expiredTime;
+
+            // 跳转到首页或指定页面
+            // setTimeout(() => {
+            //   window.location.href = '/';  // 可以修改为其他页面
+            // }, 1500);
+          } else if (data.Data && data.Data.status === 1) {
+            // 已扫码但未确认
+            document.getElementById('login-status').innerHTML = '已扫描，请在手机上确认登录';
+          } else if (data.Data && data.Data.Status === 2) {
+            // 已扫码但被拒绝
+            document.getElementById('login-status').innerHTML = '登录被拒绝，请重新扫码';
+          } else {
+            // 未扫码或其他状态
+            document.getElementById('login-status').innerHTML = '等待扫描...';
+          }
+        })
+        .catch(error => {
+          console.error('检查登录状态出错:', error);
+        });
+  }
+
+
+  // 每1秒检查一次登录状态
+  const statusCheckInterval = setInterval(checkLoginStatus, 1000);
+
+  // 页面加载时初始化倒计时
+  checkLoginStatus();
+
+  // 页面卸载时清除定时器
+  window.addEventListener('beforeunload', function() {
+    clearInterval(statusCheckInterval);
+  });
+</script>
+
+<style>
+  .qrcode-container {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+    font-family: Arial, sans-serif;
+  }
+
+  .qrcode-image {
+    margin: 20px 0;
+  }
+
+  .qrcode-image img {
+    max-width: 280px;
+    border: 1px solid #ddd;
+  }
+
+  .instructions {
+    margin: 20px 0;
+    font-size: 16px;
+    color: #333;
+  }
+
+  #login-status {
+    padding: 10px;
+    background-color: #f8f8f8;
+    border-radius: 4px;
+    margin: 10px 0;
+  }
+
+  .qr-info {
+    font-size: 14px;
+    color: #666;
+    margin-top: 20px;
+  }
+
+  .error {
+    color: red;
+    padding: 20px;
+  }
+</style>
