@@ -13,4 +13,6 @@ Rails.application.routes.draw do
   # root "posts#index"
   get "login" => "login#index"
   post "login" => "login#show_wechat_qrcode"
+  post "check_login_status" => "login#check_login_status"
+
 end

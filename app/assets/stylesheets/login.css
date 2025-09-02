@@ -1,0 +1,109 @@
+/* 通用样式 */
+
+
+.login-container {
+  width: 100%;
+  max-width: 500px;
+  background: white;
+  border-radius: 12px;
+  padding: 20px 30px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  margin: 60px auto 0; /* 顶部间距固定为 60px，左右自动居中 */
+  box-sizing: border-box;
+}
+
+/* 设置 h2 标题的布局 */
+.login-header {
+  display: flex;
+  align-items: center; /* 垂直居中对齐文本和图片 */
+  justify-content: center; /* 居中对齐整个内容 */
+  gap: 10px; /* 文字和图片之间的间距 */
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+/* 图标的样式调整 */
+.login-img {
+  width: 40px; /* 调整图片大小 */
+  height: 40px;
+  object-fit: cover; /* 保持图标比例 */
+}
+
+
+h2 {
+  margin-bottom: 18px;
+  font-size: 1.8rem;
+  color: var(--text-color);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+label {
+  font-size: 1rem;
+  margin-bottom: 5px;
+  text-align: start;
+}
+
+select {
+  width: 100%;
+  padding: 10px 15px;
+  font-size: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: border-color 0.3s ease;
+}
+
+select:focus {
+  outline: none;
+  border-color: #0076df;
+}
+
+button {
+  width: 100%;
+  padding: 12px 20px;
+  background: #0076df;
+  color: white;
+  font-size: 1rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+button:hover {
+  background: #0056b3;
+}
+
+.footer {
+  margin-top: 20px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.footer p {
+  margin: 0;
+}
+
+.footer a {
+  color: #0076df;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+/* 移动端调整 */
+@media (max-width: 768px) {
+  .login-container {
+    margin-top: 40px; /* 在移动端减小顶部间距 */
+    width: 90%; /* 在移动端减小宽度比例 */
+    padding: 15px 20px; /* 减小内边距 */
+  }
+}

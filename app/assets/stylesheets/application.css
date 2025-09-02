@@ -8,3 +8,50 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+
+:root {
+  --bg-color: #f4f7fa; /* 背景颜色 */
+  --text-color: #333; /* 主文字颜色 */
+  --secondary-text-color: #666; /* 次要文字颜色 */
+  --success-color: #28a745; /* 成功状态 */
+  --error-color: #dc3545; /* 错误状态 */
+  --primary-color: #0076df; /* 主按钮/强调色 */
+  --border-color: #ddd; /* 边框颜色 */
+  --hover-color: #0056b3; /* 按钮悬停颜色 */
+  --font-family: IBM Plex Sans, SF Pro, Source Code Pro, sans-serif;
+}
+
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+h2 {
+  color: var(--text-color);
+}
+
+.instructions {
+  color: var(--text-color);
+}
+
+#error {
+  color: var(--error-color);
+}
+
+button {
+  background-color: var(--primary-color);
+  border: 1px solid var(--border-color);
+}
+
+button:hover {
+  background-color: var(--hover-color);
+}
+

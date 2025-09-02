@@ -8,8 +8,8 @@ module WechatApis
       "/Login/#{get_protocol_path(protocol)}"
     end
 
-    def self.check_status(protocol)
-      "/user/check_status/#{get_protocol_path(protocol)}"
+    def self.check_status(uuid)
+      "/Login/LoginCheckQR?uuid=#{uuid}"
     end
 
     private

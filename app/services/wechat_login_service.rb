@@ -23,4 +23,14 @@ class WechatLoginService < BaseApiService
     end
   end
 
+  def check_qrcode_status(uuid)
+    path = WechatApis::Base.check_status(uuid)
+
+    response = post(path)
+    if response[:error]
+      # handle_error(response, "获取二维码失败")
+    else
+      response
+    end
+  end
 end

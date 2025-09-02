@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-class LoginController < ActionController::Base
+class LoginController < ApplicationController
+
   def index
     # 将协议选项传递给视图
     @protocol_options = WechatProtocol.options_for_select
@@ -16,15 +17,15 @@ class LoginController < ActionController::Base
 
     begin
       # 使用微信API服务
-      api_service = WechatLoginService.new(wechat_protocol)
-      result = api_service.get_qrcode
+      @api_service = WechatLoginService.new(wechat_protocol)
+      result = @api_service.get_qrcode
 
       if result[:error]
         render json: { status: 'error', message: result[:message] }, status: :service_unavailable
       else
         # 检查结果是否包含预期的数据结构
         Rails.logger.debug("API结果: #{result.inspect}")
-        
+
         if result["Data"].present?
           # 将API返回的数据格式转换为我们自己的格式
           @qrcode_data = {
@@ -34,7 +35,7 @@ class LoginController < ActionController::Base
             expired_time: result["Data"]["ExpiredTime"],
             device_id: result["DeviceId"]
           }
-          
+
           @protocol_type = wechat_protocol
           @protocol_label = WechatProtocol.label_for(wechat_protocol)
 
@@ -58,23 +59,20 @@ class LoginController < ActionController::Base
 
   # 检查登录状态
   def check_login_status
-    protocol = params[:protocol]
+    # Get uuid from params instead of as a method argument
     uuid = params[:uuid]
-    device_id = params[:device_id]
-    
-    if protocol.blank? || uuid.blank?
-      render json: { status: 'error', message: "参数不完整" }, status: :bad_request
+
+    if uuid.blank?
+      render json: { Success: false, Message: "UUID不能为空" }, status: :unprocessable_entity
       return
     end
-    
-    begin
-      api_service = WechatLoginService.new(protocol)
-      result = api_service.check_status(uuid, device_id)
-      
-      render json: result
-    rescue => e
-      Rails.logger.error("检查登录状态失败: #{e.message}")
-      render json: { status: 'error', message: "服务暂时不可用" }, status: :internal_server_error
-    end
+
+    escape_uuid = uuid.to_s.delete('\\n').strip
+    @api_service = WechatLoginService.new()
+    response = @api_service.check_qrcode_status(escape_uuid)
+    render json: response[:error] ?
+                   { Success: false, Message: "检查登录状态失败" } :
+                   response
   end
+
 end

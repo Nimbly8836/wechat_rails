@@ -1,8 +1,24 @@
-<div>
-  登录表单
+<!--<img width="100" height="100" src="https://img.icons8.com/hands/100/sms.png" alt="sms"/>-->
+<!--<img width="100" height="100" src="https://img.icons8.com/hands/100/qr-code.png" alt="qr-code"/>-->
+<div class="login-container">
+  <%= turbo_frame_tag "qrcode_result" do %>
+
+    <h2 class="login-header">
+      <img class="login-img" src="https://img.icons8.com/hands/100/choose.png"
+           alt="choose"/>
+      选择协议
+    </h2>
+
+    <form action="/login" method="post" id="login-form" class="form-container">
+      <select name="protocol" id="protocol" class="qrcode-image" required>
+        <option value="" disabled selected>请选择</option>
+        <% @protocol_options.each do |protocol, label| %>
+          <option value="<%= protocol %>"><%= label %></option>
+        <% end %>
+      </select>
+
+      <button type="submit" class="btn-primary">确定</button>
+    </form>
+  <% end %>
+
 </div>
-<%= form_with url: login_path, method: :post do |form| %>
-  <label for="protocol">选择 微信协议</label>
-  <%= form.select :protocol, options_for_select(@protocol_options), { include_blank: '请选择' }, { required: true } %>
-  <%= form.submit "确定" %>
-<% end %>
