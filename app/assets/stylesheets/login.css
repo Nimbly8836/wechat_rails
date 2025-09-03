@@ -107,3 +107,7 @@ button:hover {
     padding: 15px 20px; /* 减小内边距 */
   }
 }
+
+#reTryBtn {
+  margin-top: 10px;
+}

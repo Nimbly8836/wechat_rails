@@ -26,6 +26,9 @@ class LoginController < ApplicationController
         # 检查结果是否包含预期的数据结构
         Rails.logger.debug("API结果: #{result.inspect}")
 
+        @protocol_type = wechat_protocol
+        @protocol_label = WechatProtocol.label_for(wechat_protocol)
+
         if result["Data"].present?
           # 将API返回的数据格式转换为我们自己的格式
           @qrcode_data = {
@@ -33,12 +36,9 @@ class LoginController < ApplicationController
             qrcode_url: result["Data"]["QrUrl"],
             uuid: result["Data"]["Uuid"],
             expired_time: result["Data"]["ExpiredTime"],
-            device_id: result["DeviceId"]
+            device_id: result["DeviceId"],
+            protocol: @protocol_type
           }
-
-          @protocol_type = wechat_protocol
-          @protocol_label = WechatProtocol.label_for(wechat_protocol)
-
           respond_to do |format|
             format.html { render :qrcode }
             format.json { render json: {

@@ -1,13 +1,11 @@
 <%= turbo_frame_tag "qrcode_result" do %>
-  <div>
+  <div data-controller="qrcode" 
+       data-qrcode-uuid-value="<%= @qrcode_data[:uuid] %>"
+       data-qrcode-protocol-value="<%= @protocol_type %>">
     <h2>微信登录</h2>
     <p> <%= @protocol_label %> 协议</p>
 
-    <div class="qrcode-image"
-         data-controller="qrcode"
-         data-qrcode-uuid-value="
-           <%= @qrcode_data[:uuid] %>"
-    >
+    <div class="qrcode-image">
       <% if @qrcode_data[:qrcode_url].present? %>
         <img src="<%= @qrcode_data[:qrcode_url] %>" alt="微信登录二维码">
       <% elsif @qrcode_data[:qrcode_base64].present? %>
@@ -21,6 +19,11 @@
     <p class="instructions">请使用微信扫描上方二维码登录</p>
 
     <div id="login-status">等待扫描...</div>
+    <div id="login-error" style="display: none;">
+      <button id="reTryBtn" class="btn btn-primary"
+              data-action="click->qrcode#reGetQrCode">重新获取二维码
+      </button>
+    </div>
 
     <div class="qr-info">
       <p>二维码将在 <span id="countdown">300</span> 秒后过期</p>
