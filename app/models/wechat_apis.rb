@@ -16,26 +16,26 @@ module WechatApis
 
     def self.get_protocol_path(protocol)
       case protocol
-      when 'iPad'
-        'LoginGetQR'
-      when 'Car'
-        'LoginGetQRCar'
-      when 'APad'
-        'LoginGetQRPad'
-      when 'Mac'
-        'LoginGetQRMac'
-      when 'Windows'
-        'LoginGetQRWin'
-      when 'WindowsUwp'
-        'LoginGetQRWinUnified'
-      when 'iPadX'
-        'LoginGetQRx'
-      when 'APadX'
-        'LoginGetQRPadx'
-      when 'WindowsUwpX'
-        'LoginGetQRWinUwp'
+      when "iPad"
+        "LoginGetQR"
+      when "Car"
+        "LoginGetQRCar"
+      when "APad"
+        "LoginGetQRPad"
+      when "Mac"
+        "LoginGetQRMac"
+      when "Windows"
+        "LoginGetQRWin"
+      when "WindowsUwp"
+        "LoginGetQRWinUnified"
+      when "iPadX"
+        "LoginGetQRx"
+      when "APadX"
+        "LoginGetQRPadx"
+      when "WindowsUwpX"
+        "LoginGetQRWinUwp"
       else
-        'default'
+        "default"
       end
     end
   end
@@ -57,8 +57,8 @@ module WechatApis
 
   # 联系人相关API路径
   module Contact
-    def self.list(protocol)
-      "/contact/list/#{Base.get_protocol_path(protocol)}"
+    def self.list
+      "/Friend/GetContractList"
     end
 
     def self.details(protocol)

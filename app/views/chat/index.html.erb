@@ -1,0 +1,54 @@
+<div class="chat-container">
+  <!-- 左侧边栏 -->
+  <div class="sidebar">
+    <!-- 应用标题 -->
+    <div class="header">
+      <div class="app-name">
+        <div class="app-name-icon">T</div>
+        Telegram
+      </div>
+    </div>
+
+    <!-- 搜索栏 -->
+    <input type="text" class="search-bar" placeholder="搜索联系人或搜索消息...">
+
+    <!-- 标签栏 -->
+    <div class="tab-bar">
+      <div class="tab active">消息</div>
+      <div class="tab">联系人</div>
+    </div>
+
+    <!-- 联系人列表 -->
+    <div class="contacts-list">
+      <% @contacts.each do |contact| %>
+        <div class="contact-item">
+          <div class="avatar">
+            <% if contact[:avatar_url].present? %>
+              <%= image_tag contact[:avatar_url], alt: contact[:name] %>
+            <% else %>
+              <div class="avatar-placeholder"><%= contact[:name].first %></div>
+            <% end %>
+          </div>
+          <div class="contact-info">
+            <div class="contact-name"><%= contact[:name] %></div>
+            <div class="last-message"><%= contact[:last_message][:content] rescue "" %></div>
+          </div>
+          <div class="contact-meta">
+            <div class="timestamp"><%= format_timestamp(contact[:last_message][:created_at]) rescue "" %></div>
+            <% if contact[:unread_count].to_i > 0 %>
+              <div class="unread-count"><%= contact[:unread_count] %></div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+  
+  <!-- 右侧内容区 -->
+  <div class="main-content">
+    <div class="welcome-screen">
+      <div class="welcome-title">欢迎使用聊天应用</div>
+      <div class="welcome-subtitle">选择一个聊天来开始对话</div>
+    </div>
+  </div>
+</div>

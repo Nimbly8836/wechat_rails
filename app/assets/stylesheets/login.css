@@ -1,5 +1,33 @@
 /* 通用样式 */
+.login-container {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
 
+
+.instructions {
+  color: var(--text-color);
+}
+
+#error {
+  color: var(--error-color);
+}
+
+button {
+  background-color: var(--primary-color);
+  border: 1px solid var(--border-color);
+}
+
+button:hover {
+  background-color: var(--hover-color);
+}
 
 .login-container {
   width: 100%;

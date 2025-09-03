@@ -15,4 +15,11 @@ Rails.application.routes.draw do
   post "login" => "login#show_wechat_qrcode"
   post "check_login_status" => "login#check_login_status"
 
+  # chat
+  get "chat" => "chat#index"
+
+  # contact management
+  get "contact" => "contact#index"
+  get "contact/:id" => "contact#show", as: :contact
+
 end

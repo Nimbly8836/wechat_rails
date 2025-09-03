@@ -1,14 +1,33 @@
 # app/services/base_api_service.rb
-require 'net/http'
-require 'uri'
-require 'json'
+require "net/http"
+require "uri"
+require "json"
+require "singleton"
 
 class BaseApiService
-  attr_reader :protocol_type, :config
+  include Singleton
+  attr_reader :config
+  attr_accessor :protocol_type
 
-  def initialize(protocol_type = nil)
-    @protocol_type = protocol_type
+  @@wx_id = nil
+
+  def self.wx_id
+    @@wx_id
+  end
+
+  def self.wx_id=(value)
+    @@wx_id = value
+  end
+
+  # 实例方法获取 wx_id
+  def wx_id
+    @@wx_id
+  end
+
+  # Singleton 模式下的 initialize 不能接受参数
+  def initialize
     @config = WechatApiConfigLoader.config
+    @protocol_type = nil
   end
 
   # 获取基础URL
@@ -27,7 +46,7 @@ class BaseApiService
   end
 
   # 发送POST请求
-  def post(path, params = {})
+  def post(path, params = { Wxid: @@wx_id })
     make_request(path, params, :post)
   end
 
@@ -45,7 +64,7 @@ class BaseApiService
 
   # 构建完整的URL
   def build_url(path)
-    path.start_with?('http') ? path : "#{base_url}#{path}"
+    path.start_with?("http") ? path : "#{base_url}#{path}"
   end
 
   # 处理响应
@@ -64,15 +83,15 @@ class BaseApiService
 
   # 设置请求头
   def set_headers(request)
-    request['User-Agent'] = get_user_agent
-    request['Accept'] = 'application/json'
-    request['Content-Type'] = 'application/json' if request.method != 'GET'
+    request["User-Agent"] = get_user_agent
+    request["Accept"] = "application/json"
+    request["Content-Type"] = "application/json" if request.method != "GET"
     request
   end
 
   # 获取User-Agent
   def get_user_agent
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36'
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36"
   end
 
   private
@@ -105,7 +124,7 @@ class BaseApiService
 
     # 发送请求
     http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = (uri.scheme == 'https')
+    http.use_ssl = (uri.scheme == "https")
     http.read_timeout = @config[:timeout] || 30
 
     # 重试机制

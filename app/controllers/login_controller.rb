@@ -68,11 +68,39 @@ class LoginController < ApplicationController
     end
 
     escape_uuid = uuid.to_s.delete('\\n').strip
-    @api_service = WechatLoginService.new()
+    @api_service = WechatLoginService.new(nil)
     response = @api_service.check_qrcode_status(escape_uuid)
+    # 登录成功之后调用自动心跳和设置wx_id
+    # Rails.logger.debug(response)
+    if response&.dig(:Data, :baseResponse, :ret) == 0 and
+       response&.dig(:Data, :baseResponse, :acctSectResp, :userName)
+      # 获取并设置微信ID
+      wx_id = response&.dig(:Data, :baseResponse, :acctSectResp, :userName)
+      @api_service.set_wx_id(wx_id)
+      # 异步获取联系人列表
+      fetch_contacts_in_background(wx_id)
+    end
+
+    # @api_service.set_wx_id(response["Data"]["WxId"])
     render json: response[:error] ?
                    { Success: false, Message: "检查登录状态失败" } :
                    response
   end
 
+  private
+
+  def fetch_contacts_in_background(wx_id)
+    Thread.new do
+      begin
+        contact_service = ContactService.new(wx_id)
+        contact_service.fetch_contacts
+      rescue => e
+        Rails.logger.error("获取联系人失败: #{e.message}")
+        Rails.logger.error(e.backtrace.join("\n"))
+      ensure
+        ActiveRecord::Base.connection_pool.release_connection
+      end
+    end
+
+  end
 end
