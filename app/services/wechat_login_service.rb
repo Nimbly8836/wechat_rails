@@ -6,7 +6,7 @@ class WechatLoginService
   def initialize(protocol_type = nil)
     @protocol_type = protocol_type
     @api_service = BaseApiService.instance
-    @api_service.protocol_type = protocol_type  # 使用属性赋值而不是构造函数参数
+    @api_service.protocol_type = protocol_type # 使用属性赋值而不是构造函数参数
   end
 
   # 设置 wx_id
@@ -50,4 +50,15 @@ class WechatLoginService
       response
     end
   end
+
+  def auto_heart_beat(wxid)
+    path = WechatApis::Base.auto_heart_beat
+    response = @api_service.post(path, { wxid: wxid })
+    if response[:error]
+      # handle_error(response, "获取二维码失败")
+    else
+      response
+    end
+  end
+
 end

@@ -12,6 +12,10 @@ module WechatApis
       "/Login/LoginCheckQR?uuid=#{uuid}"
     end
 
+    def self.auto_heart_beat
+      "/Login/AutoHeartBeat"
+    end
+
     private
 
     def self.get_protocol_path(protocol)

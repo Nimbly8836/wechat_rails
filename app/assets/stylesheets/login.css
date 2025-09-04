@@ -1,35 +1,29 @@
-/* 通用样式 */
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 15px 0;
+  color: #666;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+
+.divider span {
+  padding: 0 10px;
+}
+
 .login-container {
-  margin: 0;
-  padding: 0;
   font-family: var(--font-family);
-  background-color: var(--bg-color);
   color: var(--text-color);
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-}
 
-
-.instructions {
-  color: var(--text-color);
-}
-
-#error {
-  color: var(--error-color);
-}
-
-button {
-  background-color: var(--primary-color);
-  border: 1px solid var(--border-color);
-}
-
-button:hover {
-  background-color: var(--hover-color);
-}
-
-.login-container {
   width: 100%;
   max-width: 500px;
   background: white;
@@ -59,7 +53,6 @@ button:hover {
   object-fit: cover; /* 保持图标比例 */
 }
 
-
 h2 {
   margin-bottom: 18px;
   font-size: 1.8rem;
@@ -70,6 +63,7 @@ form {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  margin: 16px 0px;
 }
 
 label {
@@ -79,6 +73,7 @@ label {
 }
 
 select {
+  margin: 16px 0px;
   width: 100%;
   padding: 10px 15px;
   font-size: 1rem;
@@ -104,8 +99,33 @@ button {
   transition: background 0.3s;
 }
 
-button:hover {
-  background: #0056b3;
+
+.btn-text {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: #0a66c2;            /* 改成你的主题色 */
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-text:hover { text-decoration: underline; }
+.btn-text:disabled { opacity: .5; cursor: not-allowed; }
+.inline-form { display: inline; } /* 让 button_to 表单不换行 */
+
+
+.instructions {
+  color: var(--text-color);
+}
+
+#error {
+  color: var(--error-color);
+}
+
+#login-status {
+  margin: 10px;
+  font-size: 14px;
+  font-style: italic;
 }
 
 .footer {

@@ -1,5 +1,5 @@
 # app/services/contact_service.rb
-class ContactService
+class ContactApiService
   def initialize(wx_id = nil)
     @api_service = BaseApiService.instance
     @wx_id = wx_id || BaseApiService.wx_id
@@ -9,7 +9,7 @@ class ContactService
     path = WechatApis::Contact.list
 
     response = @api_service.post(path, {
-      Wxid: @wx_id,
+      # Wxid: @wx_id,
       CurrentWxcontactSeq: current_wx_seq,
       CurrentChatRoomContactSeq: current_chatroom_seq
     })
@@ -44,8 +44,8 @@ class ContactService
 
     # 批量插入联系人，忽略已存在的
     usernames.each do |username|
-      Contact.find_or_create_by(username: username) do |contact|
-        contact.wx_id = @wx_id
+      Contact.find_or_create_by(user_name: username) do |contact|
+        contact.own_wxid = @wx_id
       end
     end
   end

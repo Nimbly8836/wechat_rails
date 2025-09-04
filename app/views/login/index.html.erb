@@ -2,23 +2,56 @@
 <!--<img width="100" height="100" src="https://img.icons8.com/hands/100/qr-code.png" alt="qr-code"/>-->
 <div class="login-container">
   <%= turbo_frame_tag "qrcode_result" do %>
+    <% if @logged_in_users.present? %>
+      <div class="form-container">
+        <h2 class="login-header">
+          <img class="login-img" src="https://img.icons8.com/hands/100/choose.png"
+               alt="choose"/>
+          已登录账号
+        </h2>
+        <div class="user-selection">
+          <select class="form-select">
+            <option value="">-- 选择已登录账号 --</option>
+            <% @logged_in_users.each do |user| %>
+              <option value="<%= user.user_name %>"><%= user.nick_name.present? ? user.nick_name : user.user_name %></option>
+            <% end %>
+          </select>
+          <button
+            id="reconnect-user-btn"
+            class="btn btn-success"
+            data-action="click->qrcode#reconnectUser">
+            使用已有账号
+          </button>
+        </div>
 
-    <h2 class="login-header">
-      <img class="login-img" src="https://img.icons8.com/hands/100/choose.png"
-           alt="choose"/>
-      选择协议
-    </h2>
+        <div class="divider">
+          <span>或</span>
+        </div>
 
-    <form action="/login" method="post" id="login-form" class="form-container">
-      <select name="protocol" id="protocol" class="qrcode-image" required>
-        <option value="" disabled selected>请选择</option>
-        <% @protocol_options.each do |protocol, label| %>
-          <option value="<%= protocol %>"><%= label %></option>
-        <% end %>
-      </select>
+        <button type="button" class="btn-text" data-action="click->example#do">
+          使用新账号登录
+        </button>
+      </div>
+    <% else %>
+      <h2 class="login-header">
+        <img class="login-img" src="https://img.icons8.com/hands/100/choose.png"
+             alt="choose"/>
+        选择协议
+      </h2>
 
-      <button type="submit" class="btn-primary">确定</button>
-    </form>
+      <form action="/login" method="post" id="login-form" class="form-container">
+        <select name="protocol" id="protocol" class="qrcode-image" required>
+          <option value="" disabled selected>请选择</option>
+          <% @protocol_options.each do |protocol, label| %>
+            <option value="<%= protocol %>"><%= label %></option>
+          <% end %>
+        </select>
+
+        <button type="submit" class="btn-primary">确定</button>
+      </form>
+    <% end %>
+
   <% end %>
+
 
 </div>
