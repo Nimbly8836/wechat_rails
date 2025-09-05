@@ -24,8 +24,45 @@
 
 <body>
 <%= yield %>
-<div id="title">
-
+<!-- 错误对话框 -->
+<div id="error-dialog" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl shadow-xl w-80 p-6 text-center">
+    <h2 class="text-lg font-semibold text-red-600 mb-4">服务器错误</h2>
+    <p id="error-dialog-message" class="text-gray-700 mb-6">发生未知错误，请稍后再试。</p>
+    <button id="error-dialog-close" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
+      确定
+    </button>
+  </div>
 </div>
+
+<script>
+  // 弹窗控制方法
+  function showErrorDialog(message) {
+    const dialog = document.getElementById("error-dialog");
+    const msg = document.getElementById("error-dialog-message");
+    msg.textContent = message || "服务器错误，请稍后再试。";
+    dialog.classList.remove("hidden");
+  }
+
+  function hideErrorDialog() {
+    document.getElementById("error-dialog").classList.add("hidden");
+  }
+
+  document.getElementById("error-dialog-close").addEventListener("click", hideErrorDialog);
+
+  // 保存原始 fetch
+  const originalFetch = window.fetch;
+
+  // 全局拦截
+  window.fetch = async (...args) => {
+    const response = await originalFetch(...args);
+
+    if (!response.ok && response.status >= 500) {
+      showErrorDialog("服务器错误，请稍后再试 (错误码 " + response.status + ")");
+    }
+
+    return response;
+  };
+</script>
 </body>
 </html>

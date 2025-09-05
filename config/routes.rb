@@ -14,6 +14,7 @@ Rails.application.routes.draw do
   get "login" => "login#index"
   post "login" => "login#show_wechat_qrcode"
   post "check_login_status" => "login#check_login_status"
+  post "re-login" => "login#reconnect_user"
 
   # chat
   get "chat" => "chat#index"

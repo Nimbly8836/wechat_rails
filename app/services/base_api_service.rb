@@ -61,6 +61,12 @@ class BaseApiService
     make_request(path, params, :delete)
   end
 
+  # 处理错误并抛出异常
+  def handle_error(message, status: nil, body: nil)
+    Rails.logger.error("API调用错误: #{message}, 状态: #{status}, 响应体: #{body}")
+    raise ApiError.new(message, status: status, body: body)
+  end
+
   protected
 
   # 构建完整的URL

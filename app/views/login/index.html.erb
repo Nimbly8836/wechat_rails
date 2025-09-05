@@ -1,6 +1,6 @@
 <!--<img width="100" height="100" src="https://img.icons8.com/hands/100/sms.png" alt="sms"/>-->
 <!--<img width="100" height="100" src="https://img.icons8.com/hands/100/qr-code.png" alt="qr-code"/>-->
-<div class="login-container">
+<div class="login-container" data-controller="login">
   <%= turbo_frame_tag "qrcode_result" do %>
     <% if @logged_in_users.present? %>
       <div class="form-container">
@@ -19,8 +19,8 @@
           <button
             id="reconnect-user-btn"
             class="btn btn-success"
-            data-action="click->qrcode#reconnectUser">
-            使用已有账号
+            data-action="click->login#reLogin">
+            二次登录
           </button>
         </div>
 

@@ -55,7 +55,17 @@ class WechatLoginService
     path = WechatApis::Base.auto_heart_beat
     response = @api_service.post(path, { wxid: wxid })
     if response[:error]
-      # handle_error(response, "获取二维码失败")
+      @api_service.handle_error("自动心跳失败", body: response)
+    else
+      response
+    end
+  end
+
+  def re_login(wxid)
+    path = WechatApis::Base.re_login(wxid)
+    response = @api_service.post(path)
+    if response[:error] or !response["Success"]
+      @api_service.handle_error("二次登录失败", body: response)
     else
       response
     end
