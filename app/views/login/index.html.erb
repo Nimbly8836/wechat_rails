@@ -3,55 +3,61 @@
 <div class="login-container" data-controller="login">
   <%= turbo_frame_tag "qrcode_result" do %>
     <% if @logged_in_users.present? %>
-      <div class="form-container">
+      <div id="logged-in" class="form-container">
         <h2 class="login-header">
-          <img class="login-img" src="https://img.icons8.com/hands/100/choose.png"
-               alt="choose"/>
-          已登录账号
+          <img class="login-img" src="https://img.icons8.com/hands/100/choose.png" alt="choose"/>
+          选择账号
         </h2>
-        <div class="user-selection">
-          <select class="form-select">
-            <option value="">-- 选择已登录账号 --</option>
-            <% @logged_in_users.each do |user| %>
-              <option value="<%= user.user_name %>"><%= user.nick_name.present? ? user.nick_name : user.user_name %></option>
-            <% end %>
-          </select>
-          <button
-            id="reconnect-user-btn"
-            class="btn btn-success"
-            data-action="click->login#reLogin">
-            二次登录
-          </button>
-        </div>
+
+        <select class="form-select">
+          <option value="">选择账号</option>
+          <% @logged_in_users.each do |user| %>
+            <option value="<%= user.user_name %>"><%= user.nick_name.presence || user.user_name %></option>
+          <% end %>
+        </select>
+
+        <button id="reconnect-user-btn" class="btn btn-success" data-action="click->login#reLogin">
+          二次登录
+        </button>
 
         <div class="divider">
           <span>或</span>
         </div>
 
-        <button type="button" class="btn-text" data-action="click->example#do">
-          使用新账号登录
+        <button type="button" class="btn-text" data-action="click->login#showScanQrCode">
+          扫码登录
         </button>
       </div>
-    <% else %>
+
+    <% end %>
+    <div id="scan-login" style="display:none;">
       <h2 class="login-header">
-        <img class="login-img" src="https://img.icons8.com/hands/100/choose.png"
-             alt="choose"/>
+        <img class="login-img" src="https://img.icons8.com/hands/100/choose.png" alt="choose"/>
         选择协议
       </h2>
 
-      <form action="/login" method="post" id="login-form" class="form-container">
+      <form action="/login" method="post" id="login-form">
         <select name="protocol" id="protocol" class="qrcode-image" required>
-          <option value="" disabled selected>请选择</option>
+          <option value="" disabled selected>选择协议</option>
           <% @protocol_options.each do |protocol, label| %>
             <option value="<%= protocol %>"><%= label %></option>
           <% end %>
         </select>
 
-        <button type="submit" class="btn-primary">确定</button>
-      </form>
-    <% end %>
+        <button type="submit">确定</button>
 
-  <% end %>
+        <div class="divider">
+          <span>或</span>
+        </div>
+
+        <button type="button" class="btn-text" data-action="click->login#showScanQrCode">
+          二次登录
+        </button>
+      </form>
+    </div>
+
+
+<% end %>
 
 
 </div>

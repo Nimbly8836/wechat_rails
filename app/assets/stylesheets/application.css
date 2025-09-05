@@ -8,6 +8,7 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+@import "tailwindcss";
 
 :root {
   --bg-color: #f4f7fa; /* 背景颜色 */

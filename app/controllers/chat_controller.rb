@@ -9,7 +9,7 @@ class ChatController < ApplicationController
   def mock_contacts
     [
       {
-        id: 1,
+        id: "wxid_m5cfzdokfzre22",
         name: "张三",
         avatar_url: nil,
         last_message: {
@@ -19,7 +19,7 @@ class ChatController < ApplicationController
         unread_count: 2
       },
       {
-        id: 2,
+        id: "2",
         name: "李四",
         avatar_url: nil,
         last_message: {
@@ -29,7 +29,7 @@ class ChatController < ApplicationController
         unread_count: 0
       },
       {
-        id: 3,
+        id: "3",
         name: "王五",
         avatar_url: nil,
         last_message: {
@@ -39,7 +39,7 @@ class ChatController < ApplicationController
         unread_count: 1
       },
       {
-        id: 4,
+        id: "4",
         name: "前端开发群",
         avatar_url: nil,
         last_message: {
@@ -49,7 +49,7 @@ class ChatController < ApplicationController
         unread_count: 3
       },
       {
-        id: 5,
+        id: "5",
         name: "设计团队",
         avatar_url: nil,
         last_message: {

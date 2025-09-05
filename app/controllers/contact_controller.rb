@@ -1,7 +1,7 @@
 class ContactController < ApplicationController
   # 同步联系人
   def fetch_all_from_server
-    contact_service = ContactService.new
+    contact_service = ContactApiService.new
     contact_service.fetch_contacts
   end
 
@@ -14,7 +14,7 @@ class ContactController < ApplicationController
   end
 
   def show
-    @contact = Contact.find_by(user_name: :params[:user_name])
+    @contact = Contact.find_by(user_name: params[:user_name])
 
     if @contact
       respond_to do |format|

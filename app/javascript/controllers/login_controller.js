@@ -42,4 +42,18 @@ export default class extends Controller {
     }
 
   }
+
+  showScanQrCode() {
+    const loggedIn = this.element.querySelector("#logged-in");
+    const scanLogin = this.element.querySelector("#scan-login");
+
+    if (!loggedIn || !scanLogin) {
+      return;
+    }
+
+    const showingScan = scanLogin.style.display === "block";
+
+    loggedIn.style.display = showingScan ? "block" : "none";
+    scanLogin.style.display = showingScan ? "none" : "block";
+  }
 }

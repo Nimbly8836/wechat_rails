@@ -4,8 +4,10 @@
     <!-- 应用标题 -->
     <div class="header">
       <div class="app-name">
-        <div class="app-name-icon">T</div>
-        Telegram
+        <div class="">
+          <img width="30" height="30" src="https://img.icons8.com/hands/50/sms.png" alt="sms"/>
+        </div>
+        Wechat
       </div>
     </div>
 
@@ -21,7 +23,7 @@
     <!-- 联系人列表 -->
     <div class="contacts-list">
       <% @contacts.each do |contact| %>
-        <div class="contact-item">
+        <div class="contact-item" data-contact-id="<%= contact[:id] %>">
           <div class="avatar">
             <% if contact[:avatar_url].present? %>
               <%= image_tag contact[:avatar_url], alt: contact[:name] %>
@@ -43,12 +45,39 @@
       <% end %>
     </div>
   </div>
-  
+
   <!-- 右侧内容区 -->
   <div class="main-content">
-    <div class="welcome-screen">
-      <div class="welcome-title">欢迎使用聊天应用</div>
-      <div class="welcome-subtitle">选择一个聊天来开始对话</div>
+    <div class="chat-box" id="chat-box">
+      <div class="welcome-screen">
+        <div class="welcome-title">欢迎使用聊天应用</div>
+        <div class="welcome-subtitle">选择一个聊天来开始对话</div>
+      </div>
     </div>
   </div>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const contacts = document.querySelectorAll('.contact-item');
+    const chatBox = document.getElementById('chat-box');
+
+    contacts.forEach(contact => {
+      contact.addEventListener('click', async () => {
+        const contactId = contact.dataset.contactId;
+
+        // 移除左侧选中样式
+        contacts.forEach(c => c.classList.remove('active'));
+        contact.classList.add('active');
+
+        // 请求对应聊天内容（假设 Rails 有对应 API /chats/:id）
+        const response = await fetch(`/contact/${contactId}`);
+        const chatHtml = await response.text();
+
+        // 渲染聊天框
+        chatBox.innerHTML = chatHtml;
+      });
+    });
+  });
+
+</script>
