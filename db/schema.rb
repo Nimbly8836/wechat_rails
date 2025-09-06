@@ -10,8 +10,24 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_04_073649) do
-  create_table "contact", primary_key: "user_name", id: :string, force: :cascade do |t|
+ActiveRecord::Schema[8.0].define(version: 2025_09_06_142711) do
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "pg_catalog.plpgsql"
+
+  create_table "chat_rooms", force: :cascade do |t|
+    t.string "wx_id", null: false
+    t.string "name"
+    t.binary "avatar"
+    t.json "members", default: []
+    t.bigint "contact_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contact_id"], name: "index_chat_rooms_on_contact_id"
+  end
+
+  create_table "contacts", force: :cascade do |t|
+    t.string "user_name", null: false
+    t.string "own_wxid", null: false
     t.string "nick_name"
     t.string "py_initial"
     t.string "quan_pin"
@@ -33,8 +49,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_04_073649) do
     t.string "phone_num_list"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "own_wxid"
-    t.integer "user_type"
+    t.index ["user_name", "own_wxid"], name: "index_contacts_on_user_name_and_own_wxid", unique: true
   end
 
   create_table "login_infos", force: :cascade do |t|
@@ -47,15 +62,32 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_04_073649) do
     t.integer "status"
     t.integer "plugin_flag"
     t.integer "reg_type"
-    t.boolean "safe_device"
+    t.integer "safe_device"
     t.string "official_user_name"
     t.string "official_nick_name"
     t.integer "push_mail_status"
-    t.string "fsurl"
+    t.text "fs_url"
+    t.boolean "online"
     t.datetime "last_login_at"
-    t.boolean "is_online"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_name"], name: "index_login_infos_on_user_name", unique: true
   end
+
+  create_table "messages", force: :cascade do |t|
+    t.bigint "chat_room_id", null: false
+    t.string "from_wxid"
+    t.text "text"
+    t.string "from_user_name"
+    t.string "wx_msg_id"
+    t.string "wx_new_msg_id"
+    t.boolean "deleted", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_room_id"], name: "index_messages_on_chat_room_id"
+    t.index ["from_wxid", "wx_msg_id", "wx_new_msg_id"], name: "index_messages_on_from_wxid_and_wx_msg_id_and_wx_new_msg_id", unique: true
+  end
+
+  add_foreign_key "chat_rooms", "contacts"
+  add_foreign_key "messages", "chat_rooms"
 end

@@ -1,8 +1,7 @@
 class Contact < ApplicationRecord
-  self.primary_key = :user_name
-  self.table_name = :contact
 
   validates :user_name, presence: true
+  validates :own_wxid, presence: true
 
 
   # 获取头像

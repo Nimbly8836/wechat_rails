@@ -1,7 +1,8 @@
 class CreateContacts < ActiveRecord::Migration[8.0]
   def change
-    create_table :contact, id: false do |t|
-      t.string :user_name, null: false, primary_key: true
+    create_table :contacts do |t|
+      t.string :user_name, null: false
+      t.string :own_wxid, null: false
       t.string :nick_name
       t.string :py_initial
       t.string :quan_pin
@@ -21,8 +22,8 @@ class CreateContacts < ActiveRecord::Migration[8.0]
       t.string :province
       t.string :city
       t.string :phone_num_list
-
       t.timestamps
     end
+    add_index :contacts, [ :user_name, :own_wxid ], unique: true
   end
 end

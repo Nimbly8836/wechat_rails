@@ -29,35 +29,36 @@
         </button>
       </div>
 
+    <% else %>
+      <div id="scan-login" style="">
+        <h2 class="login-header">
+          <img class="login-img" src="https://img.icons8.com/hands/100/choose.png" alt="choose"/>
+          选择协议
+        </h2>
+
+        <form action="/login" method="post" id="login-form">
+          <select name="protocol" id="protocol" class="qrcode-image" required>
+            <option value="" disabled selected>选择协议</option>
+            <% @protocol_options.each do |protocol, label| %>
+              <option value="<%= protocol %>"><%= label %></option>
+            <% end %>
+          </select>
+
+          <button type="submit">确定</button>
+
+          <div class="divider">
+            <span>或</span>
+          </div>
+
+          <button type="button" class="btn-text" data-action="click->login#showScanQrCode">
+            二次登录
+          </button>
+        </form>
+      </div>
     <% end %>
-    <div id="scan-login" style="display:none;">
-      <h2 class="login-header">
-        <img class="login-img" src="https://img.icons8.com/hands/100/choose.png" alt="choose"/>
-        选择协议
-      </h2>
-
-      <form action="/login" method="post" id="login-form">
-        <select name="protocol" id="protocol" class="qrcode-image" required>
-          <option value="" disabled selected>选择协议</option>
-          <% @protocol_options.each do |protocol, label| %>
-            <option value="<%= protocol %>"><%= label %></option>
-          <% end %>
-        </select>
-
-        <button type="submit">确定</button>
-
-        <div class="divider">
-          <span>或</span>
-        </div>
-
-        <button type="button" class="btn-text" data-action="click->login#showScanQrCode">
-          二次登录
-        </button>
-      </form>
-    </div>
 
 
-<% end %>
+  <% end %>
 
 
 </div>

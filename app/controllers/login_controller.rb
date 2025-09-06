@@ -139,46 +139,46 @@ class LoginController < ApplicationController
         ActiveRecord::Base.connection_pool.release_connection
       end
     end
+  end
 
-    def save_current_login_user(userinfo)
-      return false if userinfo.blank?
+  def save_current_login_user(userinfo)
+    return false if userinfo.blank?
 
-      # Extract and filter only the attributes we need
-      user_data = {
-        user_name: userinfo["userName"],
-        nick_name: userinfo["nickName"],
-        bind_uin: userinfo["bindUin"],
-        bind_email: userinfo["bindEmail"],
-        bind_mobile: userinfo["bindMobile"],
-        alias: userinfo["alias"],
-        status: userinfo["status"],
-        plugin_flag: userinfo["pluginFlag"],
-        reg_type: userinfo["regType"],
-        safe_device: userinfo["safeDevice"],
-        official_user_name: userinfo["officialUserName"],
-        official_nick_name: userinfo["officialNickName"],
-        push_mail_status: userinfo["pushMailStatus"],
-        fsurl: userinfo["fsurl"],
-        last_login_at: Time.current,
-        is_online: true
-      }
+    # Extract and filter only the attributes we need
+    user_data = {
+      user_name: userinfo["userName"],
+      nick_name: userinfo["nickName"],
+      bind_uin: userinfo["bindUin"],
+      bind_email: userinfo["bindEmail"],
+      bind_mobile: userinfo["bindMobile"],
+      alias: userinfo["alias"],
+      status: userinfo["status"],
+      plugin_flag: userinfo["pluginFlag"],
+      reg_type: userinfo["regType"],
+      safe_device: userinfo["safeDevice"],
+      official_user_name: userinfo["officialUserName"],
+      official_nick_name: userinfo["officialNickName"],
+      push_mail_status: userinfo["pushMailStatus"],
+      fs_url: userinfo["fsurl"],
+      last_login_at: Time.current,
+      online: true
+    }
 
-      begin
-        login_info = LoginInfo.create(user_data)
-        if login_info.persisted?
-          Rails.logger.info("User #{login_info.user_name} successfully saved")
-          true
-        else
-          Rails.logger.error("Failed to save login info: #{login_info.errors.full_messages.join(', ')}")
-          false
-        end
-      rescue => e
-        Rails.logger.error("Error saving login info: #{e.message}")
-        Rails.logger.error(e.backtrace.join("\n"))
+    begin
+      login_info = LoginInfo.create(user_data)
+      if login_info.persisted?
+        Rails.logger.info("User #{login_info.user_name} successfully saved")
+        true
+      else
+        Rails.logger.error("Failed to save login info: #{login_info.errors.full_messages.join(', ')}")
         false
       end
-
+    rescue => e
+      Rails.logger.error("Error saving login info: #{e.message}")
+      Rails.logger.error(e.backtrace.join("\n"))
+      false
     end
 
   end
+
 end
