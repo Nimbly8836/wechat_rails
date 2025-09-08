@@ -21,6 +21,6 @@ Rails.application.routes.draw do
 
   # contact management
   get "contact" => "contact#index"
-  get "contact/:user_name" => "contact#show"
+  get "contact/:id" => "contact#show"
 
 end
