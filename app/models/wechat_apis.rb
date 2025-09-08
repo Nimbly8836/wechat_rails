@@ -71,12 +71,12 @@ module WechatApis
       "/Friend/GetContractList"
     end
 
-    def self.details(protocol)
-      "/contact/details/#{Base.get_protocol_path(protocol)}"
+    def self.details
+      "/Friend/GetContractDetail"
     end
 
-    def self.add(protocol)
-      "/contact/add/#{Base.get_protocol_path(protocol)}"
+    def self.add
+      "/"
     end
   end
 

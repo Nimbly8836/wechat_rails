@@ -1,188 +1,206 @@
+/* ===== 整体布局 ===== */
 .chat-container {
-  display: flex;
-  height: calc(100vh - 60px); /* Adjust as needed based on your layout */
-  background-color: white;
+    display: flex;
+    height: calc(100vh - 60px);
+    background-color: #fff;
 }
 
+/* 左侧 sidebar */
 .sidebar {
-  width: 330px;
-  border-right: 1px solid #e5e5e5;
-  display: flex;
-  flex-direction: column;
-  background-color: #fff;
+    width: 330px;
+    border-right: 1px solid #e5e5e5;
+    display: flex;
+    flex-direction: column;
+    background-color: #fff;
 }
 
+/* 右侧内容区 */
 .main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background-color: #f0f2f5;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #f0f2f5;
 }
 
+/* header / search / tabs 保持你现有样式（略） */
 .header {
-  height: 60px;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  background-color: #fff;
-  border-bottom: 1px solid #e5e5e5;
-}
-
-.app-name {
-  font-size: 18px;
-  font-weight: 500;
-  color: #333;
-  display: flex;
-  align-items: center;
-}
-
-.app-name-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background-color: #3390EC;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 10px;
-  font-weight: bold;
+    height: 60px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #e5e5e5;
+    background: #fff;
 }
 
 .search-bar {
-  padding: 8px 16px;
-  margin: 8px;
-  background-color: #f0f2f5;
-  border-radius: 20px;
-  border: none;
-  outline: none;
-  /*width: calc(100% - 32px);*/
+    padding: 8px 16px;
+    margin: 8px;
+    border-radius: 20px;
+    border: none;
+    outline: none;
+    background: #f0f2f5;
 }
 
 .tab-bar {
-  display: flex;
-  border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    border-bottom: 1px solid #e5e5e5;
 }
 
 .tab {
-  flex: 1;
-  padding: 16px 0;
-  text-align: center;
-  font-weight: 500;
-  cursor: pointer;
+    flex: 1;
+    padding: 16px 0;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 500;
 }
 
 .tab.active {
-  border-bottom: 2px solid #3390EC;
-  color: #3390EC;
+    border-bottom: 2px solid #3390EC;
+    color: #3390EC;
 }
 
+/* ===== list-area: 包裹滚动区 & 字母导航 ===== */
+.list-area {
+    position: relative; /* 关键：letter-nav 以此为参考定位 */
+    flex: 1;
+    min-height: 0; /* 关键：允许内部 overflow 生效 (flex 子项滚动) */
+}
+
+/* 联系人滚动区（占满 list-area） */
 .contacts-list {
-  flex: 1;
-  overflow-y: auto;
+    height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
 }
 
+/* 可选 wrapper（保持 DOM 结构清晰） */
+.contacts-wrapper {
+}
+
+/* 联系人项样式 */
 .contact-item {
-  padding: 8px 16px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  position: relative;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .contact-item:hover {
-  background-color: #f0f2f5;
+    background: #f0f2f5;
 }
 
+/* 头像 */
 .avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  margin-right: 12px;
-  background-color: #ddd;
-  overflow: hidden;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 500;
-  font-size: 20px;
-  color: #555;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin-right: 12px;
+    background: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+    font-size: 20px;
+    color: #555;
+    flex-shrink: 0;
+    overflow: hidden;
 }
 
 .avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #e0e0e0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #e0e0e0;
 }
 
+/* info */
 .contact-info {
-  flex: 1;
-  overflow: hidden;
+    flex: 1;
+    overflow: hidden;
 }
 
 .contact-name {
-  font-weight: 500;
-  margin-bottom: 4px;
+    font-weight: 500;
+    margin-bottom: 4px;
 }
 
 .last-message {
-  color: #777;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    color: #777;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.contact-meta {
-  text-align: right;
-  min-width: 50px;
+/* group header */
+.contact-group .group-header {
+    font-weight: bold;
+    padding: 6px 8px;
+    background: #f5f5f5;
 }
 
-.timestamp {
-  font-size: 12px;
-  color: #777;
-  margin-bottom: 4px;
-}
-
-.unread-count {
-  background-color: #3390EC;
-  color: white;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  margin-left: auto;
-}
-
+/* 欢迎屏（右侧聊天区）保留原样 */
 .welcome-screen {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #777;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    color: #777;
 }
 
-.welcome-title {
-  font-size: 18px;
-  margin-bottom: 16px;
-  font-weight: 500;
+/* ===== 字母导航（浮在右侧） ===== */
+.letter-nav {
+    position: absolute; /* 相对于 .list-area */
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%); /* 垂直居中 */
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 3px 4px;
+    z-index: 50; /* 保证覆盖在联系人之上 */
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    max-height: calc(100% - 16px);
+    overflow: auto; /* 若字母过多可以滚内部 */
+    -webkit-font-smoothing: antialiased;
 }
 
-.welcome-subtitle {
-  font-size: 14px;
+/* 每个字母项 */
+.letter-nav .letter {
+    padding: 4px 6px;
+    cursor: pointer;
+    font-size: 12px;
+    user-select: none;
+    border-radius: 4px;
+    line-height: 1;
+}
+
+.letter-nav .letter:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.letter-nav .letter.active {
+    color: #1c7ed6;
+    font-weight: 700;
+    background: rgba(28, 126, 214, 0.08);
+}
+
+/* 响应式：窄屏时隐藏字母导航（可按需） */
+@media (max-width: 420px) {
+    .letter-nav {
+        display: none;
+    }
 }

@@ -1,6 +1,6 @@
 <div class="chat-container">
   <!-- 左侧边栏 -->
-  <div class="sidebar">
+  <div class="sidebar" style="position: relative;">
     <!-- 应用标题 -->
     <div class="header">
       <div class="app-name">
@@ -16,34 +16,45 @@
 
     <!-- 标签栏 -->
     <div class="tab-bar">
-      <div class="tab active">消息</div>
-      <div class="tab">联系人</div>
+      <div class="tab">消息</div>
+      <div class="tab active">联系人</div>
     </div>
 
-    <!-- 联系人列表 -->
-    <div class="contacts-list">
-      <% @contacts.each do |contact| %>
-        <div class="contact-item" data-contact-id="<%= contact[:id] %>">
-          <div class="avatar">
-            <% if contact[:avatar_url].present? %>
-              <%= image_tag contact[:avatar_url], alt: contact[:name] %>
-            <% else %>
-              <div class="avatar-placeholder"><%= contact[:name].first %></div>
-            <% end %>
-          </div>
-          <div class="contact-info">
-            <div class="contact-name"><%= contact[:name] %></div>
-            <div class="last-message"><%= contact[:last_message][:content] rescue "" %></div>
-          </div>
-          <div class="contact-meta">
-            <div class="timestamp"><%= format_timestamp(contact[:last_message][:created_at]) rescue "" %></div>
-            <% if contact[:unread_count].to_i > 0 %>
-              <div class="unread-count"><%= contact[:unread_count] %></div>
-            <% end %>
-          </div>
+    <!-- 新增一个 list-area 包裹可滚动列表和字母导航 -->
+    <div class="list-area">
+      <div class="contacts-list" id="contacts-list">
+        <div class="contacts-wrapper">
+          <% @grouped_contacts.sort.each do |initial, contacts| %>
+            <div class="contact-group" id="group-<%= initial %>">
+              <div class="group-header"><%= initial %></div>
+              <% contacts.each do |contact| %>
+                <div class="contact-item" data-contact-id="<%= contact.id %>">
+                  <div class="avatar">
+                    <% if contact.avatar_url.present? %>
+                      <%= image_tag contact.avatar_url, alt: contact.display_name %>
+                    <% else %>
+                      <div class="avatar-placeholder"><%= contact.display_name %></div>
+                    <% end %>
+                  </div>
+                  <div class="contact-info">
+                    <div class="contact-name"><%= contact.display_name %></div>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
         </div>
-      <% end %>
+      </div>
+
+      <!-- letter-nav 与 contacts-list 平级，绝对定位在 list-area 右侧 -->
+      <div class="letter-nav" aria-hidden="false">
+        <% @letters.each do |letter| %>
+          <div class="letter" data-letter="<%= letter %>"><%= letter %></div>
+        <% end %>
+      </div>
     </div>
+
+
   </div>
 
   <!-- 右侧内容区 -->
@@ -58,26 +69,59 @@
 </div>
 
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const contacts = document.querySelectorAll('.contact-item');
-    const chatBox = document.getElementById('chat-box');
+    document.addEventListener('DOMContentLoaded', () => {
+        const contacts = document.querySelectorAll('.contact-item');
+        const chatBox = document.getElementById('chat-box');
 
-    contacts.forEach(contact => {
-      contact.addEventListener('click', async () => {
-        const contactId = contact.dataset.contactId;
+        contacts.forEach(contact => {
+            contact.addEventListener('click', async () => {
+                const contactId = contact.dataset.contactId;
 
-        // 移除左侧选中样式
-        contacts.forEach(c => c.classList.remove('active'));
-        contact.classList.add('active');
+                // 移除左侧选中样式
+                contacts.forEach(c => c.classList.remove('active'));
+                contact.classList.add('active');
 
-        // 请求对应聊天内容（假设 Rails 有对应 API /chats/:id）
-        const response = await fetch(`/contact/${contactId}`);
-        const chatHtml = await response.text();
+                // 请求对应聊天内容（假设 Rails 有对应 API /chats/:id）
+                const response = await fetch(`/contact/${contactId}`);
+                const chatHtml = await response.text();
 
-        // 渲染聊天框
-        chatBox.innerHTML = chatHtml;
-      });
+                // 渲染聊天框
+                chatBox.innerHTML = chatHtml;
+            });
+        });
     });
-  });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const letters = document.querySelectorAll('.letter-nav .letter');
+        const contactsList = document.getElementById('contacts-list');
+        const groups = document.querySelectorAll('.contact-group');
+
+        // 点击字母滚动到对应分组
+        letters.forEach(letter => {
+            letter.addEventListener('click', () => {
+                const initial = letter.dataset.letter;
+                const group = document.getElementById(`group-${initial}`);
+                if (group) {
+                    group.scrollIntoView({behavior: 'smooth', block: 'start'});
+                }
+            });
+        });
+
+        // 滚动监听，右侧高亮当前首字母
+        contactsList.addEventListener('scroll', () => {
+            let currentInitial = '#';
+            groups.forEach(group => {
+                const rect = group.getBoundingClientRect();
+                if (rect.top - contactsList.getBoundingClientRect().top <= 10) {
+                    currentInitial = group.id.replace('group-', '');
+                }
+            });
+
+            letters.forEach(letter => {
+                letter.classList.toggle('active', letter.dataset.letter === currentInitial);
+            });
+        });
+    });
+
 
 </script>

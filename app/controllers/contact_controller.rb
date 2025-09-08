@@ -6,7 +6,7 @@ class ContactController < ApplicationController
   end
 
   def index
-    @contacts = Contact.all.order(:username)
+    @contacts = Contact.all.order(:user_name)
     respond_to do |format|
       format.html
       format.json { render json: @contacts }
@@ -14,15 +14,18 @@ class ContactController < ApplicationController
   end
 
   def show
-    @contact = Contact.find_by(user_name: params[:user_name])
+    @contact = Contact.find_by(id: params[:id])
 
     if @contact
       respond_to do |format|
-        format.html
-        format.json { render json: @contact }
+        format.html # Rails 会去 app/views/contact/show.html.erb 渲染
+        format.json { render json: @contact.attributes }
       end
     else
-      render json: { error: "联系人不存在" }, status: :not_found
+      respond_to do |format|
+        format.html { render plain: "联系人不存在", status: :not_found }
+        format.json { render json: { error: "联系人不存在" }, status: :not_found }
+      end
     end
   end
 

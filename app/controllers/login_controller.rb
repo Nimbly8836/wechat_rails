@@ -77,7 +77,7 @@ class LoginController < ApplicationController
       @api_service.auto_heart_beat(wx_id)
       # 保存当前登录用户
       save_current_login_user(response&.dig("Data", "acctSectResp"))
-      # 异步获取联系人列表，这里只有id，后续可以按照需要去加载信息
+      # 异步获取联系人列表
       fetch_contacts_in_background(wx_id)
     end
 
@@ -111,6 +111,8 @@ class LoginController < ApplicationController
     end
     @api_service.set_wx_id(login_info.user_name)
     @api_service.auto_heart_beat(login_info.user_name)
+    # 异步获取联系人列表
+    fetch_contacts_in_background(user_name)
 
     # 更新用户状态
     login_info.mark_as_online!
@@ -132,6 +134,7 @@ class LoginController < ApplicationController
       begin
         contact_service = ContactApiService.new(wx_id)
         contact_service.fetch_contacts
+        contact_service.sync_contacts_for_init
       rescue => e
         Rails.logger.error("获取联系人失败: #{e.message}")
         Rails.logger.error(e.backtrace.join("\n"))
