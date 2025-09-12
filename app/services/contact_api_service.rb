@@ -46,11 +46,11 @@ class ContactApiService
       contacts = response.dig("Data", "ContactList") || []
 
       contacts.each do |c|
-        next if c["UserName"].present?
+        next if c.dig("UserName", "string").blank?
         attrs = parse_contact_data(c)
 
-        # 只更新这一批的数据
-        relation.where(user_name: attrs[:user_name]).update_all(attrs.merge(updated_at: Time.current))
+        # 直接更新
+        relation.where(user_name: attrs[:user_name]).update(attrs.merge(updated_at: Time.current))
       end
     end
 

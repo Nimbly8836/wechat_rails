@@ -18,39 +18,42 @@ default: &default
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  username: wechat_rails
-  password: wechat_rails_password
-  host: 198.51.100.20
-  port: 35432
+#  username: wechat_rails
+#  password: wechat_rails_password
+#  host: 198.51.100.20
+#  port: 35432
+  url: <%= Rails.application.credentials.dig(:development, :database, :url) %>
+
 
 
 
 development:
   <<: *default
-  database: wechat_rails_development
+#  database: wechat_rails_development
+  url: <%= Rails.application.credentials.dig(:development, :database, :url) %>
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.
   # When left blank, PostgreSQL will use the default role. This is
   # the same name as the operating system user running Rails.
-  username: wechat_rails
+#  username: wechat_rails
 
   # The password associated with the PostgreSQL role (username).
-  password: wechat_rails_password
+#  password: wechat_rails_password
 
   # Connect on a TCP socket. Omitted by default since the client uses a
   # domain socket that doesn't need configuration. Windows does not have
   # domain sockets, so uncomment these lines.
-  host: 198.51.100.20
+#  host: 198.51.100.20
 
   # The TCP port the server listens on. Defaults to 5432.
   # If your server runs on a different port number, change accordingly.
-  port: 35432
+#  port: 35432
 
   # Schema search path. The server defaults to $user,public
   #schema_search_path: myapp,sharedapp,public
 
-  # Minimum log levels, in increasing order:
+  # Minimum log levels, in increasing order:q
   #   debug5, debug4, debug3, debug2, debug1,
   #   log, notice, warning, error, fatal, and panic
   # Defaults to warning.

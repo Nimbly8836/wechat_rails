@@ -1,9 +1,57 @@
-<h1>联系人信息</h1>
+<div class="
+items-center
+max-w-md
+mx-auto
+mt-40
+ bg-white
+ rounded-2xl
+shadow-lg
+relative
+overflow-hidden"
+     data-controller="contact"
+>
+  <!-- 上半部分：头像 + 基础信息 -->
+  <div class="p-6 text-center border-b">
+    <% if @contact.big_head_img_url.present? %>
+      <img src="<%= @contact.big_head_img_url %>"
+           alt="<%= @contact.nick_name %>"
+           class="w-24 h-24 mx-auto rounded-full border-4 border-white shadow-md"/>
+    <% else %>
+      <div class="w-24 h-24 mx-auto flex items-center justify-center rounded-full bg-gray-200 text-2xl font-bold text-gray-600 shadow-md">
+        <%= @contact.nick_name.to_s.first || "?" %>
+      </div>
+    <% end %>
 
-<p><strong>用户名:</strong> <%= @contact.user_name %></p>
-<p><strong>昵称:</strong> <%= @contact.nick_name.presence || "未设置" %></p>
-<p><strong>拼音首字母:</strong> <%= @contact.py_initial %></p>
-<p><strong>全拼:</strong> <%= @contact.quan_pin %></p>
-<p><strong>性别:</strong> <%= @contact.sex %></p>
-<p><strong>地区:</strong> <%= @contact.province %> <%= @contact.city %></p>
-<p><strong>签名:</strong> <%= @contact.signature %></p>
+    <h2 class="mt-4 text-2xl font-semibold text-gray-800">
+      <%= @contact.nick_name.presence || "未设置昵称" %>
+    </h2>
+    <p class="text-sm text-gray-500">用户名: <%= @contact.user_name %></p>
+    <p class="text-sm text-gray-500"><%= @contact.country %> <%= @contact.city %></p>
+    <p class="mt-2 text-gray-600 text-sm italic"><%= @contact.signature.presence || "这个人很神秘，什么都没有写" %></p>
+  </div>
+
+  <!-- 浮动按钮 -->
+  <div class="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+    <%= link_to "💬 发起聊天", chat_path(@contact),
+                class: "px-6 py-2 bg-blue-500 text-white font-medium rounded-full shadow hover:bg-blue-600 transition" %>
+  </div>
+
+  <!-- 折叠详情 -->
+  <div class="pt-12 pb-6 px-6">
+    <button type="button"
+            data-action="click->contact#toggleDetails"
+            class="w-screen text-center text-sm text-gray-600 hover:text-gray-400 transition">
+      查看更多信息 ▾
+    </button>
+
+    <div data-contact-target="details" class="mt-4 hidden space-y-2 text-sm text-gray-700">
+      <p><strong>拼音首字母:</strong> <%= @contact.py_initial %></p>
+      <p><strong>全拼:</strong> <%= @contact.quan_pin %></p>
+      <p><strong>性别:</strong> <%= @contact.sex %></p>
+      <p><strong>备注:</strong> <%= @contact.remark %></p>
+      <p><strong>别名:</strong> <%= @contact.alias %></p>
+      <p><strong>手机号:</strong> <%= @contact.phone_num_list %></p>
+      <p><strong>标签:</strong> <%= @contact.label_list %></p>
+    </div>
+  </div>
+</div>
