@@ -86,7 +86,7 @@ select:focus {
   border-color: #0076df;
 }
 
-button {
+.btn {
   width: 100%;
   padding: 12px 20px;
   background: #0076df;

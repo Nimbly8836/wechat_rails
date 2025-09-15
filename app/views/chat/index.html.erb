@@ -1,51 +1,63 @@
-<div class="chat-container" data-controller="chat">
-  <!-- 左侧边栏 -->
-  <div class="sidebar" style="position: relative;">
-    <!-- 应用标题 -->
-    <div class="header">
-      <div class="app-name">
-        <div class="">
-          <img width="30" height="30" src="https://img.icons8.com/hands/50/sms.png" alt="sms"/>
-        </div>
-        Wechat
+<div class="flex h-[calc(100vh-60px)] bg-white" data-controller="chat">
+  <!-- 左侧 sidebar -->
+  <div id="sidebar"
+       class="flex flex-col min-w-[250px] max-w-[500px] w-[330px] border-r border-gray-200 bg-white relative">
+    <!-- header -->
+    <div class="flex items-center h-[60px] px-4 border-b border-gray-200 bg-white">
+      <div class="flex items-center space-x-2 font-medium">
+        <img width="30" height="30" src="https://img.icons8.com/hands/50/sms.png" alt="sms"/>
+        <span>Wechat</span>
       </div>
     </div>
 
     <!-- 搜索栏 -->
-    <input type="text" class="search-bar" placeholder="搜索联系人或搜索消息...">
+    <input type="text"
+           class="m-2 rounded-full border-none bg-gray-100 px-4 py-2 outline-none"
+           placeholder="搜索联系人或搜索消息...">
 
-    <!-- 标签栏 -->
-    <div class="tab-bar">
-      <div class="tab">消息</div>
-      <div class="tab active">联系人</div>
+    <!-- tab 栏 -->
+    <div class="flex border-b border-gray-200">
+      <div data-active="false"
+           class="flex-1 py-4 text-center font-medium cursor-pointer
+                  data-[active=true]:border-b-2 data-[active=true]:border-blue-500 data-[active=true]:text-blue-500"
+           data-action="click->chat#switchTab"
+           data-tab="messages">
+        消息
+      </div>
+      <div data-active="true"
+           class="flex-1 py-4 text-center font-medium cursor-pointer
+                  data-[active=true]:border-b-2 data-[active=true]:border-blue-500 data-[active=true]:text-blue-500"
+           data-action="click->chat#switchTab"
+           data-tab="contacts">
+        联系人
+      </div>
     </div>
 
-    <!-- 新增一个 list-area 包裹可滚动列表和字母导航 -->
-    <div class="list-area">
-      <div class="contacts-list"
-           id="contacts-list"
+    <!-- list-area -->
+    <div class="relative flex-1 min-h-0 contacts-list">
+      <!-- 联系人滚动区 -->
+      <div id="contacts-list"
+           class="h-full overflow-y-auto"
            data-chat-target="contactsList"
            data-action="scroll->chat#highlightLetter">
-        <div class="contacts-wrapper">
+        <div>
           <% @grouped_contacts.sort.each do |initial, contacts| %>
-            <div class="contact-group"
-                 id="group-<%= initial %>"
-                 data-chat-target="group">
-              <div class="group-header"><%= initial %></div>
+            <div id="group-<%= initial %>" data-chat-target="group">
+              <div class="px-2 py-1 font-bold bg-gray-100"><%= initial %></div>
               <% contacts.each do |contact| %>
-                <div class="contact-item"
+                <div class="flex items-center px-4 py-2 cursor-pointer border-b border-gray-100 hover:bg-gray-100"
                      data-contact-id="<%= contact.id %>"
                      data-chat-target="contact"
                      data-action="click->chat#selectContact">
-                  <div class="avatar">
+                  <div class="flex items-center justify-center w-12 h-12 mr-3 rounded-full bg-gray-300 text-gray-600 text-lg font-medium overflow-hidden flex-shrink-0">
                     <% if contact.avatar_url.present? %>
-                      <%= image_tag contact.avatar_url, alt: contact.display_name %>
+                      <%= image_tag contact.avatar_url, class: "w-full h-full object-cover", alt: contact.display_name %>
                     <% else %>
-                      <div class="avatar-placeholder"><%= contact.display_name %></div>
+                      <%= contact.display_name %>
                     <% end %>
                   </div>
-                  <div class="contact-info">
-                    <div class="contact-name"><%= contact.display_name %></div>
+                  <div class="flex-1 overflow-hidden">
+                    <div class="font-medium truncate"><%= contact.display_name %></div>
                   </div>
                 </div>
               <% end %>
@@ -54,24 +66,37 @@
         </div>
       </div>
 
-      <div class="letter-nav" aria-hidden="false">
+      <!-- 字母导航 -->
+      <div class="absolute
+            right-2 top-1/2 -translate-y-1/2 flex flex-col items-center justify-center
+            gap-1 px-1 py-1 bg-white/85 rounded-md shadow-md z-50 antialiased sm:flex
+            overflow-hidden"
+           aria-hidden="false"
+           id="letter-nav">
         <% @letters.each do |letter| %>
-          <div class="letter"
+          <div class="letter px-1.5 py-0.5 text-xs cursor-pointer select-none rounded
+          hover:bg-black/5"
                data-letter="<%= letter %>"
                data-chat-target="letter"
-               data-action="click->chat#scrollToGroup"><%= letter %></div>
+               data-action="click->chat#scrollToGroup">
+            <%= letter %>
+          </div>
         <% end %>
       </div>
     </div>
   </div>
+
+  <!-- 拖拽分隔线 -->
+  <div id="resizer"
+       class="w-1 cursor-col-resize bg-gray-200 hover:bg-gray-400"
+       data-action="mousedown->chat#startResize"></div>
+
   <!-- 右侧内容区 -->
-  <div class="main-content">
-    <div class="chat-box"
-         id="chat-box"
-         data-chat-target="chatBox">
-      <div class="welcome-screen">
-        <div class="welcome-title">欢迎使用聊天应用</div>
-        <div class="welcome-subtitle">选择一个聊天来开始对话</div>
+  <div class="flex flex-col flex-1 bg-gray-100">
+    <div id="chat-box" class="flex-1" data-chat-target="chatBox">
+      <div class="flex flex-col items-center justify-center flex-1 text-gray-500">
+        <div class="text-lg font-medium">欢迎使用聊天应用</div>
+        <div class="text-sm">选择一个聊天来开始对话</div>
       </div>
     </div>
   </div>
