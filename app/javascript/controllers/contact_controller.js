@@ -8,7 +8,12 @@ export default class extends Controller {
     // 按钮文字切换
     event.currentTarget.textContent =
         this.detailsTarget.classList.contains("hidden")
-            ? "查看更多信息 ▾"
+            ? "查看更多 ▾"
             : "收起信息 ▴"
+  }
+
+
+  toChatRoom(contact) {
+    console.log("toChatRoom")
   }
 }

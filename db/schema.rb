@@ -14,11 +14,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_06_142711) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
-# Could not dump table "chat_rooms" because of following ActiveRecord::ConnectionFailed
-#   PQconsumeInput() server closed the connection unexpectedly
-	This probably means the server terminated abnormally
-	before or while processing the request.
-
+  create_table "chat_rooms", force: :cascade do |t|
+    t.string "wx_id", null: false
+    t.string "name"
+    t.binary "avatar"
+    t.json "members", default: []
+    t.bigint "contact_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contact_id"], name: "index_chat_rooms_on_contact_id"
+  end
 
   create_table "contacts", force: :cascade do |t|
     t.string "user_name", null: false

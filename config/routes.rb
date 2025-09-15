@@ -23,4 +23,9 @@ Rails.application.routes.draw do
   get "contact" => "contact#index"
   get "contact/:id" => "contact#show"
 
+  # chat room management
+  get "chat_room" => "chat_room#list"
+  get "chat_room/:id" => "chat_room#show"
+  post "chat_room/:contact_id" => "chat_room#create"
+
 end
