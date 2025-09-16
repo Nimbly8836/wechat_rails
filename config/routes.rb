@@ -24,8 +24,15 @@ Rails.application.routes.draw do
   get "contact/:id" => "contact#show"
 
   # chat room management
-  get "chat_room" => "chat_room#list"
-  get "chat_room/:id" => "chat_room#show"
-  post "chat_room/:contact_id" => "chat_room#create"
+  resources :chat_room do
+    resources :messages, only: [:index, :create]
+    collection do
+      get :list
+    end
+  end
+
+  post "message/callback/:wxid" => "messages#callback"
+
+  mount ActionCable.server => '/cable'
 
 end
