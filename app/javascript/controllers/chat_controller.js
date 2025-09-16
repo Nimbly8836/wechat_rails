@@ -1,5 +1,4 @@
 import {Controller} from "@hotwired/stimulus"
-
 // Connects to data-controller="chat"
 export default class extends Controller {
   static targets = ["chatBox", "contact", "letter", "contactsList", "group"]
@@ -88,6 +87,69 @@ export default class extends Controller {
       tab.dataset.active = "false"
     })
     clicked.dataset.active = "true"
+
+    // tab 切换显示/隐藏容器
+    const messageList = document.getElementById("message-list")
+    const contactsList = document.getElementById("contacts-list")
+    if (clicked.dataset.tab === "messages") {
+      messageList.classList.remove("hidden")
+      contactsList.classList.add("hidden")
+      // 拉取消息
+      fetch(`/chat_room/list`)
+          .then(resp => resp.json())
+          .then(chatRooms => {
+            const chatRoomList = document.getElementById("chat-room-list")
+            if (chatRooms.length === 0) {
+              chatRoomList.innerHTML = '<div class="text-gray-400 text-center py-8">暂无会话</div>'
+            } else {
+              chatRoomList.innerHTML = chatRooms.map(room =>
+                `<div class="flex items-center px-4 py-2 cursor-pointer border-b border-gray-100 hover:bg-gray-100"
+                     data-chat-room-id="${room.id}"
+                     onclick="window.dispatchEvent(new CustomEvent('open-chat-room',{detail:{id:${room.id}}}))">
+                  <div class="flex items-center justify-center w-12 h-12 mr-3 rounded-full bg-gray-300 text-gray-600 text-lg font-medium overflow-hidden flex-shrink-0">
+                    ${room.avatar_base64 ? `<img src='data:image/png;base64,${room.avatar_base64}' class='w-full h-full object-cover' alt='avatar'/>` : `<span>?</span>`}
+                  </div>
+                  <div class="flex-1 overflow-hidden">
+                    <div class="font-medium truncate">${room.name || '未命名会话'}</div>
+                    <div class="text-xs text-gray-500">ID: ${room.id} | 联系人ID: ${room.contact_id}</div>
+                  </div>
+                </div>`
+              ).join('')
+            }
+          })
+
+            // 监听点击事件，加载聊天界面
+            window.addEventListener('open-chat-room', (e) => {
+              const chatRoomId = e.detail.id
+              fetch(`/chat_room/${chatRoomId}`)
+                .then(resp => resp.text())
+                .then(html => {
+                  document.getElementById('chat-box').innerHTML = html
+                  // 拉取历史消息
+                  fetch(`/chat_room/${chatRoomId}/messages`)
+                    .then(resp => resp.json())
+                    .then(messages => {
+                      const list = document.getElementById("chat-message-list")
+                      if (list) {
+                        list.innerHTML = ''
+                        messages.forEach(msg => {
+                          const div = document.createElement("div")
+                          div.className = "py-1"
+                          div.innerHTML = `<span class='font-bold'>${msg.from_user_name}：</span>${msg.text}<span class='text-xs text-gray-400 ml-2'>${msg.created_at.replace('T',' ').slice(0,19)}</span>`
+                          list.appendChild(div)
+                        })
+                        list.scrollTop = list.scrollHeight
+                      }
+                    })
+                  // 订阅 Action Cable
+                  // this.subscribeToRoom(chatRoomId)
+                })
+            })
+    } else {
+      messageList.classList.add("hidden")
+      contactsList.classList.remove("hidden")
+    }
   }
+
 
 }

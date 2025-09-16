@@ -12,6 +12,7 @@ shadow-lg
 relative
 overflow-hidden"
      data-controller="contact"
+     data-contact-contact-value="<%= @contact.to_json %>"
 >
   <!-- 上半部分：头像 + 基础信息 -->
   <div class="p-6 text-center">
@@ -36,7 +37,7 @@ overflow-hidden"
   <!-- 浮动按钮 -->
   <div class="text-center">
     <button type="button"
-            data-action="click->contact#toggleDetails"
+            data-action="click->contact#toChatRoom"
             class="bg-transparent
             text-center
             hover:bg-blue-500 t
@@ -71,6 +72,7 @@ overflow-hidden"
     </button>
 
     <div data-contact-target="details" class="mt-4 hidden space-y-2 text-sm text-gray-700">
+      <p><strong>拼音首字母:</strong> <%= @contact.id %></p>
       <p><strong>拼音首字母:</strong> <%= @contact.py_initial %></p>
       <p><strong>全拼:</strong> <%= @contact.quan_pin %></p>
       <p><strong>性别:</strong> <%= @contact.sex %></p>
