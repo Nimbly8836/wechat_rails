@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_16_063149) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_17_054550) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -76,18 +76,32 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_16_063149) do
 
   create_table "messages", force: :cascade do |t|
     t.bigint "chat_room_id", null: false
-    t.string "from_wxid"
-    t.text "text"
-    t.string "from_user_name"
-    t.string "wx_msg_id"
-    t.string "wx_new_msg_id"
-    t.boolean "deleted", default: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "wx_messages_id"
     t.index ["chat_room_id"], name: "index_messages_on_chat_room_id"
-    t.index ["from_wxid", "wx_msg_id", "wx_new_msg_id"], name: "index_messages_on_from_wxid_and_wx_msg_id_and_wx_new_msg_id", unique: true
+    t.index ["wx_messages_id"], name: "index_messages_on_wx_messages_id"
+  end
+
+  create_table "wx_messages", force: :cascade do |t|
+    t.bigint "msg_id"
+    t.bigint "new_msg_id"
+    t.bigint "msg_seq"
+    t.datetime "msg_create_time", precision: nil
+    t.integer "status"
+    t.integer "msg_type"
+    t.string "from_user_name"
+    t.string "to_user_name"
+    t.text "content"
+    t.integer "img_status"
+    t.text "msg_source"
+    t.string "push_content"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["msg_id", "new_msg_id", "msg_seq"], name: "index_wx_messages_on_msg_id_and_new_msg_id_and_msg_seq", unique: true
   end
 
   add_foreign_key "chat_rooms", "contacts"
   add_foreign_key "messages", "chat_rooms"
+  add_foreign_key "messages", "wx_messages", column: "wx_messages_id"
 end

@@ -47,7 +47,7 @@ class BaseApiService
 
   # 发送POST请求
   def post(path, params = {})
-    params_with_wxid = params.merge({ Wxid: @@wx_id })
+    params_with_wxid = { Wxid: @@wx_id }.merge(params.compact)
     make_request(path, params_with_wxid, :post)
   end
 

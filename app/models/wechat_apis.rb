@@ -63,6 +63,10 @@ module WechatApis
     def self.history(protocol)
       "/message/history/#{Base.get_protocol_path(protocol)}"
     end
+
+    def self.sync
+      "/Msg/Sync"
+    end
   end
 
   # 联系人相关API路径

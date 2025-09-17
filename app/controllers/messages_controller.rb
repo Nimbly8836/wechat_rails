@@ -21,11 +21,18 @@ class MessagesController < ApplicationController
   end
 
   def callback
-    # 主动去同步消息
+    # 收到回掉消息才去主动去同步消息
     if params[:wxid].present?
-
+      message_api_service = MessageApiService.new(params[:wxid])
+      response = message_api_service.sync_messages(params[:wxid])
+      unless response["Success"]
+        render json: response and return
+      end
+      saves = WechatModels::SyncMessageModel.parse_saves(response)
+      render json: {"save_number": saves.length, "error": false, "message": "success"}
     end
   end
+
   private
 
   def message_params
