@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 class WxMessage < ApplicationRecord
-  has_many :messages, -> { order(created_at: :desc) }
+  has_many :messages, -> { order(message_time: :desc) }
 
   def self.save_to_chat_room(messages)
     messages.map do |message|
-      Message.new()
+      Message.new({})
     end
 
   end

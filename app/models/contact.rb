@@ -1,5 +1,5 @@
 class Contact < ApplicationRecord
-
+  has_many :chat_rooms, foreign_key: :contact_id
   validates :user_name, presence: true
   validates :own_wxid, presence: true
 
