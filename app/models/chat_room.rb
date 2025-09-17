@@ -1,4 +1,6 @@
 class ChatRoom < ApplicationRecord
+  belongs_to :contact
+  has_many :messages, -> { order(message_time: :desc) }
 
   def avatar_base64
     if self.avatar.present?

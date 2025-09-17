@@ -1,13 +1,19 @@
-<div class="flex flex-col h-full w-full bg-white rounded-lg shadow p-4">
+<div class="flex flex-col h-full w-full bg-white rounded-lg shadow p-4" data-controller="chat_room"
+     data-chat_room-current-wxid-value="wxid_rmsckjea5cun22">
+  <!-- 聊天头部 -->
   <div class="flex items-center mb-4">
     <div class="w-10 h-10 rounded-full bg-gray-200 mr-3"></div>
     <div class="font-bold text-lg">聊天窗口</div>
   </div>
-  <div class="flex-1 overflow-y-auto mb-4" id="chat-message-list">
-    <div class="text-gray-400 text-center py-8">暂无消息</div>
+
+  <!-- 消息列表 -->
+  <div class="flex-1 overflow-y-auto mb-4 flex flex-col gap-2" data-chat_room-target="messageList">
+    <div class="text-gray-400 text-center py-8" data-chat_room-target="emptyMessage">暂无消息</div>
   </div>
+
+  <!-- 输入区 -->
   <div class="flex items-center border-t pt-2">
-    <input type="text" class="flex-1 border rounded-full px-4 py-2 mr-2" placeholder="输入消息..."/>
-    <button class="bg-blue-500 text-white px-4 py-2 rounded-full">发送</button>
+    <input type="text" class="flex-1 border rounded-full px-4 py-2 mr-2" placeholder="输入消息..." data-chat_room-target="input"/>
+    <button class="bg-blue-500 text-white px-4 py-2 rounded-full" data-action="click->chat_room#sendMessage">发送</button>
   </div>
 </div>
