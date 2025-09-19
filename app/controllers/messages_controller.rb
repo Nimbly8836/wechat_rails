@@ -14,17 +14,16 @@ class MessagesController < ApplicationController
   end
 
   def create
-    message = Message.create!(message_params)
-    ActionCable.server.broadcast(
-      "chat_room_#{message.chat_room_id}",
-      {
-        id: message.id,
-        text: message.text,
-        from_user_name: message.from_user_name,
-        created_at: message.created_at.strftime("%Y-%m-%d %H:%M:%S")
-      }
+    args = send_message_params
+    chat_room = ChatRoom.includes(:contact).find(args[:chat_room_id])
+    sender = MessageSender.new(
+      chat_room,
+      args[:msg_type],
+      args[:content],
+      args[:extra],
     )
-    render json: message
+    res = sender.send
+    render json: { success: true, result: res }
   end
 
   def callback
@@ -44,8 +43,11 @@ class MessagesController < ApplicationController
 
   private
 
-  def message_params
-    params.require(:message).permit(:chat_room_id, :from_user_name, :text)
+  def send_message_params
+    params.require(:chat_room_id)
+    params.require(:msg_type)
+    params.require(:content)
+    params.permit(:chat_room_id, :msg_type, :content, :extra)
   end
 
   def save_to_chat_room_message(wx_messages, owner_wxid)

@@ -51,6 +51,7 @@ class WechatLoginService
     end
   end
 
+  # 自动心跳，自动二次登录
   def auto_heart_beat(wxid)
     path = WechatApis::Base.auto_heart_beat
     response = @api_service.post(path, { wxid: wxid })

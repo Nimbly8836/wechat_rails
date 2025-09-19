@@ -8,11 +8,18 @@ class MessageApiService
 
   def sync_messages(wxid)
     path = WechatApis::Message.sync
-    @api_service.post(path, {
-      "Scene": 0,
-      "Synckey": "",
-      "Wxid": wxid,
-    })
+    params = WechatRequest::Message::Sync.new(wxid: wxid).to_h
+    @api_service.post(path, params)
+  end
+
+  def send_text(to_wxid, content, at)
+    path = WechatApis::Message.send_text
+    params = WechatRequest::Message::SendText.new(wxid: @wx_id,
+                                                  at: at,
+                                                  content: content,
+                                                  toWxid: to_wxid).to_h
+
+    @api_service.post(path, params)
   end
 
 end
