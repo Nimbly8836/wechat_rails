@@ -92,9 +92,11 @@ export default class extends Controller {
     // tab 切换显示/隐藏容器
     const messageList = document.getElementById("message-list")
     const contactsList = document.getElementById("contacts-list")
+    const letterNav = document.getElementById("letter-nav")
     if (clicked.dataset.tab === "messages") {
       messageList.classList.remove("hidden")
       contactsList.classList.add("hidden")
+      letterNav.hidden = true
       // 拉取消息
       fetch(`/chat_room/list`)
           .then(resp => resp.json())
@@ -135,6 +137,7 @@ export default class extends Controller {
     } else {
       messageList.classList.add("hidden")
       contactsList.classList.remove("hidden")
+      letterNav.hidden = false
     }
   }
 
