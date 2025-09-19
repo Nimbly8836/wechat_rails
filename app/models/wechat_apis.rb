@@ -52,21 +52,18 @@ module WechatApis
 
   # 消息相关API路径
   module Message
-    def self.send(protocol)
-      "/message/send/#{Base.get_protocol_path(protocol)}"
-    end
 
-    def self.receive(protocol)
-      "/message/receive/#{Base.get_protocol_path(protocol)}"
-    end
-
-    def self.history(protocol)
-      "/message/history/#{Base.get_protocol_path(protocol)}"
+    def self.revoke
+      "/Msg/Revoke"
     end
 
     def self.sync
       "/Msg/Sync"
     end
+
+    def self.send_text
+      "/Msg/SendTxt"
+      end
   end
 
   # 联系人相关API路径

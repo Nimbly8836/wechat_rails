@@ -10,6 +10,7 @@ export default class extends Controller {
     this.startWidth = 0
     this.minWidth = 250
     this.maxWidth = 500
+    this.eventListenerAdded = false
   }
 
   // 点击联系人
@@ -118,33 +119,19 @@ export default class extends Controller {
             }
           })
 
-            // 监听点击事件，加载聊天界面
-            window.addEventListener('open-chat-room', (e) => {
-              const chatRoomId = e.detail.id
-              fetch(`/chat_room/${chatRoomId}`)
-                .then(resp => resp.text())
-                .then(html => {
-                  document.getElementById('chat-box').innerHTML = html
-                  // 拉取历史消息
-                  fetch(`/chat_room/${chatRoomId}/messages`)
-                    .then(resp => resp.json())
-                    .then(messages => {
-                      const list = document.getElementById("chat-message-list")
-                      if (list) {
-                        list.innerHTML = ''
-                        messages.forEach(msg => {
-                          const div = document.createElement("div")
-                          div.className = "py-1"
-                          div.innerHTML = `<span class='font-bold'>${msg.from_user_name}：</span>${msg.text}<span class='text-xs text-gray-400 ml-2'>${msg.created_at.replace('T',' ').slice(0,19)}</span>`
-                          list.appendChild(div)
-                        })
-                        list.scrollTop = list.scrollHeight
-                      }
-                    })
-                  // 订阅 Action Cable
-                  // this.subscribeToRoom(chatRoomId)
-                })
-            })
+            // 添加事件监听器，在右侧显示聊天界面
+            if (!this.eventListenerAdded) {
+              window.addEventListener('open-chat-room', (e) => {
+                const chatRoomId = e.detail.id
+                fetch(`/chat_room/${chatRoomId}`)
+                  .then(resp => resp.text())
+                  .then(html => {
+                    const chatBox = document.getElementById('chat-box')
+                    chatBox.innerHTML = html
+                  })
+              })
+              this.eventListenerAdded = true
+            }
     } else {
       messageList.classList.add("hidden")
       contactsList.classList.remove("hidden")
