@@ -29,7 +29,8 @@ export default class extends Controller {
       return;
     }
 
-    this.messageListTarget.innerHTML = "";
+    const container = this.messageListTarget
+    container.innerHTML = "";
 
     if (this.messages.length === 0) {
       if (this.hasEmptyMessageTarget) {
@@ -37,31 +38,52 @@ export default class extends Controller {
       }
       return;
     }
-
     if (this.hasEmptyMessageTarget) {
       this.emptyMessageTarget.style.display = "none";
     }
 
-    console.log("renderMessages", this.messages)
+    let lastSender = null;
+    let debugCount = 0;
     this.messages.forEach(m => {
       const msg = m.wx_message;
-      const isMine = msg.from_user_name === this.currentWxidValue;
-      const wrapper = document.createElement("div");
-      wrapper.className = `flex ${isMine ? "justify-end" : "justify-start"}`;
-      wrapper.innerHTML = `
-        <div class="max-w-xs break-words px-4 py-2 rounded-lg ${isMine
-          ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"}">
-          ${msg.content}
-          <div class="text-xs mt-1 text-gray-500 text-right">
-          ${new Date(m.message_time).toLocaleString("zh-Hans-CN")}
-          </div>
-        </div>
-      `;
-      this.messageListTarget.appendChild(wrapper);
-    });
+      const sender = msg.from_user_name || msg.from_wxid || null
 
-    // 滚动到底部
-    this.messageListTarget.scrollTop = this.messageListTarget.scrollHeight;
+      const isMine = msg.msg_type === "self_send"
+
+      const isNewGroup = lastSender !== null && lastSender !== sender;
+      lastSender = sender;
+
+      // 每行：左右对齐 + 底对齐
+      const row = document.createElement("div")
+      row.className = `w-full flex ${isMine ? "justify-end"
+          : "justify-start"} ${isNewGroup ? "mt-3" : "mt-1"} items-end`
+
+      // 气泡
+      const bubble = document.createElement("div")
+      bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${isMine
+          ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
+          : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"}`
+
+      // 文本内容，预留时间空间
+      const content = document.createElement("div")
+      content.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words"
+      content.textContent = msg.content || msg.text || ""
+
+      // 时间
+      const time = document.createElement("span")
+      time.className = `absolute bottom-1 right-2 text-[10px] leading-[10px] ${isMine
+          ? "text-blue-100" : "text-gray-400"}`
+      const ts = m.message_time || msg.created_at
+      time.textContent = ts ? new Date(ts).toLocaleTimeString("zh-Hans-CN",
+          {hour: "2-digit", minute: "2-digit"}) : ""
+
+      bubble.appendChild(content)
+      bubble.appendChild(time)
+      row.appendChild(bubble)
+      container.appendChild(row)
+    })
+
+    container.scrollTop = container.scrollHeight
   }
 
   sendMessage() {
