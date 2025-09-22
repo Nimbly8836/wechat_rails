@@ -1,1 +1,11 @@
 @import "tailwindcss";
+@layer utilities {
+  @keyframes tgDots {
+    0%, 80%, 100% { opacity: 0.2; }
+    40% { opacity: 1; }
+  }
+
+  .animate-tg-dot {
+    animation: tgDots 1.4s infinite;
+  }
+}

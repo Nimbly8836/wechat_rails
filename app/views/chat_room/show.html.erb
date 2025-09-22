@@ -5,7 +5,11 @@
   <!-- 顶部：会话信息 -->
   <div class="flex items-center justify-between px-4 h-14 border-b bg-white">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden"></div>
+      <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+        <img src='data:image/png;base64,<%= @chat_room.avatar_base64 %>' class='w-full h-full
+        object-cover'
+             alt='avatar'/>
+      </div>
       <div class="leading-tight">
         <div class="font-semibold text-gray-900"><%= @chat_room.name.presence || "聊天窗口" %></div>
         <div class="text-xs text-gray-500">在线</div>
@@ -18,7 +22,8 @@
   </div>
 
   <!-- 中间：消息列表 -->
-  <div class="flex-1 w-full overflow-y-auto px-4 py-3 flex flex-col justify-end gap-2 min-h-0" data-chat-room-target="messageList">
+  <div class="flex-1 w-full overflow-y-auto px-4 py-3 flex flex-col justify-start gap-2 min-h-0"
+       data-chat-room-target="messageList">
     <div class="text-gray-400 text-center py-8" data-chat-room-target="emptyMessage">暂无消息</div>
   </div>
 
@@ -26,11 +31,19 @@
   <div class="flex items-center gap-2 px-3 py-2 border-t bg-white">
     <button class="px-2 text-xl leading-none">😊</button>
     <button class="px-2 text-xl leading-none">📎</button>
-    <input type="text"
-           class="flex-1 border border-gray-200 bg-gray-50 rounded-full px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-           placeholder="输入消息…"
-           data-chat-room-target="input"/>
-    <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full"
-            data-action="click->chat-room#sendMessage">发送</button>
+
+    <textarea
+      rows="1"
+      class="flex-1 border border-gray-200 bg-gray-50 rounded-full px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none leading-6"
+      placeholder="输入消息…"
+      data-chat-room-target="input"
+    ></textarea>
+
+    <button
+      class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full"
+      data-action="click->chat-room#sendMessage"
+    >
+      发送
+    </button>
   </div>
 </div>
