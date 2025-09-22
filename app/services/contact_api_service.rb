@@ -3,6 +3,9 @@ class ContactApiService
   def initialize(wx_id = nil)
     @api_service = BaseApiService.instance
     @wx_id = wx_id || BaseApiService.wx_id
+    if wx_id.present?
+      BaseApiService.wx_id = wx_id
+    end
   end
 
   def fetch_contacts(current_wx_seq = 0, current_chatroom_seq = 0)
@@ -86,7 +89,8 @@ class ContactApiService
       label_list: c["LabelList"], # 如果有
       province: c["Province"],
       city: c["City"],
-      phone_num_list: c.dig("PhoneNumListInfo", "PhoneNumList")&.to_json # 接口里是结构化的，存 JSON
+      phone_num_list: c.dig("PhoneNumListInfo", "PhoneNumList")&.to_json, # 接口里是结构化的，存 JSON
+      member_list: c.dig("NewChatroomData", "ChatRoomMember")&.to_json
     }.compact # 去掉 nil
   end
 

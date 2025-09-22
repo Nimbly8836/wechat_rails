@@ -21,7 +21,7 @@ class ChatRoomController < ApplicationController
 
   def show
     @chat_room = ChatRoom.where(id: params[:id]).first
-    if !@chat_room
+    unless @chat_room
       render json: { status: "error", message: "聊天室不存在" }, status: :not_found
     end
   end
@@ -32,7 +32,7 @@ class ChatRoomController < ApplicationController
 
   def list
     chat_rooms = ChatRoom.all.order(:created_at)
-    render json: chat_rooms.as_json(only: [:id, :name, :contact_id], methods: [:avatar_base64])
+    render json: chat_rooms.as_json(only: [ :id, :name, :contact_id ], methods: [ :avatar_base64 ])
   end
 
   private

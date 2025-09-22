@@ -30,7 +30,6 @@ class MessageSender
       raise ArgumentError, "Unsupported message_type: #{@message_type}"
     end
     save_send_message(res)
-    res
   end
 
   def save_send_message(res)
@@ -56,11 +55,15 @@ class MessageSender
                                     content: @message_content,
                                   })
     # 保存到当前聊天的消息
-    Message.create({
+    message =  Message.create({
                      wx_messages_id: wx_message.id,
                      chat_room_id: @chat_room.id,
                      message_time: wx_message.msg_create_time
                    })
+    # 返回和分页一样的结构
+    message.as_json.merge(
+      wx_message: wx_message.as_json
+    )
   end
 
   private

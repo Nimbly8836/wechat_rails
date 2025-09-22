@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_17_081335) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_22_092915) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -49,6 +49,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_17_081335) do
     t.string "phone_num_list"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.jsonb "member_list"
     t.index ["user_name", "own_wxid"], name: "index_contacts_on_user_name_and_own_wxid", unique: true
   end
 
@@ -99,6 +100,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_17_081335) do
     t.string "push_content"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "refer_new_msg_id"
+    t.string "refer_title"
     t.index ["msg_id", "new_msg_id", "msg_seq"], name: "index_wx_messages_on_msg_id_and_new_msg_id_and_msg_seq", unique: true
   end
 

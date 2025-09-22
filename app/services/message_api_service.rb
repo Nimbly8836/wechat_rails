@@ -4,6 +4,9 @@ class MessageApiService
   def initialize(wx_id = nil)
     @api_service = BaseApiService.instance
     @wx_id = wx_id || BaseApiService.wx_id
+    if wx_id.present?
+      BaseApiService.wx_id = wx_id
+    end
   end
 
   def sync_messages(wxid)
