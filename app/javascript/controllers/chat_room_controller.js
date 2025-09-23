@@ -1,7 +1,7 @@
 import {Controller} from "@hotwired/stimulus";
 
 export default class extends Controller {
-  static targets = ["messageList", "input", "emptyMessage"];
+  static targets = ["messageList", "input", "emptyMessage", "menu"];
   static values = {currentWxid: String, id: Number};
 
   connect() {
@@ -95,6 +95,7 @@ export default class extends Controller {
               ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
               : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"
       }`;
+      bubble.style.maxWidth = "65%"
 
       let inner;
 
@@ -138,12 +139,14 @@ export default class extends Controller {
         const wrapper = document.createElement("div");
         wrapper.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words overflow-hidden";
         wrapper.style.maxHeight = "6rem"; // 初始折叠高度
+        // wrapper.style.maxWidth = "35%";
 
         wrapper.textContent = msg.content || "";
 
         const toggle = document.createElement("button");
         toggle.className = "mt-1 text-xs hover:underline ml-3";
         toggle.textContent = "展开";
+        // toggle.style.maxWidth = "35%";
 
         toggle.addEventListener("click", () => {
           if (wrapper.style.maxHeight === "6rem") {
@@ -158,6 +161,18 @@ export default class extends Controller {
         bubble.appendChild(wrapper);
         bubble.appendChild(toggle);
 
+      } else if (msg.msg_type === "emoji") {
+        // === Emoji 消息 ===
+        bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${
+            isMine
+                ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
+                : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"
+        }`;
+
+        const inner = document.createElement("div");
+        inner.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words";
+        inner.textContent = "Emoji 替代符，TODO";
+        bubble.appendChild(inner);
       } else {
         // === 普通文本消息 ===
         bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${
@@ -215,7 +230,6 @@ export default class extends Controller {
           bubble.appendChild(retry);
         }
       }
-
 
     });
 
@@ -309,4 +323,20 @@ export default class extends Controller {
     }
   }
 
+  toggleMenu(event) {
+    event.stopPropagation()
+
+    if (this.menuTarget.classList.contains("hidden")) {
+      this.menuTarget.classList.remove("hidden")
+      // 点击页面其他地方时关闭
+      document.addEventListener("click", this.closeMenu)
+    } else {
+      this.closeMenu()
+    }
+  }
+
+  closeMenu = () => {
+    this.menuTarget.classList.add("hidden")
+    document.removeEventListener("click", this.closeMenu)
+  }
 }

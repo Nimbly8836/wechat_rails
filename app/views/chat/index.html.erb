@@ -1,4 +1,4 @@
-<div class="flex h-[calc(100vh-60px)] bg-white" data-controller="chat">
+<div class="flex h-[calc(100vh-5px)] bg-white" data-controller="chat">
   <!-- 左侧 sidebar -->
   <div id="sidebar"
        class="flex flex-col min-w-[250px] max-w-[500px] w-[330px] border-r border-gray-200 bg-white relative">
@@ -33,7 +33,7 @@
       </div>
     </div>
     <!-- 消息列表容器，初始隐藏 -->
-    <div id="message-list" class="hidden px-4 py-2">
+    <div id="message-list" class="hidden px-4 py-2 overflow-y-auto">
       <div id="chat-room-list">
         <%# 这里后续由 JS 填充数据，结构与联系人列表一致 %>
       </div>
@@ -98,7 +98,7 @@
        data-action="mousedown->chat#startResize"></div>
 
   <!-- 右侧内容区 -->
-  <div class="flex flex-col flex-1 bg-gray-100">
+  <div class="flex flex-col flex-1 bg-gray-100 overflow-x-hidden">
     <div id="chat-box" class="flex-1 h-full" data-chat-target="chatBox">
       <div class="flex flex-col items-center justify-center h-full text-gray-500">
         <div class="text-lg font-medium">欢迎使用聊天应用</div>
