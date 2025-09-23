@@ -17,12 +17,26 @@
     </div>
     <div class="flex items-center gap-3 text-gray-500">
       <button class="hover:text-gray-700" title="搜索">🔍</button>
-      <button class="hover:text-gray-700" title="更多">⋯</button>
+      <!-- 菜单触发 -->
+      <button class="hover:text-gray-700 relative"
+              data-action="click->chat-room#toggleMenu">
+        ⋯
+      </button>
     </div>
   </div>
 
+  <!-- 二级菜单 -->
+  <div data-chat-room-target="menu"
+       class="hidden absolute right-3 top-14 w-48 bg-blue-100 shadow-lg rounded-xl border
+       border-gray-100 overflow-hidden z-50">
+    <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">设置界面</button>
+    <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">同步信息</button>
+    <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">更新聊天室信息</button>
+  </div>
+
   <!-- 中间：消息列表 -->
-  <div class="flex-1 w-full overflow-y-auto px-4 py-3 flex flex-col justify-start gap-2 min-h-0"
+  <div class="flex-1 w-full overflow-y-auto overflow-x-clip px-4 py-3 flex flex-col justify-start gap-2
+  min-h-0"
        data-chat-room-target="messageList">
     <div class="text-gray-400 text-center py-8" data-chat-room-target="emptyMessage">暂无消息</div>
   </div>
