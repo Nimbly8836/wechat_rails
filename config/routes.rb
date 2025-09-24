@@ -29,6 +29,9 @@ Rails.application.routes.draw do
     collection do
       get :list
     end
+    member do
+      post :sync_chat_members
+    end
   end
 
   post "message/callback/:wxid" => "messages#callback"

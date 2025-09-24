@@ -13,9 +13,10 @@ class ChatRoomController < ApplicationController
                                     avatar: URI.open(contact.avatar_url).read,
                                     members: contact.member_list.as_json,
                                   })
-      # SyncChatRoomMembersJob.perform_later(contact.user_name,
-      #                                      contact.own_wxid,
-      #                                      contact.member_list.as_json)
+      SyncChatRoomMembersJob.perform_later(chat_room.id,
+                                           contact.user_name,
+                                           contact.own_wxid,
+                                           contact.member_list.as_json)
       chat_room
     end
   end
@@ -38,6 +39,14 @@ class ChatRoomController < ApplicationController
   def list
     chat_rooms = ChatRoom.all.order(:created_at)
     render json: chat_rooms.as_json(only: [:id, :name, :contact_id], methods: [:avatar_base64])
+  end
+
+  def sync_chat_members
+    chat_room = ChatRoom.includes(:contact).find(params[:chat_room_id])
+    SyncChatRoomMembersJob.perform_later(chat_room.id,
+                                         chat_room.contact.user_name,
+                                         chat_room.contact.own_wxid,
+                                         chat_room.member_list.as_json)
   end
 
   private

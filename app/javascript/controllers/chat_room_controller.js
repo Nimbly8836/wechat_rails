@@ -373,6 +373,20 @@ export default class extends Controller {
     }
   }
 
+  syncMembers() {
+    fetch(`/chat_room/${this.idValue}/sync_chat_members`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": document.querySelector(
+            'meta[name="csrf-token"]').content
+      },
+      body: JSON.stringify({
+        chat_room_id: this.idValue,
+      })
+    }).then()
+  }
+
   closeMenu = () => {
     this.menuTarget.classList.add("hidden")
     document.removeEventListener("click", this.closeMenu)
