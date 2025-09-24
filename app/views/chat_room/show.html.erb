@@ -1,7 +1,9 @@
 <div class="flex flex-col h-full w-full bg-[#f7f8fa]"
      data-controller="chat-room"
      data-chat-room-current-wxid-value="<%= @chat_room.wx_id %>"
-     data-chat-room-id-value="<%= @chat_room.id %>">
+     data-chat-room-id-value="<%= @chat_room.id %>"
+     data-chat-room-members-value="<%= @chat_room.members %>"
+>
   <!-- 顶部：会话信息 -->
   <div class="flex items-center justify-between px-4 h-14 border-b bg-white">
     <div class="flex items-center gap-3">

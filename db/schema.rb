@@ -10,9 +10,35 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_22_092915) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_24_021021) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "chat_room_members", force: :cascade do |t|
+    t.bigint "chat_room_id", null: false
+    t.string "room_wxid", null: false
+    t.string "user_name"
+    t.string "nick_name"
+    t.string "py_initial"
+    t.string "quan_pin"
+    t.integer "sex"
+    t.string "remark"
+    t.string "remark_py_initial"
+    t.string "remark_quan_pin"
+    t.string "signature"
+    t.string "alias"
+    t.string "sns_bg_img"
+    t.string "country"
+    t.string "big_head_img_url"
+    t.string "small_head_img_url"
+    t.string "card_img_url"
+    t.string "province"
+    t.string "city"
+    t.string "phone_num_list"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["chat_room_id"], name: "index_chat_room_members_on_chat_room_id"
+  end
 
   create_table "chat_rooms", force: :cascade do |t|
     t.string "wx_id", null: false
@@ -105,6 +131,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_22_092915) do
     t.index ["msg_id", "new_msg_id", "msg_seq"], name: "index_wx_messages_on_msg_id_and_new_msg_id_and_msg_seq", unique: true
   end
 
+  add_foreign_key "chat_room_members", "chat_rooms"
   add_foreign_key "chat_rooms", "contacts"
   add_foreign_key "messages", "chat_rooms"
   add_foreign_key "messages", "wx_messages", column: "wx_messages_id"
