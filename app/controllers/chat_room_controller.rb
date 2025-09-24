@@ -11,6 +11,7 @@ class ChatRoomController < ApplicationController
                         name: contact.remark || contact.nick_name,
                         wx_id: contact.user_name,
                         avatar: URI.open(contact.avatar_url).read,
+                        members: contact.member_list,
                       })
     end
   end
