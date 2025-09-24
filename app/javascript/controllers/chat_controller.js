@@ -1,9 +1,20 @@
 import {Controller} from "@hotwired/stimulus"
+// import
+
 // Connects to data-controller="chat"
 export default class extends Controller {
   static targets = ["chatBox", "contact", "letter", "contactsList", "group"]
 
   connect() {
+    console.log("load chat controller")
+    // this.subscription = consumer.subscriptions.create(
+    //     { channel: "ChatRoomChannel", id: this.idValue },
+    //     {
+    //       received: (data) => {
+    //         console.log("收到消息:", data)
+    //       }
+    //     }
+    // )
     this.sidebar = document.getElementById("sidebar")
     this.resizer = document.getElementById("resizer")
     this.startX = 0

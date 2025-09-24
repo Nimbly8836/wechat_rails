@@ -1,7 +1,7 @@
 class SyncChatRoomMembersJob < ApplicationJob
   queue_as :default
 
-  def perform(owner_wxid, chat_room_wxid)
+  def perform(chat_room_wxid, owner_wxid, members)
     # 需要去同步群里的人的信息
   end
 end

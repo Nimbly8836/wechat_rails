@@ -33,6 +33,6 @@ Rails.application.routes.draw do
 
   post "message/callback/:wxid" => "messages#callback"
 
-  mount ActionCable.server => '/cable'
+  # mount ActionCable.server => "/cable"
 
 end

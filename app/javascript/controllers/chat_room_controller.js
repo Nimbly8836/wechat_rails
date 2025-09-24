@@ -1,12 +1,22 @@
 import {Controller} from "@hotwired/stimulus";
+// import consumer from "../channels/consumer"
 
 export default class extends Controller {
   static targets = ["messageList", "input", "emptyMessage", "menu"];
   static values = {currentWxid: String, id: Number, members: Array};
 
   connect() {
-    console.log("connect chat room controller", this.currentWxidValue,
-        this.membersValue)
+    console.log("chat controller loaded", this.idValue)
+
+    // this.subscription = consumer.subscriptions.create(
+    //     { channel: "ChatRoomChannel", id: this.idValue },
+    //     {
+    //       received: (data) => {
+    //         console.log("收到消息:", data)
+    //       }
+    //     }
+    // )
+
     this.messages = [];
     this.loadMessages();
     // 回车发送、Shift+Enter换行
@@ -23,6 +33,12 @@ export default class extends Controller {
 
     // 初始化时也调整一次
     this.autoResize();
+  }
+
+  disconnect() {
+    if (this.subscription) {
+      consumer.subscriptions.remove(this.subscription)
+    }
   }
 
   autoResize() {
@@ -108,7 +124,6 @@ export default class extends Controller {
         const member_info = this.membersValue.find(it => it.UserName === wxid)
         if (member_info) {
           msg.content = msg.content.replace(wxid, member_info.NickName)
-          console.log(msg)
         }
       }
     }

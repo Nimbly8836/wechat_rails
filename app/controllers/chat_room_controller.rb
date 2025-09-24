@@ -6,13 +6,17 @@ class ChatRoomController < ApplicationController
 
   def create
     Contact.find(params[:contact_id]).then do |contact|
-      ChatRoom.create({
-                        contact_id: contact.id,
-                        name: contact.remark || contact.nick_name,
-                        wx_id: contact.user_name,
-                        avatar: URI.open(contact.avatar_url).read,
-                        members: contact.member_list,
-                      })
+      chat_room = ChatRoom.create({
+                                    contact_id: contact.id,
+                                    name: contact.remark || contact.nick_name,
+                                    wx_id: contact.user_name,
+                                    avatar: URI.open(contact.avatar_url).read,
+                                    members: contact.member_list.as_json,
+                                  })
+      # SyncChatRoomMembersJob.perform_later(contact.user_name,
+      #                                      contact.own_wxid,
+      #                                      contact.member_list.as_json)
+      chat_room
     end
   end
 
@@ -33,7 +37,7 @@ class ChatRoomController < ApplicationController
 
   def list
     chat_rooms = ChatRoom.all.order(:created_at)
-    render json: chat_rooms.as_json(only: [ :id, :name, :contact_id ], methods: [ :avatar_base64 ])
+    render json: chat_rooms.as_json(only: [:id, :name, :contact_id], methods: [:avatar_base64])
   end
 
   private
