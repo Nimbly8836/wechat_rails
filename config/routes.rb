@@ -31,6 +31,7 @@ Rails.application.routes.draw do
     end
     member do
       post :sync_chat_members
+      get :chat_members
     end
   end
 

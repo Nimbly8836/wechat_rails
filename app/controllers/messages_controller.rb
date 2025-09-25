@@ -39,6 +39,7 @@ class MessagesController < ApplicationController
 
   def callback
     # 收到回掉消息才去主动去同步消息
+    Rails.logger.debug "message callback"
     wxid = params[:wxid]
     if wxid.present?
       message_api_service = MessageApiService.new(wxid)

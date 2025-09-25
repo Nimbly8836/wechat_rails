@@ -3,8 +3,8 @@ class ContactApiService
   def initialize(wx_id = nil)
     @api_service = BaseApiService.instance
     @wx_id = wx_id || BaseApiService.wx_id
-    if wx_id.present?
-      BaseApiService.wx_id = wx_id
+    if @wx_id.present?
+      BaseApiService.wx_id = @wx_id
     end
   end
 
@@ -59,10 +59,10 @@ class ContactApiService
 
   end
 
-  def fetch_contacts_detail(ids)
+  def fetch_contacts_detail(ids, chat_room = "")
     path = WechatApis::Contact.details
     @api_service.post(path, {
-      "ChatRoom": "",
+      "ChatRoom": chat_room,
       "Towxids": ids
     })
   end
