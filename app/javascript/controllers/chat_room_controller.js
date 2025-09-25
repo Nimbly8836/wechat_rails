@@ -1,12 +1,12 @@
-import {Controller} from "@hotwired/stimulus";
+import { Controller } from "@hotwired/stimulus";
 // import consumer from "../channels/consumer"
 
 export default class extends Controller {
   static targets = ["messageList", "input", "emptyMessage", "menu"];
-  static values = {currentWxid: String, id: Number, members: Array};
+  static values = { currentWxid: String, id: Number, members: Array };
 
   connect() {
-    console.log("chat controller loaded", this.idValue)
+    console.log("chat_room controller loaded", this.idValue, this.currentWxidValue)
 
     // this.subscription = consumer.subscriptions.create(
     //     { channel: "ChatRoomChannel", id: this.idValue },
@@ -17,6 +17,13 @@ export default class extends Controller {
     //     }
     // )
 
+    // room 需要加载 members
+    if (this.isRoom()) {
+      fetch(`chat_room/${this.idValue}/chat_members`).then(res => res.json()).then(data => {
+        this.chatMembers = data
+        this.renderMessages()
+      }).catch(error => console.error("加载room members 失败", error))
+    }
     this.messages = [];
     this.loadMessages();
     // 回车发送、Shift+Enter换行
@@ -26,7 +33,7 @@ export default class extends Controller {
         this.sendMessage();   // 调用发送
       }
       // Shift+Enter 默认就是换行，不拦截
-    });
+    }), this.currentWxidValue;
 
     // 自动高度调整
     this.inputTarget.addEventListener("input", this.autoResize.bind(this));
@@ -41,6 +48,10 @@ export default class extends Controller {
     }
   }
 
+  isRoom() {
+    return this.currentWxidValue.endsWith("@chatroom")
+  }
+
   autoResize() {
     const el = this.inputTarget;
     el.style.height = "auto";  // 重置高度
@@ -51,25 +62,37 @@ export default class extends Controller {
   loadMessages() {
     console.log("loadMessages")
     fetch(`/chat_room/${this.idValue}/messages`)
-        .then(res => res.json())
-        .then(data => {
-          this.messages = data;
-          this.renderMessages();
-        })
-        .catch(error => {
-          console.error("加载消息失败:", error)
-        });
+      .then(res => res.json())
+      .then(data => {
+        this.messages = data;
+        this.renderMessages();
+      })
+      .catch(error => {
+        console.error("加载消息失败:", error)
+      });
   }
 
   getMessageType(msg) {
-    if (msg.msg_type === "refer" && msg.content?.trim().startsWith("<msg")) {
+    if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(/(\w+:|.*)\n</)?.length > 0) && msg.content.length > 250) {
+      // 这里线解析一下， 已知 type 5 一般是 card，57 是引用消息
+      if (!this.isRoom()) {
+        const parse = this.parseWxXmlMessage(msg.content)
+        if (parse.msgType === "5") {
+          return "card"
+        }
+        if (parse.msgType === "57") {
+          return "refer"
+        }
+      }
+      return "xml_unparsed";
+    }
+    // 公众号判断，并没用
+    if (this.currentWxidValue?.startsWith("gh_")
+      && msg.msg_type === "refer" && msg.content?.trim().startsWith("<msg")) {
       return "card";
     }
     if (msg.msg_type === "refer") {
       return "refer";
-    }
-    if (msg.content?.trim().startsWith("<") && msg.content.length > 250) {
-      return "xml_unparsed";
     }
     if (msg.msg_type === "emoji") {
       return "emoji";
@@ -104,7 +127,6 @@ export default class extends Controller {
       lastSender = sender;
 
       const row = this.buildRow(isMine, isNewGroup, msg);
-      this.replaceRoomSenderWxid(msg)
       const bubble = this.renderMessageBubble(msg, isMine);
       row.appendChild(bubble);
       container.appendChild(row);
@@ -117,28 +139,45 @@ export default class extends Controller {
   }
 
   replaceRoomSenderWxid(msg) {
-    if (this.membersValue && msg.content) {
+    if (this.chatMembers && msg.content) {
       const title_send_wxid = msg.content.match(/\w+:\n/)?.[0]
       if (title_send_wxid) {
         const wxid = title_send_wxid.slice(0, -2);
-        const member_info = this.membersValue.find(it => it.UserName === wxid)
+        const member_info = this.chatMembers.find(it => it.user_name === wxid)
         if (member_info) {
-          msg.content = msg.content.replace(wxid, member_info.NickName)
+          msg.content = msg.content.replace(wxid + ":", member_info.remark || member_info.nick_name)
         }
       }
     }
   }
 
+
   buildRow(isMine, isNewGroup, msg) {
     const row = document.createElement("div");
-    row.className = `w-full flex ${isMine ? "justify-end"
-        : "justify-start"} ${isNewGroup ? "mt-3" : "mt-1"} items-end`;
+    row.className = `w-full flex ${isMine ? "justify-end" : "justify-start"} ${isNewGroup ? "mt-3" : "mt-1"} items-end`;
+
+    // 如果不是我自己，并且是群聊，显示头像
+    if (!isMine && this.isRoom()) {
+      const senderWxid = msg.content.match(/\w+:\n/)?.[0]?.slice(0, -2);
+      const member = this.chatMembers?.find(m => m.user_name === senderWxid);
+      const avatarUrl = member?.small_head_img_url || "https://img.icons8.com/ios/100/user-male-circle--v1.png";
+
+      const avatar = document.createElement("img");
+      avatar.src = avatarUrl;
+      avatar.className = "w-12 h-12 rounded-full mr-2"; // tailwind，可自定义
+      avatar.alt = member?.nick_name || senderWxid;
+
+      row.appendChild(avatar);
+    }
+
     return row;
   }
 
   renderMessageBubble(msg, isMine) {
     const bubble = document.createElement("div");
     const type = this.getMessageType(msg);
+
+    this.replaceRoomSenderWxid(msg)
 
     switch (type) {
       case "card":
@@ -219,11 +258,10 @@ export default class extends Controller {
   }
 
   renderTextMessage(bubble, msg, isMine) {
-    bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${
-        isMine
-            ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
-            : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"
-    }`;
+    bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${isMine
+      ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
+      : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"
+      }`;
     const inner = document.createElement("div");
     inner.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words";
     inner.textContent = msg.refer_title || msg.content || "";
@@ -238,13 +276,13 @@ export default class extends Controller {
     time.className = "absolute bottom-1 right-2 text-[10px] leading-[10px] text-gray-400";
     const ts = msg.created_at;
     time.textContent = ts
-        ? new Date(ts).toLocaleString("zh-Hans-CN", {
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit"
-        })
-        : "";
+      ? new Date(ts).toLocaleString("zh-Hans-CN", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+      : "";
     bubble.appendChild(time);
   }
 
@@ -306,7 +344,7 @@ export default class extends Controller {
       headers: {
         "Content-Type": "application/json",
         "X-CSRF-Token": document.querySelector(
-            'meta[name="csrf-token"]').content
+          'meta[name="csrf-token"]').content
       },
       body: JSON.stringify({
         chat_room_id: this.idValue,
@@ -315,29 +353,29 @@ export default class extends Controller {
         extra: {}
       })
     })
-        .then(res => res.json())
-        .then(newMsg => {
-          // 替换临时消息
-          const index = this.messages.findIndex(m => m.id === tempId);
-          if (index !== -1) {
-            this.messages[index] = {
-              ...newMsg.result,
-              sending: false,
-              send_failed: false
-            };
-            this.renderMessages();
-          }
-        })
-        .catch(error => {
-          console.error("发送消息失败:", error);
-          // 更新临时消息为失败状态
-          const index = this.messages.findIndex(m => m.id === tempId);
-          if (index !== -1) {
-            this.messages[index].sending = false;
-            this.messages[index].send_failed = true;
-            this.renderMessages();
-          }
-        });
+      .then(res => res.json())
+      .then(newMsg => {
+        // 替换临时消息
+        const index = this.messages.findIndex(m => m.id === tempId);
+        if (index !== -1) {
+          this.messages[index] = {
+            ...newMsg.result,
+            sending: false,
+            send_failed: false
+          };
+          this.renderMessages();
+        }
+      })
+      .catch(error => {
+        console.error("发送消息失败:", error);
+        // 更新临时消息为失败状态
+        const index = this.messages.findIndex(m => m.id === tempId);
+        if (index !== -1) {
+          this.messages[index].sending = false;
+          this.messages[index].send_failed = true;
+          this.renderMessages();
+        }
+      });
   }
 
   parseWxXmlMessage(xmlString) {
@@ -349,15 +387,15 @@ export default class extends Controller {
       const desc = xml.querySelector("des")?.textContent?.trim() || "";
       const url = xml.querySelector("url")?.textContent?.trim() || "";
       const cover = xml.querySelector("thumburl")?.textContent?.trim()
-          || xml.querySelector("cover")?.textContent?.trim();
+        || xml.querySelector("cover")?.textContent?.trim();
       const source = xml.querySelector(
-              "publisher > nickname")?.textContent?.trim()
-          || xml.querySelector("appname")?.textContent?.trim();
-
-      return {type: "xml", title, desc, url, cover, source};
+        "publisher > nickname")?.textContent?.trim()
+        || xml.querySelector("appname")?.textContent?.trim();
+      const msgType = xml.querySelector("type")?.textContent?.trim() ||0
+      return { type: "xml", title, desc, url, cover, source, msgType };
     } catch (e) {
       console.error("XML parse error:", e);
-      return {type: "text", content: xmlString}; // fallback
+      return { type: "text", content: xmlString }; // fallback
     }
   }
 
@@ -379,7 +417,7 @@ export default class extends Controller {
       headers: {
         "Content-Type": "application/json",
         "X-CSRF-Token": document.querySelector(
-            'meta[name="csrf-token"]').content
+          'meta[name="csrf-token"]').content
       },
       body: JSON.stringify({
         chat_room_id: this.idValue,

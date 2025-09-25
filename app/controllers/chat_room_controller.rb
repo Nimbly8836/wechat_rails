@@ -1,4 +1,4 @@
-require 'open-uri'
+require "open-uri"
 
 class ChatRoomController < ApplicationController
   def index
@@ -11,7 +11,7 @@ class ChatRoomController < ApplicationController
                                     name: contact.remark || contact.nick_name,
                                     wx_id: contact.user_name,
                                     avatar: URI.open(contact.avatar_url).read,
-                                    members: contact.member_list.as_json,
+                                    members: contact.member_list.as_json
                                   })
       SyncChatRoomMembersJob.perform_later(chat_room.id,
                                            contact.user_name,
@@ -33,12 +33,11 @@ class ChatRoomController < ApplicationController
   end
 
   def edit
-
   end
 
   def list
     chat_rooms = ChatRoom.all.order(:created_at)
-    render json: chat_rooms.as_json(only: [:id, :name, :contact_id], methods: [:avatar_base64])
+    render json: chat_rooms.as_json(only: [ :id, :name, :contact_id ], methods: [ :avatar_base64 ])
   end
 
   def sync_chat_members
@@ -46,7 +45,12 @@ class ChatRoomController < ApplicationController
     SyncChatRoomMembersJob.perform_later(chat_room.id,
                                          chat_room.contact.user_name,
                                          chat_room.contact.own_wxid,
-                                         chat_room.member_list.as_json)
+                                         chat_room.members.as_json)
+  end
+
+  def chat_members
+    members = ChatRoomMember.where(chat_room_id: params[:id])
+    render json: members.as_json()
   end
 
   private
