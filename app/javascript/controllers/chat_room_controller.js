@@ -1,15 +1,25 @@
-import { Controller } from "@hotwired/stimulus";
+import {Controller} from "@hotwired/stimulus";
 // import consumer from "../channels/consumer"
 
 export default class extends Controller {
   static targets = ["messageList", "input", "emptyMessage", "menu", "showMore"]
-  static values = { currentWxid: String, id: Number, members: Array };
+  static values = {currentWxid: String, id: Number, members: Array};
 
   connect() {
-    console.log("chat_room controller loaded", this.idValue, this.currentWxidValue)
+    console.log("chat_room controller loaded", this.idValue,
+        this.currentWxidValue)
+
+    window.addEventListener("chat:notify", (e) => {
+      const payload = e.detail;
+      if (payload.chat_room_id === this.idValue) {
+        this.loadNewMessages(payload.id);
+      }
+    });
+
     // room 需要加载 members
     if (this.isRoom()) {
-      fetch(`chat_room/${this.idValue}/chat_members`).then(res => res.json()).then(data => {
+      fetch(`chat_room/${this.idValue}/chat_members`).then(
+          res => res.json()).then(data => {
         this.chatMembers = data
         this.renderMessages()
       }).catch(error => console.error("加载room members 失败", error))
@@ -26,7 +36,8 @@ export default class extends Controller {
     }), this.currentWxidValue;
 
     // 监听滚动
-    this.messageListTarget.addEventListener("scroll", this.handleScroll.bind(this));
+    this.messageListTarget.addEventListener("scroll",
+        this.handleScroll.bind(this));
 
     // 自动高度调整
     this.inputTarget.addEventListener("input", this.autoResize.bind(this));
@@ -36,9 +47,6 @@ export default class extends Controller {
   }
 
   disconnect() {
-    if (this.subscription) {
-      consumer.subscriptions.remove(this.subscription)
-    }
   }
 
   isRoom() {
@@ -46,7 +54,9 @@ export default class extends Controller {
   }
 
   handleScroll() {
-    if (!this.hasShowMoreTarget) return;
+    if (!this.hasShowMoreTarget) {
+      return;
+    }
 
     // 到顶部并且滚动高度大于等于100才显示
     if (this.messageListTarget.scrollTop <= 0 &&
@@ -56,7 +66,6 @@ export default class extends Controller {
       this.showMoreTarget.style.display = "none";
     }
   }
-
 
   autoResize() {
     const el = this.inputTarget;
@@ -68,18 +77,19 @@ export default class extends Controller {
   loadMessages() {
     console.log("loadMessages")
     fetch(`/chat_room/${this.idValue}/messages`)
-      .then(res => res.json())
-      .then(data => {
-        this.messages = data;
-        this.renderMessages();
-      })
-      .catch(error => {
-        console.error("加载消息失败:", error)
-      });
+        .then(res => res.json())
+        .then(data => {
+          this.messages = data;
+          this.renderMessages();
+        })
+        .catch(error => {
+          console.error("加载消息失败:", error)
+        });
   }
 
   getMessageType(msg) {
-    if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(/(\w+:|.*)\n</)?.length > 0) && msg.content.length > 250) {
+    if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(
+        /(\w+:|.*)\n</)?.length > 0) && msg.content.length > 250) {
       // 这里线解析一下， 已知 type 5 一般是 card，57 是引用消息
       if (!this.isRoom()) {
         const parse = this.parseWxXmlMessage(msg.content)
@@ -94,7 +104,7 @@ export default class extends Controller {
     }
     // 公众号判断，并没用
     if (this.currentWxidValue?.startsWith("gh_")
-      && msg.msg_type === "refer" && msg.content?.trim().startsWith("<msg")) {
+        && msg.msg_type === "refer" && msg.content?.trim().startsWith("<msg")) {
       return "card";
     }
     if (msg.msg_type === "refer") {
@@ -127,18 +137,19 @@ export default class extends Controller {
 
     this.messages.forEach((m) => {
       const msg = m.wx_message;
-      const sender = msg.from_user_name || msg.from_wxid || null;
-      const isMine = msg.to_user_name === this.currentWxidValue;
+      const sender = msg.from_user_name || "";
       const isNewGroup = lastSender !== null && lastSender !== sender;
       lastSender = sender;
 
-      const row = this.buildRow(isMine, isNewGroup, msg);
-      const bubble = this.renderMessageBubble(msg, isMine);
+      const row = this.buildRow(isNewGroup, msg);
+      const bubble = this.renderMessageBubble(msg);
       row.appendChild(bubble);
       container.appendChild(row);
 
       // 渲染发送状态
-      this.renderStatus(m, bubble, msg, isMine);
+      this.renderStatus(m, bubble, msg);
+      // 时间
+      this.addTimestamp(bubble, m)
     });
 
     container.scrollTop = container.scrollHeight;
@@ -151,22 +162,24 @@ export default class extends Controller {
         const wxid = title_send_wxid.slice(0, -2);
         const member_info = this.chatMembers.find(it => it.user_name === wxid)
         if (member_info) {
-          msg.content = msg.content.replace(wxid + ":", member_info.remark || member_info.nick_name)
+          msg.content = msg.content.replace(wxid + ":",
+              member_info.remark || member_info.nick_name)
         }
       }
     }
   }
 
-
-  buildRow(isMine, isNewGroup, msg) {
+  buildRow(isNewGroup, msg) {
     const row = document.createElement("div");
-    row.className = `w-full flex ${isMine ? "justify-end" : "justify-start"} ${isNewGroup ? "mt-3" : "mt-1"} items-end`;
+    row.className = `w-full flex ${msg.self_send ? "justify-end"
+        : "justify-start"} ${isNewGroup ? "mt-3" : "mt-1"} items-end`;
 
     // 如果不是我自己，并且是群聊，显示头像
-    if (!isMine && this.isRoom()) {
+    if (!msg.self_send && this.isRoom()) {
       const senderWxid = msg.content.match(/\w+:\n/)?.[0]?.slice(0, -2);
       const member = this.chatMembers?.find(m => m.user_name === senderWxid);
-      const avatarUrl = member?.small_head_img_url || "https://img.icons8.com/ios/100/user-male-circle--v1.png";
+      const avatarUrl = member?.small_head_img_url
+          || "https://img.icons8.com/ios/100/user-male-circle--v1.png";
 
       const avatar = document.createElement("img");
       avatar.src = avatarUrl;
@@ -179,7 +192,7 @@ export default class extends Controller {
     return row;
   }
 
-  renderMessageBubble(msg, isMine) {
+  renderMessageBubble(msg) {
     const bubble = document.createElement("div");
     const type = this.getMessageType(msg);
 
@@ -194,7 +207,7 @@ export default class extends Controller {
         return this.renderEmojiMessage(bubble);
       case "text":
       default:
-        return this.renderTextMessage(bubble, msg, isMine);
+        return this.renderTextMessage(bubble, msg);
     }
   }
 
@@ -227,7 +240,7 @@ export default class extends Controller {
     `;
     bubble.appendChild(inner);
 
-    this.addTimestamp(bubble, msg);
+    // this.addTimestamp(bubble, msg);
     return bubble;
   }
 
@@ -253,7 +266,7 @@ export default class extends Controller {
 
     bubble.appendChild(wrapper);
     bubble.appendChild(toggle);
-    this.addTimestamp(bubble, msg);
+    // this.addTimestamp(bubble, msg);
     return bubble;
   }
 
@@ -263,16 +276,16 @@ export default class extends Controller {
     return bubble;
   }
 
-  renderTextMessage(bubble, msg, isMine) {
-    bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${isMine
-      ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
-      : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"
-      }`;
+  renderTextMessage(bubble, msg) {
+    bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${msg.self_send
+        ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
+        : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"
+    }`;
     const inner = document.createElement("div");
     inner.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words";
     inner.textContent = msg.refer_title || msg.content || "";
     bubble.appendChild(inner);
-    this.addTimestamp(bubble, msg);
+    // this.addTimestamp(bubble, msg);
     return bubble;
   }
 
@@ -280,20 +293,20 @@ export default class extends Controller {
   addTimestamp(bubble, msg) {
     const time = document.createElement("span");
     time.className = "absolute bottom-1 right-2 text-[10px] leading-[10px] text-gray-400";
-    const ts = msg.created_at;
+    const ts = msg.message_time;
     time.textContent = ts
-      ? new Date(ts).toLocaleString("zh-Hans-CN", {
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit"
-      })
-      : "";
+        ? new Date(ts).toLocaleString("zh-Hans-CN", {
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit"
+        })
+        : "";
     bubble.appendChild(time);
   }
 
-  renderStatus(m, bubble, msg, isMine) {
-    if (!isMine) {
+  renderStatus(m, bubble, msg) {
+    if (!msg.self_send) {
       return;
     }
     if (m.sending) {
@@ -336,6 +349,7 @@ export default class extends Controller {
         msg_type: "self_send",
         content: content,
         to_user_name: this.currentWxidValue,
+        self_send: true,
       }
     };
 
@@ -350,7 +364,7 @@ export default class extends Controller {
       headers: {
         "Content-Type": "application/json",
         "X-CSRF-Token": document.querySelector(
-          'meta[name="csrf-token"]').content
+            'meta[name="csrf-token"]').content
       },
       body: JSON.stringify({
         chat_room_id: this.idValue,
@@ -359,29 +373,29 @@ export default class extends Controller {
         extra: {}
       })
     })
-      .then(res => res.json())
-      .then(newMsg => {
-        // 替换临时消息
-        const index = this.messages.findIndex(m => m.id === tempId);
-        if (index !== -1) {
-          this.messages[index] = {
-            ...newMsg.result,
-            sending: false,
-            send_failed: false
-          };
-          this.renderMessages();
-        }
-      })
-      .catch(error => {
-        console.error("发送消息失败:", error);
-        // 更新临时消息为失败状态
-        const index = this.messages.findIndex(m => m.id === tempId);
-        if (index !== -1) {
-          this.messages[index].sending = false;
-          this.messages[index].send_failed = true;
-          this.renderMessages();
-        }
-      });
+        .then(res => res.json())
+        .then(newMsg => {
+          // 替换临时消息
+          const index = this.messages.findIndex(m => m.id === tempId);
+          if (index !== -1) {
+            this.messages[index] = {
+              ...newMsg.result,
+              sending: false,
+              send_failed: false
+            };
+            this.renderMessages();
+          }
+        })
+        .catch(error => {
+          console.error("发送消息失败:", error);
+          // 更新临时消息为失败状态
+          const index = this.messages.findIndex(m => m.id === tempId);
+          if (index !== -1) {
+            this.messages[index].sending = false;
+            this.messages[index].send_failed = true;
+            this.renderMessages();
+          }
+        });
   }
 
   parseWxXmlMessage(xmlString) {
@@ -393,15 +407,15 @@ export default class extends Controller {
       const desc = xml.querySelector("des")?.textContent?.trim() || "";
       const url = xml.querySelector("url")?.textContent?.trim() || "";
       const cover = xml.querySelector("thumburl")?.textContent?.trim()
-        || xml.querySelector("cover")?.textContent?.trim();
+          || xml.querySelector("cover")?.textContent?.trim();
       const source = xml.querySelector(
-        "publisher > nickname")?.textContent?.trim()
-        || xml.querySelector("appname")?.textContent?.trim();
-      const msgType = xml.querySelector("type")?.textContent?.trim() ||0
-      return { type: "xml", title, desc, url, cover, source, msgType };
+              "publisher > nickname")?.textContent?.trim()
+          || xml.querySelector("appname")?.textContent?.trim();
+      const msgType = xml.querySelector("type")?.textContent?.trim() || 0
+      return {type: "xml", title, desc, url, cover, source, msgType};
     } catch (e) {
       console.error("XML parse error:", e);
-      return { type: "text", content: xmlString }; // fallback
+      return {type: "text", content: xmlString}; // fallback
     }
   }
 
@@ -423,7 +437,7 @@ export default class extends Controller {
       headers: {
         "Content-Type": "application/json",
         "X-CSRF-Token": document.querySelector(
-          'meta[name="csrf-token"]').content
+            'meta[name="csrf-token"]').content
       },
       body: JSON.stringify({
         chat_room_id: this.idValue,
@@ -446,31 +460,76 @@ export default class extends Controller {
   }
 
   loadMore() {
-    if (this.messages.length === 0) return;
+    if (this.messages.length === 0) {
+      return;
+    }
 
     const firstMsgId = this.messages[0].id;
-    console.log("加载更多 before_id=", firstMsgId);
-
-    // 记录当前高度
     const container = this.messageListTarget;
     const oldHeight = container.scrollHeight;
 
     fetch(`/chat_room/${this.idValue}/messages?before_id=${firstMsgId}`)
         .then(res => res.json())
         .then(data => {
-          if (data.length === 0) return;
+          if (!data.length) {
+            return;
+          }
 
-          // prepend 消息
+          // prepend 消息到数组
           this.messages = [...data, ...this.messages];
-          this.renderMessages();
+
+          // 只渲染新增消息
+          data.forEach(m => {
+            const msg = m.wx_message;
+            const lastSender = null; // loadMore 时每条消息都显示头像
+            const row = this.buildRow(true, msg);
+            const bubble = this.renderMessageBubble(msg);
+            row.appendChild(bubble);
+            container.prepend(row);
+            this.renderStatus(m, bubble, msg);
+          });
 
           // 维持滚动位置
           const newHeight = container.scrollHeight;
           container.scrollTop = newHeight - oldHeight;
         })
-        .catch(error => console.error("加载更多失败:", error));
+        .catch(console.error);
   }
 
+  // 拉取新的消息
+  loadNewMessages(msgId) {
+    if (this.messages.length === 0) {
+      return this.loadMessages(); // 没有消息就直接拉取前100条
+    }
+
+    const container = this.messageListTarget;
+
+    fetch(`/chat_room/${this.idValue}/messages?after_id=${msgId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.length) {
+            return;
+          }
+
+          // append 到消息数组
+          this.messages = [...this.messages, ...data];
+
+          // 只渲染新增消息
+          data.forEach(m => {
+            const msg = m.wx_message;
+            const isMine = msg.to_user_name === this.currentWxidValue;
+            const row = this.buildRow(isMine, true, msg); // true 表示显示头像/间距
+            const bubble = this.renderMessageBubble(msg, isMine);
+            row.appendChild(bubble);
+            container.appendChild(row);
+            this.renderStatus(m, bubble, msg, isMine);
+          });
+
+          // 滚动到底部
+          container.scrollTop = container.scrollHeight;
+        })
+        .catch(console.error);
+  }
 
   closeMenu = () => {
     this.menuTarget.classList.add("hidden")

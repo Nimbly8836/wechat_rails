@@ -4,25 +4,26 @@ class MessagesController < ApplicationController
   def index
     chat_room_id = params[:chat_room_id]
     before_id = params[:before_id] # 可选，用于加载更多消息
+    after_id = params[:after_id]
 
     messages = Message.includes(:wx_message)
                       .where(chat_room_id: chat_room_id)
 
     # 如果前端传了 before_id，就取更早的消息
     messages = messages.where('id < ?', before_id) if before_id.present?
+    messages = messages.where('id >= ?', after_id) if after_id.present?
 
     messages = messages.order(id: :desc).limit(100)
 
     render json: messages.reverse.as_json(
       include: {
         wx_message: {
-          only: [:msg_type, :content, :from_user_name, :to_user_name,
-                 :new_msg_id, :refer_new_msg_id, :refer_title]
+          only: [ :msg_type, :content, :from_user_name, :to_user_name,
+                 :new_msg_id, :refer_new_msg_id, :refer_title, :self_send ]
         }
       }
     )
   end
-
 
   def create
     args = send_message_params
@@ -48,7 +49,7 @@ class MessagesController < ApplicationController
       unless response["Success"]
         render json: response and return
       end
-      saves = WechatModels::SyncMessageModel.parse_saves(response)
+      saves = WechatModels::SyncMessageModel.parse_saves(response, wxid)
       SaveChatRoomMessageJob.perform_later(saves.as_json, wxid)
       SyncCreateContactsJob.perform_later(saves.as_json, wxid)
       render json: { "save_number": saves.length, "error": false, "message": "success" }

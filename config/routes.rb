@@ -38,6 +38,7 @@ Rails.application.routes.draw do
 
   post "message/callback/:wxid" => "messages#callback"
 
-  # mount ActionCable.server => "/cable"
+  get "/notion/message", to: "message_events#events"
+
 
 end

@@ -38,9 +38,5 @@ class WxMessage < ApplicationRecord
     recalled: 10002         # 撤回消息 (MM_DATA_RECALLED)
   }
 
-  def is_mine_send(room_wxid)
-    self.to_user_name == room_wxid
-  end
-
 
 end

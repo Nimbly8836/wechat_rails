@@ -29,12 +29,20 @@ class SaveChatRoomMessageJob < ApplicationJob
         }
       end.compact
 
-      Message.insert_all(messages_to_save) if messages_to_save.any?
-      # messages_to_save.each do |message|
-      #   ActionCable.server.broadcast("chat_room_#{message[:chat_room_id]}", message.as_json)
-      # end
-      Rails.logger.debug "Saved #{messages_to_save.count} messages to messages table"
-      # 在 Message create 后回调
+      if messages_to_save.any?
+        Message.insert_all(messages_to_save)
+
+        # 批量查出插入的 messages
+        message_ids = messages_to_save.map { |m| m[:wx_messages_id] }
+        new_messages = Message.includes(:wx_message)
+                      .where(wx_messages_id: message_ids)
+
+        new_messages.each do |m|
+          next if m.wx_message.nil? || m.wx_message.self_send
+          m.notify_chat_room
+        end
+      end
+
     rescue StandardError => e
       Rails.logger.error "Failed to save messages: #{e.message}\n#{e.backtrace.join("\n")}"
     end
