@@ -2,21 +2,11 @@ import { Controller } from "@hotwired/stimulus";
 // import consumer from "../channels/consumer"
 
 export default class extends Controller {
-  static targets = ["messageList", "input", "emptyMessage", "menu"];
+  static targets = ["messageList", "input", "emptyMessage", "menu", "showMore"]
   static values = { currentWxid: String, id: Number, members: Array };
 
   connect() {
     console.log("chat_room controller loaded", this.idValue, this.currentWxidValue)
-
-    // this.subscription = consumer.subscriptions.create(
-    //     { channel: "ChatRoomChannel", id: this.idValue },
-    //     {
-    //       received: (data) => {
-    //         console.log("收到消息:", data)
-    //       }
-    //     }
-    // )
-
     // room 需要加载 members
     if (this.isRoom()) {
       fetch(`chat_room/${this.idValue}/chat_members`).then(res => res.json()).then(data => {
@@ -35,6 +25,9 @@ export default class extends Controller {
       // Shift+Enter 默认就是换行，不拦截
     }), this.currentWxidValue;
 
+    // 监听滚动
+    this.messageListTarget.addEventListener("scroll", this.handleScroll.bind(this));
+
     // 自动高度调整
     this.inputTarget.addEventListener("input", this.autoResize.bind(this));
 
@@ -51,6 +44,19 @@ export default class extends Controller {
   isRoom() {
     return this.currentWxidValue.endsWith("@chatroom")
   }
+
+  handleScroll() {
+    if (!this.hasShowMoreTarget) return;
+
+    // 到顶部并且滚动高度大于等于100才显示
+    if (this.messageListTarget.scrollTop <= 0 &&
+        this.messageListTarget.scrollHeight >= 100) {
+      this.showMoreTarget.style.display = "block";
+    } else {
+      this.showMoreTarget.style.display = "none";
+    }
+  }
+
 
   autoResize() {
     const el = this.inputTarget;
@@ -413,7 +419,7 @@ export default class extends Controller {
 
   syncMembers() {
     fetch(`/chat_room/${this.idValue}/sync_chat_members`, {
-      method: "POST",
+      method: "PUT",
       headers: {
         "Content-Type": "application/json",
         "X-CSRF-Token": document.querySelector(
@@ -424,6 +430,47 @@ export default class extends Controller {
       })
     }).then()
   }
+
+  syncContact() {
+    fetch(`/chat_room/${this.idValue}/sync_chat_contact`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": document.querySelector(
+            'meta[name="csrf-token"]').content
+      },
+      body: JSON.stringify({
+        chat_room_id: this.idValue,
+      })
+    }).then()
+  }
+
+  loadMore() {
+    if (this.messages.length === 0) return;
+
+    const firstMsgId = this.messages[0].id;
+    console.log("加载更多 before_id=", firstMsgId);
+
+    // 记录当前高度
+    const container = this.messageListTarget;
+    const oldHeight = container.scrollHeight;
+
+    fetch(`/chat_room/${this.idValue}/messages?before_id=${firstMsgId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.length === 0) return;
+
+          // prepend 消息
+          this.messages = [...data, ...this.messages];
+          this.renderMessages();
+
+          // 维持滚动位置
+          const newHeight = container.scrollHeight;
+          container.scrollTop = newHeight - oldHeight;
+        })
+        .catch(error => console.error("加载更多失败:", error));
+  }
+
 
   closeMenu = () => {
     this.menuTarget.classList.add("hidden")

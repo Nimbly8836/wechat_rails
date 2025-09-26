@@ -36,8 +36,8 @@ class ChatRoomController < ApplicationController
   end
 
   def list
-    chat_rooms = ChatRoom.all.order(:created_at)
-    render json: chat_rooms.as_json(only: [ :id, :name, :contact_id ], methods: [ :avatar_base64 ])
+    chat_rooms = ChatRoom.all.order_by_latest_message
+    render json: chat_rooms.as_json(only: [:id, :name, :contact_id], methods: [:avatar_base64])
   end
 
   def sync_chat_members
@@ -46,6 +46,29 @@ class ChatRoomController < ApplicationController
                                          chat_room.contact.user_name,
                                          chat_room.contact.own_wxid,
                                          chat_room.members.as_json)
+  end
+
+  def sync_chat_contact
+    chat_room = ChatRoom.includes(:contact).find(params[:id])
+    return unless chat_room
+
+    api_service = ContactApiService.new(chat_room.contact.own_wxid)
+    detail_res = api_service.fetch_contacts_detail(chat_room.contact.user_name)
+
+    return unless detail_res&.dig("Success")
+
+    raw_contact = detail_res.dig("Data", "ContactList")&.first
+    return unless raw_contact
+
+    parse_contact_data = api_service.parse_contact_data(raw_contact)
+
+    contact = chat_room.contact
+    parse_contact_data[:own_wxid] = contact.own_wxid
+    parse_contact_data[:user_name] ||= raw_contact.dig("UserName", "string")
+
+    contact.assign_attributes(parse_contact_data)
+    contact.save! if contact.changed?
+    render json: { success: true }
   end
 
   def chat_members
