@@ -53,6 +53,8 @@ class MessageSender
                                       msg_res.dig("toUserName") ||
                                       @chat_room.wx_id,
                                     content: @message_content,
+                                    # 这里发送的当然都是自己发的？（后续可能会加机器人）
+                                    self_send: true,
                                   })
     # 保存到当前聊天的消息
     message =  Message.create({

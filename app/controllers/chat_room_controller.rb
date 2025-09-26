@@ -26,7 +26,7 @@ class ChatRoomController < ApplicationController
   end
 
   def show
-    @chat_room = ChatRoom.where(id: params[:id]).first
+    @chat_room = ChatRoom.includes(:contact).find(params[:id])
     unless @chat_room
       render json: { status: "error", message: "聊天室不存在" }, status: :not_found
     end

@@ -4,14 +4,15 @@ require "nokogiri"
 module WechatModels
 
   module SyncMessageModel
-    def self.parse(api_hash)
+    def self.parse(api_hash, current_wxid)
       content = api_hash.dig("Content", "string")
       refer_app_msg = parse_refer_app_msg(content)
       refer_new_msg_id = refer_app_msg[:srv_id]
       title = refer_app_msg[:title]
+      from_user_name = api_hash.dig("FromUserName", "string")
       WxMessage.new(
         msg_id: api_hash["MsgId"],
-        from_user_name: api_hash.dig("FromUserName", "string"),
+        from_user_name: from_user_name,
         to_user_name: api_hash.dig("ToUserName", "string"),
         msg_type: api_hash["MsgType"],
         content: content,
@@ -24,16 +25,17 @@ module WechatModels
         msg_seq: api_hash["MsgSeq"],
         refer_new_msg_id: refer_new_msg_id,
         refer_title: title,
+        self_send: from_user_name === current_wxid,
       )
     end
 
-    def self.parse_saves(res)
+    def self.parse_saves(res, current_wxid)
       return [] unless res["Success"]
       add_messages = res.dig("Data", "AddMsgs") || []
       wx_messages = add_messages
                       .reject { |msg_hash| [51, 10002].include?(msg_hash["MsgType"]) }
                       .map do |msg_hash|
-        parse(msg_hash).attributes.except("id", "created_at", "updated_at")
+        parse(msg_hash, current_wxid).attributes.except("id", "created_at", "updated_at")
       end
       return [] if wx_messages.empty?
       result = WxMessage.insert_all(wx_messages, returning: %w[id])

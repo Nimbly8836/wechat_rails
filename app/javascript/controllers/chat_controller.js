@@ -1,4 +1,4 @@
-import { Controller } from "@hotwired/stimulus"
+import {Controller} from "@hotwired/stimulus"
 
 // Connects to data-controller="chat"
 export default class extends Controller {
@@ -8,6 +8,11 @@ export default class extends Controller {
   currentRoomId = null
 
   connect() {
+    // 页面初始化
+    if (Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+
     this.sidebar = document.getElementById("sidebar")
     this.resizer = document.getElementById("resizer")
     this.startX = 0
@@ -18,7 +23,25 @@ export default class extends Controller {
 
     // 默认显示消息 tab
     const messageTab = this.sidebar.querySelector('[data-tab="messages"]')
-    if (messageTab) messageTab.click()
+    if (messageTab) {
+      messageTab.click()
+    }
+
+    const evtSource = new EventSource(`/notion/message`);
+
+    evtSource.onmessage = (event) => {
+
+      const payload = JSON.parse(event.data);
+      console.log("收到新消息通知", payload);
+      window.dispatchEvent(new CustomEvent("chat:notify", { detail: payload }));
+
+      // 浏览器通知示例
+      if (Notification.permission === "granted") {
+        new Notification("聊天室新消息", {body: `聊天室有新消息`});
+      } else {
+        Notification.requestPermission();
+      }
+    };
   }
 
   // ====== 联系人点击 ======
@@ -36,8 +59,11 @@ export default class extends Controller {
   // ====== 打开聊天室 ======
   openChatRoom(chatRoomId) {
     // 隐藏欢迎页
-    const welcome = document.getElementById("chat-box").querySelector(".flex-col.items-center")
-    if (welcome) welcome.style.display = "none"
+    const welcome = document.getElementById("chat-box").querySelector(
+        ".flex-col.items-center")
+    if (welcome) {
+      welcome.style.display = "none"
+    }
 
     // 隐藏之前聊天室
     if (this.currentRoomId && this.chatCache[this.currentRoomId]) {
@@ -98,7 +124,9 @@ export default class extends Controller {
                   `<div class="flex items-center px-4 py-2 cursor-pointer border-b border-gray-100 hover:bg-gray-100"
                     data-chat-room-id="${room.id}">
                 <div class="flex items-center justify-center w-12 h-12 mr-3 rounded-full bg-gray-300 text-gray-600 text-lg font-medium overflow-hidden flex-shrink-0">
-                  ${room.avatar_base64 ? `<img src="data:image/png;base64,${room.avatar_base64}" class="w-full h-full object-cover"/>` : `<span>?</span>`}
+                  ${room.avatar_base64
+                      ? `<img src="data:image/png;base64,${room.avatar_base64}" class="w-full h-full object-cover"/>`
+                      : `<span>?</span>`}
                 </div>
                 <div class="flex-1 overflow-hidden">
                   <div class="font-medium truncate">${room.name || '未命名会话'}</div>
@@ -108,7 +136,8 @@ export default class extends Controller {
 
             // 给聊天室列表添加点击事件
             chatRooms.forEach(room => {
-              const el = document.querySelector(`[data-chat-room-id="${room.id}"]`)
+              const el = document.querySelector(
+                  `[data-chat-room-id="${room.id}"]`)
               if (el) {
                 el.addEventListener("click", () => this.openChatRoom(room.id))
               }
@@ -125,7 +154,9 @@ export default class extends Controller {
   scrollToGroup(event) {
     const initial = event.currentTarget.dataset.letter
     const group = this.groupTargets.find(g => g.id === `group-${initial}`)
-    if (group) group.scrollIntoView({ behavior: "smooth", block: "start" })
+    if (group) {
+      group.scrollIntoView({behavior: "smooth", block: "start"})
+    }
   }
 
   highlightLetter() {
@@ -139,7 +170,8 @@ export default class extends Controller {
     })
 
     this.letterTargets.forEach(letter => {
-      letter.classList.toggle("active", letter.dataset.letter === currentInitial)
+      letter.classList.toggle("active",
+          letter.dataset.letter === currentInitial)
     })
   }
 
@@ -153,8 +185,12 @@ export default class extends Controller {
 
   resize = (event) => {
     let newWidth = this.startWidth + (event.clientX - this.startX)
-    if (newWidth < this.minWidth) newWidth = this.minWidth
-    if (newWidth > this.maxWidth) newWidth = this.maxWidth
+    if (newWidth < this.minWidth) {
+      newWidth = this.minWidth
+    }
+    if (newWidth > this.maxWidth) {
+      newWidth = this.maxWidth
+    }
     this.sidebar.style.width = `${newWidth}px`
   }
 
