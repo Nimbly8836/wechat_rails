@@ -16,6 +16,6 @@ class Message < ApplicationRecord
     }.to_json
 
     # 使用 PG NOTIFY
-    ActiveRecord::Base.connection.execute("NOTIFY message, '#{payload}'")
+    NotifyRecord.connection.execute("NOTIFY message, #{NotifyRecord.connection.quote(payload)}")
   end
 end

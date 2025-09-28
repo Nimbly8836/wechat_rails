@@ -16,7 +16,26 @@ module WechatRequest
       share_link: { defaults: {}, required: [:toWxid, :type, :desc, :xml] },
       share_location: { defaults: {}, required: [:toWxid, :location] },
       share_video: { defaults: {}, required: [:toWxid, :xml] },
-      upload_img: { defaults: {}, required: [:toWxid, :base64] }
+      upload_img: { defaults: {}, required: [:toWxid, :base64] },
+
+      # Tools 接口
+      cdn_download_image: { defaults: {}, required: [:url, :wxid] },
+      download_file: { defaults: {}, required: [:dataLen, :xml, :wxid] },
+      download_img: { defaults: {}, required: [:dataLen, :xml, :wxid] },
+      download_video: { defaults: {}, required: [:dataLen, :xml, :wxid] },
+      download_voice: { defaults: {}, required: [:bufid, :fromUserName, :length, :msgId, :wxid] },
+      generate_pay_qcode: { defaults: {}, required: [:wxid] },
+      get_a8_key: { defaults: { opCode: 2, scene: 4, codeType: 19, codeVersion: 5 }, required: [:wxid] },
+      get_band_card_list: { defaults: {}, required: [:wxid] },
+      get_bound_hard_devices: { defaults: {}, required: [:wxid] },
+      get_cdn_dns: { defaults: {}, required: [:wxid] },
+      oauth_sdk_app: { defaults: {}, required: [:appId, :wxid] },
+      third_app_grant: { defaults: {}, required: [:appId, :authCode, :wxid] },
+      update_step_number_api: { defaults: {}, required: [:step, :wxid] },
+      upload_file: { defaults: {}, required: [:file, :wxid] },
+      upload_file_binary: { defaults: {}, required: [:file, :wxid] },
+      set_proxy: { defaults: {}, required: [:proxy, :wxid] },
+
     }.freeze
 
     def self.params(**optional, &block)
@@ -59,7 +78,6 @@ module WechatRequest
         str[0].upcase + str[1..-1]
       end
     end
-
 
     def to_h
       { Wxid: @wxid }.merge(extra_params)

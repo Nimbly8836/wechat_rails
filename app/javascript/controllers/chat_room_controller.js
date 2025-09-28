@@ -6,13 +6,13 @@ export default class extends Controller {
   static values = {currentWxid: String, id: Number, members: Array};
 
   connect() {
-    console.log("chat_room controller loaded", this.idValue,
-        this.currentWxidValue)
+    this.debouncedLoadNewMessages = this.debounce(
+        this.loadNewMessages.bind(this), 400);
 
     window.addEventListener("chat:notify", (e) => {
       const payload = e.detail;
       if (payload.chat_room_id === this.idValue) {
-        this.loadNewMessages(payload.id);
+        this.debouncedLoadNewMessages(payload);
       }
     });
 
@@ -44,6 +44,15 @@ export default class extends Controller {
 
     // 初始化时也调整一次
     this.autoResize();
+  }
+
+  // 防抖函数
+  debounce(fn, delay) {
+    let timer = null;
+    return function (...args) {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
   }
 
   disconnect() {
@@ -88,8 +97,11 @@ export default class extends Controller {
   }
 
   getMessageType(msg) {
+    if (msg.msg_type === "voice") {
+      return "voice";
+    }
     if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(
-        /(\w+:|.*)\n</)?.length > 0) && msg.content.length > 250) {
+        /(\w+:|.*)\n</)?.length > 0) && msg.content?.length > 250) {
       // 这里线解析一下， 已知 type 5 一般是 card，57 是引用消息
       if (!this.isRoom()) {
         const parse = this.parseWxXmlMessage(msg.content)
@@ -137,6 +149,7 @@ export default class extends Controller {
 
     this.messages.forEach((m) => {
       const msg = m.wx_message;
+      msg.id = m.id;
       const sender = msg.from_user_name || "";
       const isNewGroup = lastSender !== null && lastSender !== sender;
       lastSender = sender;
@@ -194,11 +207,17 @@ export default class extends Controller {
 
   renderMessageBubble(msg) {
     const bubble = document.createElement("div");
+    bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${msg.self_send
+        ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
+        : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"
+    }`;
     const type = this.getMessageType(msg);
 
     this.replaceRoomSenderWxid(msg)
 
     switch (type) {
+      case "voice":
+        return this.renderVoiceMessage(bubble, msg);
       case "card":
         return this.renderCardMessage(bubble, msg);
       case "xml_unparsed":
@@ -496,33 +515,40 @@ export default class extends Controller {
         .catch(console.error);
   }
 
-  // 拉取新的消息
-  loadNewMessages(msgId) {
+// 拉取新的消息
+  loadNewMessages(msg) {
     if (this.messages.length === 0) {
-      return this.loadMessages(); // 没有消息就直接拉取前100条
+      return this.loadMessages();
     }
 
     const container = this.messageListTarget;
 
-    fetch(`/chat_room/${this.idValue}/messages?after_id=${msgId}`)
+    fetch(`/chat_room/${this.idValue}/messages?after_id=${msg.message_id}`)
         .then(res => res.json())
         .then(data => {
           if (!data.length) {
             return;
           }
 
-          // append 到消息数组
-          this.messages = [...this.messages, ...data];
+          // 用 Set 做去重
+          const existingIds = new Set(this.messages.map(m => m.id));
 
-          // 只渲染新增消息
-          data.forEach(m => {
-            const msg = m.wx_message;
-            const isMine = msg.to_user_name === this.currentWxidValue;
-            const row = this.buildRow(isMine, true, msg); // true 表示显示头像/间距
-            const bubble = this.renderMessageBubble(msg, isMine);
+          const newOnes = data.filter(m => !existingIds.has(m.id));
+
+          if (!newOnes.length) {
+            return;
+          }
+
+          this.messages.push(...newOnes);
+
+          // 渲染新增消息
+          newOnes.forEach(m => {
+            const wxMsg = m.wx_message;
+            const row = this.buildRow(true, wxMsg); // true 表示新分组
+            const bubble = this.renderMessageBubble(wxMsg);
             row.appendChild(bubble);
             container.appendChild(row);
-            this.renderStatus(m, bubble, msg, isMine);
+            this.renderStatus(m, bubble, wxMsg);
           });
 
           // 滚动到底部
@@ -534,5 +560,46 @@ export default class extends Controller {
   closeMenu = () => {
     this.menuTarget.classList.add("hidden")
     document.removeEventListener("click", this.closeMenu)
+  }
+
+  renderVoiceMessage(bubble, msg) {
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(msg.content, "application/xml");
+
+    const voiceNode = xml.querySelector("voicemsg");
+    const voiceLengthMs = parseInt(
+        voiceNode?.getAttribute("voicelength") || "0", 10);
+    const voiceLengthSec = Math.floor(voiceLengthMs / 1000);
+    // 先展示一个占位 UI，点击再去请求后端下载
+    const container = document.createElement("div");
+    container.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words";
+    container.classList.add("flex", "items-center", "space-x-2",
+        "cursor-pointer");
+
+    const icon = document.createElement("img");
+    icon.src = "voice-svgrepo-com.svg";
+    icon.width = 16;
+    icon.height = 16;
+
+    const label = document.createElement("span");
+    label.textContent = `${voiceLengthSec}"         `;
+
+    container.appendChild(icon);
+    container.appendChild(label);
+
+    container.addEventListener("click", () => {
+      // 点击后去请求后端接口下载/播放
+      fetch(`/message/voice/${msg.id}`)
+          .then((res) => res.blob())
+          .then((blob) => {
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.play();
+          })
+          .catch((err) => console.error("语音下载失败:", err));
+    });
+
+    bubble.appendChild(container);
+    return bubble;
   }
 }

@@ -18,8 +18,8 @@ class MessagesController < ApplicationController
     render json: messages.reverse.as_json(
       include: {
         wx_message: {
-          only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                 :new_msg_id, :refer_new_msg_id, :refer_title, :self_send ]
+          only: [:msg_type, :content, :from_user_name, :to_user_name,
+                 :new_msg_id, :refer_new_msg_id, :refer_title, :self_send]
         }
       }
     )
@@ -54,6 +54,19 @@ class MessagesController < ApplicationController
       SyncCreateContactsJob.perform_later(saves.as_json, wxid)
       render json: { "save_number": saves.length, "error": false, "message": "success" }
     end
+  end
+
+  def download_voice
+    # 下载语音消息
+    message = Message.includes(:wx_message, :chat_room).find(params[:id])
+    voice_content = message.wx_message.parse_voice_content
+    return unless voice_content
+    api_service = ToolsApiService.new()
+    res = api_service.download_voice(msg_id: message.wx_message.msg_id,
+                               from_user_name: voice_content[:from_user_name],
+                               length: voice_content[:length],
+                               buf_id: voice_content[:buf_id])
+    send_data(res&.dig("data", "Data", "data", "buffer"))
   end
 
   private
