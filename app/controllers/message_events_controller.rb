@@ -5,8 +5,7 @@ class MessageEventsController < ApplicationController
     response.headers['Content-Type'] = 'text/event-stream'
     response.headers['Cache-Control'] = 'no-cache'
 
-    # 使用原生 PG 连接
-    conn = ActiveRecord::Base.connection.raw_connection # PG::Connection
+    conn = NotifyRecord.connection.raw_connection
 
     # 订阅全局 chat_room 通道
     conn.exec("LISTEN message")

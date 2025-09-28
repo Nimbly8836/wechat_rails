@@ -25,7 +25,7 @@ class SaveChatRoomMessageJob < ApplicationJob
         {
           chat_room_id: chat_room.id,
           wx_messages_id: msg["id"],
-          message_time: msg["msg_create_time"],
+          message_time: msg["msg_create_time"]
         }
       end.compact
 
@@ -35,7 +35,7 @@ class SaveChatRoomMessageJob < ApplicationJob
         # 批量查出插入的 messages
         message_ids = messages_to_save.map { |m| m[:wx_messages_id] }
         new_messages = Message.includes(:wx_message)
-                      .where(wx_messages_id: message_ids)
+                              .where(wx_messages_id: message_ids)
 
         new_messages.each do |m|
           next if m.wx_message.nil? || m.wx_message.self_send

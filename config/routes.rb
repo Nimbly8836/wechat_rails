@@ -37,8 +37,8 @@ Rails.application.routes.draw do
   end
 
   post "message/callback/:wxid" => "messages#callback"
+  get "message/voice/:id" => "messages#download_voice"
 
   get "/notion/message", to: "message_events#events"
-
 
 end

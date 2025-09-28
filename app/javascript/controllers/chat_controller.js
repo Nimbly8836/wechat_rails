@@ -5,6 +5,7 @@ export default class extends Controller {
   static targets = ["chatBox", "contact", "letter", "contactsList", "group"]
 
   chatCache = {}
+  chatRoomNames = {}
   currentRoomId = null
 
   connect() {
@@ -32,15 +33,16 @@ export default class extends Controller {
     evtSource.onmessage = (event) => {
 
       const payload = JSON.parse(event.data);
-      console.log("收到新消息通知", payload);
-      window.dispatchEvent(new CustomEvent("chat:notify", { detail: payload }));
+      window.dispatchEvent(new CustomEvent("chat:notify", {detail: payload}));
 
-      // 浏览器通知示例
       if (Notification.permission === "granted") {
-        new Notification("聊天室新消息", {body: `聊天室有新消息`});
-      } else {
-        Notification.requestPermission();
+        const roomName = this.chatRoomNames[payload.chat_room_id]
+            || `聊天室 ${payload.chat_room_id}`
+        new Notification("聊天室新消息", {
+          body: `${roomName}：${payload.content_preview}`
+        });
       }
+
     };
   }
 
@@ -112,7 +114,6 @@ export default class extends Controller {
       contactsList.classList.add("hidden")
       letterNav.hidden = true
 
-      // 拉取消息列表（可选，根据你的接口）
       fetch("/chat_room/list")
           .then(resp => resp.json())
           .then(chatRooms => {
@@ -134,8 +135,9 @@ export default class extends Controller {
               </div>`).join('')
             }
 
-            // 给聊天室列表添加点击事件
+            // 缓存 id -> name
             chatRooms.forEach(room => {
+              this.chatRoomNames[room.id] = room.name || '未命名会话'
               const el = document.querySelector(
                   `[data-chat-room-id="${room.id}"]`)
               if (el) {
@@ -143,6 +145,7 @@ export default class extends Controller {
               }
             })
           })
+
     } else {
       messageList.classList.add("hidden")
       contactsList.classList.remove("hidden")

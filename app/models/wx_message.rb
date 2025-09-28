@@ -38,5 +38,33 @@ class WxMessage < ApplicationRecord
     recalled: 10002         # 撤回消息 (MM_DATA_RECALLED)
   }
 
+  def parse_voice_content
+    return unless (msg_type.to_sym == :voice) and content.present?
+    doc = Nokogiri::XML(self.content)
+    voice_node = doc.at_xpath("//voicemsg")
+    return {} unless voice_node
+
+    # 获取属性
+    voicelength_ms = voice_node['voicelength'].to_i    # 毫秒
+    voice_length_sec = (voicelength_ms / 1000.0).ceil  # 秒，整数
+
+    voice_url = voice_node['voiceurl']
+    aes_key   = voice_node['aeskey']
+    from_user = voice_node['fromusername']
+
+    {
+      voice_length_sec: voice_length_sec,
+      voice_url: voice_url,
+      aes_key: aes_key,
+      from_user_name: from_user,
+      end_flag: voice_node['endflag'] == '1',
+      cancel_flag: voice_node['cancelflag'] == '1',
+      voice_format: voice_node['voiceformat'].to_i,
+      buf_id: voice_node['bufid'].to_i,
+      length: voice_node['length'].to_i,
+    }
+
+  end
+
 
 end
