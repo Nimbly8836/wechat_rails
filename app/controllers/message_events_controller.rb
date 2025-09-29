@@ -10,7 +10,7 @@ class MessageEventsController < ApplicationController
       pg_conn.exec("LISTEN message")
 
       loop do
-        pg_conn.wait_for_notify(30) do |_channel, _pid, payload|
+        pg_conn.wait_for_notify(10) do |_channel, _pid, payload|
           response.stream.write "data: #{payload}\n\n"
         end
 
