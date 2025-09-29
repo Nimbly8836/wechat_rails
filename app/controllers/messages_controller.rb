@@ -64,7 +64,7 @@ class MessagesController < ApplicationController
       render json: { error: true, message: "voice message not found" }, status: :not_found and return
     end
 
-    converter = VoiceConversionService.new(message.wx_message.msg_id)
+    converter = VoiceConversionService.new(message.id)
 
     if converter.cached_file_available?
       return send_file(converter.cached_file_path, type: converter.mime_type, disposition: "inline")
@@ -88,7 +88,6 @@ class MessagesController < ApplicationController
       Rails.logger.error { "Voice conversion failed: #{e.message}" }
       render json: { error: true, message: "voice conversion failed" }, status: :unprocessable_entity
     end
-    # send_data buff, type: "audio/octet-stream"
   end
 
   private
