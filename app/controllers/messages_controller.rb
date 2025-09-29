@@ -60,13 +60,35 @@ class MessagesController < ApplicationController
     # 下载语音消息
     message = Message.includes(:wx_message, :chat_room).find(params[:id])
     voice_content = message.wx_message.parse_voice_content
-    return unless voice_content
-    api_service = ToolsApiService.new()
-    res = api_service.download_voice(msg_id: message.wx_message.msg_id,
-                               from_user_name: voice_content[:from_user_name],
-                               length: voice_content[:length],
-                               buf_id: voice_content[:buf_id])
-    send_data(res&.dig("data", "Data", "data", "buffer"))
+    unless voice_content
+      render json: { error: true, message: "voice message not found" }, status: :not_found and return
+    end
+
+    converter = VoiceConversionService.new(message.wx_message.msg_id)
+
+    if converter.cached_file_available?
+      return send_file(converter.cached_file_path, type: converter.mime_type, disposition: "inline")
+    end
+
+    contact = Contact.find(message.chat_room.contact_id)
+    api_service = ToolsApiService.new(contact.own_wxid)
+    res = api_service.download_voice(
+      msg_id: message.wx_message.msg_id,
+      from_user_name: voice_content[:from_user_name],
+      length: voice_content[:length],
+      buf_id: voice_content[:buf_id]
+    )
+
+    buffer = res&.dig("Data", "data", "buffer")
+
+    begin
+      file_path = converter.convert_and_store!(buffer)
+      send_file(file_path, type: converter.mime_type, disposition: "inline")
+    rescue VoiceConversionService::ConversionError => e
+      Rails.logger.error { "Voice conversion failed: #{e.message}" }
+      render json: { error: true, message: "voice conversion failed" }, status: :unprocessable_entity
+    end
+    # send_data buff, type: "audio/octet-stream"
   end
 
   private
@@ -79,5 +101,4 @@ class MessagesController < ApplicationController
   end
 
 end
-
 

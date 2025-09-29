@@ -23,7 +23,7 @@ module WechatRequest
       download_file: { defaults: {}, required: [:dataLen, :xml, :wxid] },
       download_img: { defaults: {}, required: [:dataLen, :xml, :wxid] },
       download_video: { defaults: {}, required: [:dataLen, :xml, :wxid] },
-      download_voice: { defaults: {}, required: [:bufid, :fromUserName, :length, :msgId, :wxid] },
+      download_voice: { defaults: {}, required: [:bufid, :fromUserName, :length, :msgId] },
       generate_pay_qcode: { defaults: {}, required: [:wxid] },
       get_a8_key: { defaults: { opCode: 2, scene: 4, codeType: 19, codeVersion: 5 }, required: [:wxid] },
       get_band_card_list: { defaults: {}, required: [:wxid] },
