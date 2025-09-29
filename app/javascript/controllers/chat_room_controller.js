@@ -8,6 +8,11 @@ export default class extends Controller {
   connect() {
     this.debouncedLoadNewMessages = this.debounce(
         this.loadNewMessages.bind(this), 400);
+    this.voiceBlobUrls = new Map();
+    this.currentVoicePlayback = null;
+    this.voicePlaybackRates = new Map();
+    this.pendingVoiceSeeks = new Map();
+    this.voicePlaybackOptions = [0.5, 1.0, 1.5, 2.0];
 
     window.addEventListener("chat:notify", (e) => {
       const payload = e.detail;
@@ -266,7 +271,8 @@ export default class extends Controller {
   renderXmlMessage(bubble, msg) {
     bubble.className = "p-3 relative inline-block max-w-[75%] rounded-2xl shadow-sm bg-white text-gray-900 border border-gray-200";
     const wrapper = document.createElement("div");
-    wrapper.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words overflow-hidden";
+    wrapper.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap"
+        + " break-words overflow-hidden";
     wrapper.style.maxHeight = "6rem";
     wrapper.textContent = msg.content || "";
 
@@ -290,7 +296,8 @@ export default class extends Controller {
   }
 
   renderEmojiMessage(bubble) {
-    bubble.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words bg-white border border-gray-200 rounded-2xl";
+    bubble.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words"
+        + " bg-white border border-gray-200 rounded-2xl";
     bubble.textContent = "Emoji 替代符，TODO";
     return bubble;
   }
@@ -302,7 +309,8 @@ export default class extends Controller {
     }`;
     const inner = document.createElement("div");
     inner.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words";
-    inner.textContent = msg.refer_title || msg.content || "";
+    const content = msg.refer_title || msg.content || "";
+    inner.appendChild(this.buildLinkedText(content));
     bubble.appendChild(inner);
     // this.addTimestamp(bubble, msg);
     return bubble;
@@ -515,7 +523,7 @@ export default class extends Controller {
         .catch(console.error);
   }
 
-// 拉取新的消息
+  // 拉取新的消息
   loadNewMessages(msg) {
     if (this.messages.length === 0) {
       return this.loadMessages();
@@ -570,11 +578,13 @@ export default class extends Controller {
     const voiceLengthMs = parseInt(
         voiceNode?.getAttribute("voicelength") || "0", 10);
     const voiceLengthSec = Math.floor(voiceLengthMs / 1000);
-    // 先展示一个占位 UI，点击再去请求后端下载
+    const fallbackDuration = voiceLengthMs / 1000;
+    const wrapper = document.createElement("div");
+    wrapper.className = "relative w-full px-3 py-2 pr-14 pb-4";
+
     const container = document.createElement("div");
-    container.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words";
-    container.classList.add("flex", "items-center", "space-x-2",
-        "cursor-pointer");
+    container.className = "flex items-center space-x-2 cursor-pointer";
+    container.dataset.loading = "false";
 
     const icon = document.createElement("img");
     icon.src = "voice-svgrepo-com.svg";
@@ -582,24 +592,403 @@ export default class extends Controller {
     icon.height = 16;
 
     const label = document.createElement("span");
-    label.textContent = `${voiceLengthSec}"         `;
+    label.textContent = `${voiceLengthSec}"`;
+    label.dataset.originalText = label.textContent;
 
     container.appendChild(icon);
     container.appendChild(label);
+    wrapper.appendChild(container);
 
-    container.addEventListener("click", () => {
-      // 点击后去请求后端接口下载/播放
-      fetch(`/message/voice/${msg.id}`)
-          .then((res) => res.blob())
-          .then((blob) => {
-            const url = URL.createObjectURL(blob);
-            const audio = new Audio(url);
-            audio.play();
-          })
-          .catch((err) => console.error("语音下载失败:", err));
+    const controls = document.createElement("div");
+    controls.className = "flex items-center space-x-2 mt-2 text-xs text-gray-500";
+
+    const progressBar = document.createElement("div");
+    progressBar.className = "relative h-1 bg-gray-200 rounded overflow-hidden flex-1 cursor-pointer";
+    progressBar.style.minWidth = "120px";
+
+    const progressInner = document.createElement("div");
+    progressInner.className = "absolute left-0 top-0 h-full bg-blue-500 w-0";
+    progressBar.appendChild(progressInner);
+
+    const speedButton = document.createElement("button");
+    speedButton.type = "button";
+    speedButton.className = "px-1 py-1 bg-white/30 border-dashed border-white/40"
+        + " rounded text-[6px] leading-none";
+    const rateIndex = this.voicePlaybackRates.get(msg.id) ?? 1;
+    const rate = this.voicePlaybackOptions[rateIndex] ?? 1.0;
+    speedButton.textContent = `${rate.toFixed(1)}x`;
+
+    const context = {
+      messageId: msg.id,
+      fallbackDuration,
+      progressBar,
+      progressInner,
+      speedButton,
+    };
+
+    const pendingRatio = this.pendingVoiceSeeks.get(msg.id);
+    if (typeof pendingRatio === "number") {
+      progressInner.style.width = `${Math.min(Math.max(pendingRatio, 0), 1)
+      * 100}%`;
+    }
+
+    controls.appendChild(progressBar);
+    controls.appendChild(speedButton);
+
+    wrapper.appendChild(controls);
+    bubble.appendChild(wrapper);
+
+    container.addEventListener("click", () =>
+        this.handleVoiceClick(msg.id, container, label, context));
+
+    progressBar.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.seekVoice(msg.id, context, event);
     });
 
-    bubble.appendChild(container);
+    speedButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.toggleSpeed(msg.id, context);
+    });
+
     return bubble;
+  }
+
+  handleVoiceClick(messageId, container, label, context) {
+    if (container.dataset.loading === "true") {
+      return;
+    }
+
+    const original = label.dataset.originalText;
+    const cachedUrl = this.voiceBlobUrls.get(messageId);
+
+    if (cachedUrl) {
+      this.playVoice(cachedUrl, container, label, context);
+      return;
+    }
+
+    container.dataset.loading = "true";
+    label.textContent = "加载中…";
+
+    fetch(`/message/voice/${messageId}`)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`请求失败: ${res.status}`);
+          }
+          return res.blob();
+        })
+        .then((blob) => {
+          const url = URL.createObjectURL(blob);
+          this.voiceBlobUrls.set(messageId, url);
+          this.playVoice(url, container, label, context);
+        })
+        .catch((err) => {
+          console.error("语音下载失败:", err);
+          label.textContent = "下载失败";
+          setTimeout(() => {
+            label.textContent = original;
+          }, 1500);
+        })
+        .finally(() => {
+          container.dataset.loading = "false";
+        });
+  }
+
+  playVoice(url, container, label, context) {
+    this.stopCurrentVoicePlayback();
+
+    const audio = new Audio(url);
+    const original = label.dataset.originalText;
+
+    const {
+      messageId,
+      progressBar,
+      progressInner,
+      fallbackDuration,
+      speedButton,
+    } = context;
+
+    const playbackState = {
+      audio,
+      progressBar,
+      progressInner,
+      speedButton,
+      rateIndex: this.voicePlaybackRates.get(messageId) ?? 1,
+      fallbackDuration,
+      messageId,
+      animationId: null,
+      applyRate: null,
+      cleanup: null,
+    };
+
+    const stopAnimation = () => {
+      if (playbackState.animationId) {
+        cancelAnimationFrame(playbackState.animationId);
+        playbackState.animationId = null;
+      }
+    };
+
+    const hideProgress = () => {
+      const pending = this.pendingVoiceSeeks.get(messageId);
+      const ratio = typeof pending === "number" ? pending : 0;
+      progressInner.style.width = `${Math.min(Math.max(ratio, 0), 1) * 100}%`;
+      stopAnimation();
+    };
+
+    const cleanup = () => {
+      container.classList.remove("opacity-60");
+      label.textContent = original;
+      if (this.currentVoicePlayback?.audio === audio) {
+        this.currentVoicePlayback = null;
+      }
+      hideProgress();
+      this.pendingVoiceSeeks.delete(messageId);
+    };
+
+    playbackState.cleanup = cleanup;
+
+    const updateProgress = () => {
+      const duration = Number.isFinite(audio.duration) && audio.duration > 0
+          ? audio.duration
+          : fallbackDuration;
+      if (duration > 0) {
+        const percent = Math.min(1, audio.currentTime / duration) * 100;
+        progressInner.style.width = `${percent}%`;
+      }
+      playbackState.animationId = requestAnimationFrame(updateProgress);
+    };
+
+    const applyPendingSeek = () => {
+      const pending = this.pendingVoiceSeeks.get(messageId);
+      if (typeof pending !== "number") {
+        return;
+      }
+      const clamped = Math.min(Math.max(pending, 0), 1);
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = clamped * audio.duration;
+        progressInner.style.width = `${clamped * 100}%`;
+        this.pendingVoiceSeeks.delete(messageId);
+      } else {
+        progressInner.style.width = `${clamped * 100}%`;
+      }
+    };
+
+    const startTracking = () => {
+      if (this.currentVoicePlayback?.audio !== audio) {
+        return;
+      }
+      applyPendingSeek();
+      stopAnimation();
+      playbackState.animationId = requestAnimationFrame(updateProgress);
+    };
+
+    const applyRate = () => {
+      const rate = this.voicePlaybackOptions[playbackState.rateIndex] ?? 1.0;
+      audio.playbackRate = rate;
+      speedButton.textContent = `${rate.toFixed(1)}x`;
+      this.voicePlaybackRates.set(messageId, playbackState.rateIndex);
+    };
+
+    playbackState.applyRate = applyRate;
+
+    this.currentVoicePlayback = playbackState;
+    applyRate();
+
+    label.textContent = "播放中…";
+    container.classList.add("opacity-60");
+
+    audio.addEventListener("loadedmetadata", startTracking, {once: true});
+    audio.addEventListener("play", startTracking, {once: true});
+    audio.addEventListener("ended", cleanup, {once: true});
+
+    let playResult;
+    try {
+      playResult = audio.play();
+    } catch (err) {
+      console.error("语音播放失败:", err);
+      cleanup();
+      label.textContent = "播放失败";
+      setTimeout(() => {
+        label.textContent = original;
+      }, 2500);
+      return;
+    }
+
+    if (playResult && typeof playResult.then === "function") {
+      playResult.catch((err) => {
+        console.error("语音播放失败:", err);
+        cleanup();
+        label.textContent = "播放失败";
+        setTimeout(() => {
+          label.textContent = original;
+        }, 2500);
+      });
+    } else {
+      startTracking();
+    }
+  }
+
+  seekVoice(messageId, context, event) {
+    const {progressBar, progressInner} = context;
+    const rect = progressBar.getBoundingClientRect();
+    if (!rect.width) {
+      return;
+    }
+
+    const ratio = Math.min(
+        Math.max((event.clientX - rect.left) / rect.width, 0), 1);
+    progressInner.style.width = `${ratio * 100}%`;
+    this.pendingVoiceSeeks.set(messageId, ratio);
+
+    if (this.currentVoicePlayback?.messageId !== messageId) {
+      return;
+    }
+
+    const activeState = this.currentVoicePlayback;
+    const {audio} = activeState;
+    const previousInner = activeState.progressInner;
+    activeState.progressBar = progressBar;
+    activeState.progressInner = progressInner;
+    if (previousInner && previousInner !== progressInner) {
+      previousInner.style.width = `${ratio * 100}%`;
+    }
+
+    const apply = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = ratio * audio.duration;
+        this.pendingVoiceSeeks.delete(messageId);
+      }
+    };
+
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      apply();
+    } else {
+      audio.addEventListener("loadedmetadata", apply, {once: true});
+    }
+  }
+
+  toggleSpeed(messageId, context) {
+    const currentIndex = this.voicePlaybackRates.get(messageId) ?? 1;
+    const nextIndex = (currentIndex + 1) % this.voicePlaybackOptions.length;
+    this.voicePlaybackRates.set(messageId, nextIndex);
+
+    const rate = this.voicePlaybackOptions[nextIndex] ?? 1.0;
+    context.speedButton.textContent = `${rate.toFixed(1)}x`;
+
+    if (this.currentVoicePlayback?.messageId !== messageId) {
+      return;
+    }
+
+    this.currentVoicePlayback.rateIndex = nextIndex;
+    this.currentVoicePlayback.speedButton = context.speedButton;
+    if (typeof this.currentVoicePlayback.applyRate === "function") {
+      this.currentVoicePlayback.applyRate();
+    } else {
+      this.currentVoicePlayback.audio.playbackRate = rate;
+    }
+  }
+
+  stopCurrentVoicePlayback() {
+    if (!this.currentVoicePlayback) {
+      return;
+    }
+    const {audio, cleanup} = this.currentVoicePlayback;
+    audio.pause();
+    audio.currentTime = 0;
+    cleanup();
+  }
+
+  buildLinkedText(text) {
+    const fragment = document.createDocumentFragment();
+    if (!text) {
+      fragment.appendChild(document.createTextNode(""));
+      return fragment;
+    }
+
+    const anchorRegex = /<a\s+[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = anchorRegex.exec(text)) !== null) {
+      const preceding = text.slice(lastIndex, match.index);
+      if (preceding) {
+        this.appendPlainSegment(fragment, preceding);
+      }
+
+      const href = match[1];
+      const labelHtml = match[2];
+      const cleanHref = this.normalizeHref(href);
+
+      if (cleanHref) {
+        const anchor = this.createAnchor(cleanHref, this.decodeHtmlEntities(labelHtml));
+        fragment.appendChild(anchor);
+      } else {
+        this.appendPlainSegment(fragment, match[0]);
+      }
+
+      lastIndex = anchorRegex.lastIndex;
+    }
+
+    const trailing = text.slice(lastIndex);
+    if (trailing) {
+      this.appendPlainSegment(fragment, trailing);
+    }
+
+    return fragment;
+  }
+
+  appendPlainSegment(fragment, text) {
+    const urlRegex = /(https?:\/\/[^\s]+)/gi;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = urlRegex.exec(text)) !== null) {
+      const preceding = text.slice(lastIndex, match.index);
+      if (preceding) {
+        fragment.appendChild(document.createTextNode(preceding));
+      }
+
+      const url = match[0];
+      const cleanHref = this.normalizeHref(url);
+      if (cleanHref) {
+        fragment.appendChild(this.createAnchor(cleanHref, url));
+      } else {
+        fragment.appendChild(document.createTextNode(url));
+      }
+
+      lastIndex = match.index + url.length;
+    }
+
+    const trailing = text.slice(lastIndex);
+    if (trailing) {
+      fragment.appendChild(document.createTextNode(trailing));
+    }
+  }
+
+  createAnchor(href, label) {
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.textContent = label;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.className = "underline text-blue-500 hover:text-blue-600";
+    return anchor;
+  }
+
+  decodeHtmlEntities(text) {
+    const textarea = document.createElement("textarea");
+    textarea.innerHTML = text;
+    return textarea.value;
+  }
+
+  normalizeHref(href) {
+    if (!href) {
+      return null;
+    }
+    const trimmed = href.trim();
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return null;
+    }
+    return trimmed;
   }
 }

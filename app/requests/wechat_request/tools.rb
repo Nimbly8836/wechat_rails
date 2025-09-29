@@ -2,82 +2,82 @@ module WechatRequest
   module Tools
     # CDN 下载高清图片
     class CdnDownloadImage < Base
-      params { [:url, :wxid] }  # 根据实际定义添加必填参数
+      params { [:url ] }  # 根据实际定义添加必填参数
     end
 
     # 文件下载
     class DownloadFile < Base
-      params { [:dataLen, :xml, :wxid] }
+      params { [:dataLen, :xml ] }
     end
 
     # 高清图片下载
     class DownloadImg < Base
-      params { [:dataLen, :xml, :wxid] }
+      params { [:dataLen, :xml ] }
     end
 
     # 视频下载
     class DownloadVideo < Base
-      params { [:dataLen, :xml, :wxid] }
+      params { [:dataLen, :xml ] }
     end
 
     # 语音下载
     class DownloadVoice < Base
-      params { [:bufid, :fromUserName, :length, :msgId, :wxid] }  # 假设需要 voiceId，根据实际定义调整
+      params { [:bufid, :fromUserName, :length, :msgId] }
     end
 
     # 生成支付二维码
     class GeneratePayQCode < Base
-      params { [:wxid] }
+      params { [] }
     end
 
     # GetA8Key
     class GetA8Key < Base
-      params { [:opCode, :scene, :codeType, :codeVersion, :wxid] }
+      params { [:opCode, :scene, :codeType, :codeVersion ] }
     end
 
     # 获取余额及银行卡信息
     class GetBandCardList < Base
-      params { [:wxid] }
+      params { [] }
     end
 
     # 获取绑定硬件设备
     class GetBoundHardDevices < Base
-      params { [:wxid] }
+      params { [] }
     end
 
     # 获取 CDN DNS 信息
     class GetCdnDns < Base
-      params { [:wxid] }
+      params { [] }
     end
 
     # OauthSdkApp
     class OauthSdkApp < Base
-      params { [:appId, :wxid] } # 根据实际定义添加字段
+      params { [:appId ] } # 根据实际定义添加字段
     end
 
     # 第三方 APP 授权
     class ThirdAppGrant < Base
-      params { [:appId, :authCode, :wxid] } # 根据实际定义添加字段
+      params { [:appId, :authCode ] } # 根据实际定义添加字段
     end
 
     # 修改微信步数
     class UpdateStepNumberApi < Base
-      params { [:step, :wxid] }
+      params { [:step ] }
     end
 
     # 文件上传
     class UploadFile < Base
-      params { [:file, :wxid] }
+      params { [:file ] }
     end
 
     # 文件上传（二进制）
     class UploadFileBinary < Base
-      params { [:file, :wxid] }
+      params { [:file ] }
     end
 
     # 设置/删除代理 IP
     class SetProxy < Base
-      params { [:proxy, :wxid] }
+      params { [:proxy ] }
     end
   end
 end

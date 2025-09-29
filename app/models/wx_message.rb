@@ -60,7 +60,7 @@ class WxMessage < ApplicationRecord
       end_flag: voice_node['endflag'] == '1',
       cancel_flag: voice_node['cancelflag'] == '1',
       voice_format: voice_node['voiceformat'].to_i,
-      buf_id: voice_node['bufid'].to_i,
+      buf_id: voice_node['bufid'].to_s,
       length: voice_node['length'].to_i,
     }
 

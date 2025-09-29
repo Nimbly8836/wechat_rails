@@ -9,6 +9,11 @@ export default class extends Controller {
   currentRoomId = null
 
   connect() {
+    this.eventSource = null;
+    this.reconnectTimer = null;
+    this.eventSourceUrl = "/notion/message";
+    this.eventSourceRetryDelay = 2000;
+
     // 页面初始化
     if (Notification.permission !== "granted") {
       Notification.requestPermission();
@@ -28,22 +33,69 @@ export default class extends Controller {
       messageTab.click()
     }
 
-    const evtSource = new EventSource(`/notion/message`);
+    this.establishEventSource();
+  }
 
-    evtSource.onmessage = (event) => {
+  disconnect() {
+    this.teardownEventSource();
+  }
 
+  establishEventSource() {
+    this.teardownEventSource();
+
+    const source = new EventSource(this.eventSourceUrl);
+    this.eventSource = source;
+
+    source.onmessage = (event) => this.handleEventSourceMessage(event);
+    source.addEventListener("ping", () => {
+      // keep-alive event, no-op
+    });
+    source.onerror = () => {
+      this.scheduleReconnect();
+    };
+  }
+
+  handleEventSourceMessage(event) {
+    try {
       const payload = JSON.parse(event.data);
       window.dispatchEvent(new CustomEvent("chat:notify", {detail: payload}));
 
       if (Notification.permission === "granted") {
         const roomName = this.chatRoomNames[payload.chat_room_id]
-            || `聊天室 ${payload.chat_room_id}`
+            || `聊天室 ${payload.chat_room_id}`;
         new Notification("聊天室新消息", {
           body: `${roomName}：${payload.content_preview}`
         });
       }
+    } catch (error) {
+      console.error("解析消息失败", error);
+    }
+  }
 
-    };
+  scheduleReconnect() {
+    this.teardownEventSource();
+    if (this.reconnectTimer) {
+      return;
+    }
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.establishEventSource();
+    }, this.eventSourceRetryDelay);
+  }
+
+  teardownEventSource() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.eventSource) {
+      try {
+        this.eventSource.close();
+      } catch (_) {
+        // ignore close errors
+      }
+      this.eventSource = null;
+    }
   }
 
   // ====== 联系人点击 ======
