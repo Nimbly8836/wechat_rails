@@ -2,15 +2,12 @@
 
 class MessageSender
   MESSAGE_TYPES = {
-    text: 0,
-    image: 1,
-    video: 2,
-    voice: 3,
-    card: 4,
-    share_link: 5,
+    text: 1,
+    image: 3,
+    video: 43,
+    voice: 34,
     file: 6,
-    auto_file: 7,
-    app_msg: 8
+    emoji: 47,
   }.freeze
 
   attr_reader :chat_room, :message_type, :message_content
@@ -46,7 +43,7 @@ class MessageSender
                                     msg_seq: 0,
                                     msg_create_time: Time.at(msg_res.dig("servertime") ||
                                                              msg_res.dig("CreateTime")),
-                                    msg_type: :self_send,
+                                    msg_type: @message_type,
                                     from_user_name: @chat_room.contact.own_wxid,
                                     to_user_name: msg_res.dig("ToUsetName", "string") ||
                                       msg_res.dig("ToUserName", "string") ||

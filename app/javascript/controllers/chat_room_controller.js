@@ -13,6 +13,10 @@ export default class extends Controller {
     this.voicePlaybackRates = new Map();
     this.pendingVoiceSeeks = new Map();
     this.voicePlaybackOptions = [0.5, 1.0, 1.5, 2.0];
+    this.highlightedRow = null;
+    this.highlightTimer = null;
+    this.stickyAvatarEl = null;
+    this.stickyAvatarUpdateId = null;
 
     window.addEventListener("chat:notify", (e) => {
       const payload = e.detail;
@@ -61,6 +65,23 @@ export default class extends Controller {
   }
 
   disconnect() {
+    if (this.highlightTimer) {
+      clearTimeout(this.highlightTimer);
+      this.highlightTimer = null;
+    }
+    if (this.stickyAvatarUpdateId) {
+      cancelAnimationFrame(this.stickyAvatarUpdateId);
+      this.stickyAvatarUpdateId = null;
+    }
+    if (this.stickyAvatarEl) {
+      this.stickyAvatarEl.remove();
+      this.stickyAvatarEl = null;
+    }
+    if (this._stickyScrollHandler) {
+      this.messageListTarget.removeEventListener("scroll",
+          this._stickyScrollHandler);
+      this._stickyScrollHandler = null;
+    }
   }
 
   isRoom() {
@@ -79,6 +100,10 @@ export default class extends Controller {
     } else {
       this.showMoreTarget.style.display = "none";
     }
+
+    this.scheduleStickyAvatarUpdate();
+
+    this.scheduleStickyAvatarUpdate();
   }
 
   autoResize() {
@@ -89,12 +114,13 @@ export default class extends Controller {
 
   // 获取消息列表
   loadMessages() {
-    console.log("loadMessages")
     fetch(`/chat_room/${this.idValue}/messages`)
         .then(res => res.json())
         .then(data => {
           this.messages = data;
           this.renderMessages();
+          this.setupStickyAvatar();
+          this.setupStickyAvatar();
         })
         .catch(error => {
           console.error("加载消息失败:", error)
@@ -133,16 +159,30 @@ export default class extends Controller {
     return "text";
   }
 
-  renderMessages() {
+  renderMessages(options = {}) {
     if (!this.hasMessageListTarget) {
       return;
     }
     const container = this.messageListTarget;
     container.innerHTML = "";
 
+    let bottomOffset = null;
+    if (typeof options.preserveBottomOffset === "number") {
+      bottomOffset = options.preserveBottomOffset;
+    }
+
+    if (this.highlightTimer) {
+      clearTimeout(this.highlightTimer);
+      this.highlightTimer = null;
+    }
+    this.highlightedRow = null;
+
     if (this.messages.length === 0) {
       if (this.hasEmptyMessageTarget) {
         this.emptyMessageTarget.style.display = "block";
+      }
+      if (this.stickyAvatarEl) {
+        this.stickyAvatarEl.classList.add("hidden");
       }
       return;
     }
@@ -150,27 +190,36 @@ export default class extends Controller {
       this.emptyMessageTarget.style.display = "none";
     }
 
-    let lastSender = null;
+    let lastSenderKey = null;
 
-    this.messages.forEach((m) => {
-      const msg = m.wx_message;
-      msg.id = m.id;
-      const sender = msg.from_user_name || "";
-      const isNewGroup = lastSender !== null && lastSender !== sender;
-      lastSender = sender;
+    this.messages.forEach((wrapper, index) => {
+      const msg = wrapper.wx_message;
+      msg.id = wrapper.id;
+      const senderInfo = this.resolveSenderInfo(msg);
+      msg.sender_name = senderInfo.name;
+      msg.sender_avatar = senderInfo.avatar;
+      msg.sender_initial = senderInfo.initial;
+      const senderKey = senderInfo.key;
+      const isNewGroup = lastSenderKey === null || lastSenderKey !== senderKey;
+      lastSenderKey = senderKey;
 
-      const row = this.buildRow(isNewGroup, msg);
-      const bubble = this.renderMessageBubble(msg);
+      const row = this.buildRow(isNewGroup, msg, senderInfo);
+      const bubble = this.renderMessageBubble(msg, isNewGroup, senderInfo);
       row.appendChild(bubble);
       container.appendChild(row);
 
-      // 渲染发送状态
-      this.renderStatus(m, bubble, msg);
-      // 时间
-      this.addTimestamp(bubble, m)
+      this.renderStatus(wrapper, bubble, msg);
+      this.addTimestamp(bubble, wrapper);
     });
 
-    container.scrollTop = container.scrollHeight;
+    if (bottomOffset !== null) {
+      container.scrollTop = Math.max(container.scrollHeight - bottomOffset, 0);
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
+
+    this.setupStickyAvatar();
+    this.scheduleStickyAvatarUpdate();
   }
 
   replaceRoomSenderWxid(msg) {
@@ -187,56 +236,81 @@ export default class extends Controller {
     }
   }
 
-  buildRow(isNewGroup, msg) {
+  buildRow(isNewGroup, msg, senderInfo) {
     const row = document.createElement("div");
     row.className = `w-full flex ${msg.self_send ? "justify-end"
-        : "justify-start"} ${isNewGroup ? "mt-3" : "mt-1"} items-end`;
+        : "justify-start"} items-end`;
+    if (msg.id) {
+      row.dataset.messageId = msg.id;
+    }
 
-    // 如果不是我自己，并且是群聊，显示头像
-    if (!msg.self_send && this.isRoom()) {
-      const senderWxid = msg.content.match(/\w+:\n/)?.[0]?.slice(0, -2);
-      const member = this.chatMembers?.find(m => m.user_name === senderWxid);
-      const avatarUrl = member?.small_head_img_url
-          || "https://img.icons8.com/ios/100/user-male-circle--v1.png";
+    if (!msg.self_send) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "mr-2 flex justify-center items-start";
+      wrapper.style.width = "3rem";
 
-      const avatar = document.createElement("img");
-      avatar.src = avatarUrl;
-      avatar.className = "w-12 h-12 rounded-full mr-2"; // tailwind，可自定义
-      avatar.alt = member?.nick_name || senderWxid;
+      if (senderInfo.name) {
+        row.dataset.senderName = senderInfo.name;
+      }
+      if (senderInfo.avatar) {
+        row.dataset.senderAvatar = senderInfo.avatar;
+      } else {
+        delete row.dataset.senderAvatar;
+      }
 
-      row.appendChild(avatar);
+      if (isNewGroup) {
+        const avatar = document.createElement("div");
+        avatar.className = "w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
+        if (senderInfo.avatar) {
+          const img = document.createElement("img");
+          img.src = senderInfo.avatar;
+          img.alt = senderInfo.name;
+          img.className = "w-full h-full object-cover";
+          avatar.appendChild(img);
+        } else {
+          avatar.textContent = senderInfo.initial;
+          avatar.classList.add("text-gray-600", "font-semibold");
+        }
+        wrapper.appendChild(avatar);
+      } else {
+        wrapper.style.visibility = "hidden";
+        wrapper.style.opacity = "0";
+      }
+
+      row.appendChild(wrapper);
+    } else {
+      row.dataset.senderName = "我";
+      delete row.dataset.senderAvatar;
     }
 
     return row;
   }
 
-  renderMessageBubble(msg) {
+  renderMessageBubble(msg, isNewGroup, senderInfo) {
     const bubble = document.createElement("div");
-    bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${msg.self_send
-        ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
-        : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"
-    }`;
     const type = this.getMessageType(msg);
 
-    this.replaceRoomSenderWxid(msg)
+    if (type !== "refer") {
+      this.replaceRoomSenderWxid(msg);
+    }
 
     switch (type) {
       case "voice":
-        return this.renderVoiceMessage(bubble, msg);
+        return this.renderVoiceMessage(bubble, msg, isNewGroup, senderInfo);
       case "card":
-        return this.renderCardMessage(bubble, msg);
+        return this.renderCardMessage(bubble, msg, isNewGroup, senderInfo);
       case "xml_unparsed":
-        return this.renderXmlMessage(bubble, msg);
+        return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo);
       case "emoji":
-        return this.renderEmojiMessage(bubble);
-      case "text":
+        return this.renderEmojiMessage(bubble, msg, isNewGroup, senderInfo);
+      case "refer":
+        return this.renderReferMessage(bubble, msg, isNewGroup, senderInfo);
       default:
-        return this.renderTextMessage(bubble, msg);
+        return this.renderTextMessage(bubble, msg, isNewGroup, senderInfo);
     }
   }
 
-  /** ========== 各种消息渲染 ========== */
-  renderCardMessage(bubble, msg) {
+  renderCardMessage(bubble, msg, isNewGroup, senderInfo) {
     bubble.className = `
       relative inline-block rounded-2xl shadow-lg
       w-1/2 bg-white text-gray-900 border border-gray-200
@@ -264,11 +338,10 @@ export default class extends Controller {
     `;
     bubble.appendChild(inner);
 
-    // this.addTimestamp(bubble, msg);
-    return bubble;
+    return this.applyBubbleStyle(bubble, msg, isNewGroup, senderInfo);
   }
 
-  renderXmlMessage(bubble, msg) {
+  renderXmlMessage(bubble, msg, isNewGroup, senderInfo) {
     bubble.className = "p-3 relative inline-block max-w-[75%] rounded-2xl shadow-sm bg-white text-gray-900 border border-gray-200";
     const wrapper = document.createElement("div");
     wrapper.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap"
@@ -291,18 +364,17 @@ export default class extends Controller {
 
     bubble.appendChild(wrapper);
     bubble.appendChild(toggle);
-    // this.addTimestamp(bubble, msg);
-    return bubble;
+    return this.applyBubbleStyle(bubble, msg, isNewGroup, senderInfo);
   }
 
-  renderEmojiMessage(bubble) {
+  renderEmojiMessage(bubble, msg, isNewGroup, senderInfo) {
     bubble.className = "px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words"
         + " bg-white border border-gray-200 rounded-2xl";
     bubble.textContent = "Emoji 替代符，TODO";
-    return bubble;
+    return this.applyBubbleStyle(bubble, msg, isNewGroup, senderInfo);
   }
 
-  renderTextMessage(bubble, msg) {
+  renderTextMessage(bubble, msg, isNewGroup, senderInfo) {
     bubble.className = `relative inline-block max-w-[75%] rounded-2xl shadow-sm ${msg.self_send
         ? "bg-blue-500 text-white rounded-bl-2xl rounded-tr-2xl rounded-br-md"
         : "bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md"
@@ -312,7 +384,29 @@ export default class extends Controller {
     const content = msg.refer_title || msg.content || "";
     inner.appendChild(this.buildLinkedText(content));
     bubble.appendChild(inner);
-    // this.addTimestamp(bubble, msg);
+    return this.applyBubbleStyle(bubble, msg, isNewGroup, senderInfo);
+    return this.applyBubbleStyle(bubble, msg, isNewGroup, senderInfo);
+  }
+
+  applyBubbleStyle(bubble, msg, isNewGroup, senderInfo) {
+    bubble.style.marginTop = isNewGroup ? "12px" : "4px";
+
+    const existingName = bubble.querySelector('[data-role="sender-name"]');
+    if (existingName) {
+      existingName.remove();
+    }
+
+    if (!msg.self_send && this.isRoom() && isNewGroup) {
+      const name = senderInfo?.name || msg.sender_name || "";
+      if (name) {
+        const nameTag = document.createElement("div");
+        nameTag.dataset.role = "sender-name";
+        nameTag.className = "px-3 pt-1 text-xs font-semibold text-blue-500/80";
+        nameTag.textContent = name;
+        bubble.insertBefore(nameTag, bubble.firstChild);
+      }
+    }
+
     return bubble;
   }
 
@@ -565,7 +659,7 @@ export default class extends Controller {
         .catch(console.error);
   }
 
-  closeMenu = () => {
+  closeMenu() {
     this.menuTarget.classList.add("hidden")
     document.removeEventListener("click", this.closeMenu)
   }
@@ -897,6 +991,163 @@ export default class extends Controller {
     cleanup();
   }
 
+  resolveSenderInfo(msg) {
+    if (msg.self_send) {
+      return {
+        key: `self:${msg.to_user_name || 'me'}`,
+        name: "我",
+        avatar: "",
+        initial: "我"
+      };
+    }
+
+    if (this.isRoom()) {
+      const match = (msg.content || "").match(/^([^:\n]+):\n/);
+      const wxid = match ? match[1] : msg.from_user_name;
+      const member = this.chatMembers?.find(m => m.user_name === wxid);
+      const name = member?.remark || member?.nick_name || wxid || "";
+      return {
+        key: `room:${wxid}`,
+        name,
+        avatar: member?.small_head_img_url || "",
+        initial: (name || "?").slice(0, 1).toUpperCase()
+      };
+    }
+
+    const wxid = msg.from_user_name || msg.to_user_name || "联系人";
+    return {
+      key: `direct:${wxid}`,
+      name: wxid,
+      avatar: "",
+      initial: (wxid || "?").slice(0, 1).toUpperCase()
+    };
+  }
+
+  setupStickyAvatar() {
+    if (!this.hasMessageListTarget) {
+      return;
+    }
+
+    const host = this.messageListTarget.parentElement;
+    if (!host) {
+      return;
+    }
+    host.classList.add("relative");
+
+    if (!this.stickyAvatarEl) {
+      const el = document.createElement("div");
+      el.className = "sticky-avatar hidden pointer-events-none absolute left-4 bottom-4 z-20 flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full shadow px-3 py-2";
+
+      const avatarWrap = document.createElement("div");
+      avatarWrap.dataset.role = "sticky-avatar";
+      avatarWrap.className = "w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
+
+      const avatarImg = document.createElement("img");
+      avatarImg.className = "hidden w-full h-full object-cover";
+      avatarWrap.appendChild(avatarImg);
+
+      const avatarInitial = document.createElement("span");
+      avatarInitial.dataset.stickyInitial = "true";
+      avatarInitial.className = "text-gray-600 font-semibold";
+      avatarInitial.textContent = "?";
+      avatarWrap.appendChild(avatarInitial);
+
+      const nameEl = document.createElement("span");
+      nameEl.dataset.stickyName = "true";
+      nameEl.className = "text-sm font-medium text-gray-700";
+
+      el.appendChild(avatarWrap);
+      el.appendChild(nameEl);
+
+      host.appendChild(el);
+      this.stickyAvatarEl = el;
+
+      this._stickyScrollHandler = () => this.scheduleStickyAvatarUpdate();
+      this.messageListTarget.addEventListener("scroll",
+          this._stickyScrollHandler);
+    }
+  }
+
+  scheduleStickyAvatarUpdate() {
+    if (!this.stickyAvatarEl) {
+      return;
+    }
+    if (this.stickyAvatarUpdateId) {
+      return;
+    }
+    this.stickyAvatarUpdateId = requestAnimationFrame(() => {
+      this.stickyAvatarUpdateId = null;
+      this.updateStickyAvatar();
+    });
+  }
+
+  updateStickyAvatar() {
+    if (!this.stickyAvatarEl || !this.hasMessageListTarget) {
+      return;
+    }
+
+    const rows = Array.from(
+        this.messageListTarget.querySelectorAll('[data-message-id]'));
+    if (!rows.length) {
+      this.stickyAvatarEl.classList.add("hidden");
+      return;
+    }
+
+    const listRect = this.messageListTarget.getBoundingClientRect();
+    const targetY = listRect.bottom - 80;
+    let candidate = null;
+    let minDistance = Infinity;
+
+    rows.forEach((row) => {
+      const rect = row.getBoundingClientRect();
+      if (rect.bottom < listRect.top || rect.top > listRect.bottom) {
+        return;
+      }
+      const distance = Math.abs(rect.bottom - targetY);
+      if (distance < minDistance) {
+        minDistance = distance;
+        candidate = row;
+      }
+    });
+
+    if (!candidate) {
+      this.stickyAvatarEl.classList.add("hidden");
+      return;
+    }
+
+    const senderName = candidate.dataset.senderName
+        || (candidate.classList.contains("justify-end") ? "我" : "");
+    const senderAvatar = candidate.dataset.senderAvatar || "";
+
+    const avatarWrap = this.stickyAvatarEl.querySelector(
+        '[data-role="sticky-avatar"]');
+    const avatarImg = avatarWrap?.querySelector("img");
+    const initialsEl = avatarWrap?.querySelector('[data-sticky-initial]');
+    const nameEl = this.stickyAvatarEl.querySelector('[data-sticky-name]');
+
+    if (!avatarWrap || !avatarImg || !initialsEl || !nameEl) {
+      return;
+    }
+
+    if (!senderName && !senderAvatar) {
+      this.stickyAvatarEl.classList.add("hidden");
+      return;
+    }
+
+    if (senderAvatar) {
+      avatarImg.src = senderAvatar;
+      avatarImg.classList.remove("hidden");
+      initialsEl.classList.add("hidden");
+    } else {
+      avatarImg.classList.add("hidden");
+      initialsEl.classList.remove("hidden");
+      initialsEl.textContent = (senderName || "?").slice(0, 1).toUpperCase();
+    }
+
+    nameEl.textContent = senderName || "";
+    this.stickyAvatarEl.classList.remove("hidden");
+  }
+
   buildLinkedText(text) {
     const fragment = document.createDocumentFragment();
     if (!text) {
@@ -919,7 +1170,8 @@ export default class extends Controller {
       const cleanHref = this.normalizeHref(href);
 
       if (cleanHref) {
-        const anchor = this.createAnchor(cleanHref, this.decodeHtmlEntities(labelHtml));
+        const anchor = this.createAnchor(cleanHref,
+            this.decodeHtmlEntities(labelHtml));
         fragment.appendChild(anchor);
       } else {
         this.appendPlainSegment(fragment, match[0]);
@@ -989,5 +1241,20 @@ export default class extends Controller {
       return null;
     }
     return trimmed;
+  }
+
+  humanizeMessageType(msgType) {
+    const mapping = {
+      text: "文本",
+      image: "图片",
+      voice: "语音",
+      video: "视频",
+      emoji: "表情",
+      refer: "引用",
+      card: "卡片",
+      html: "网页",
+      micro_video: "小视频"
+    };
+    return mapping[msgType] || "消息";
   }
 }
