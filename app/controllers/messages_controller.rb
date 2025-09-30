@@ -10,19 +10,52 @@ class MessagesController < ApplicationController
                       .where(chat_room_id: chat_room_id)
 
     # 如果前端传了 before_id，就取更早的消息
-    messages = messages.where('id < ?', before_id) if before_id.present?
-    messages = messages.where('id >= ?', after_id) if after_id.present?
+    messages = messages.where("id < ?", before_id) if before_id.present?
+    messages = messages.where("id >= ?", after_id) if after_id.present?
 
-    messages = messages.order(id: :desc).limit(100)
+    messages = messages.order(id: :desc).limit(100).to_a
+    refer_ids = messages.filter_map { |msg| msg.wx_message&.refer_new_msg_id }.presence || []
+    refer_ids = refer_ids.uniq if refer_ids.present?
 
-    render json: messages.reverse.as_json(
-      include: {
-        wx_message: {
-          only: [:msg_type, :content, :from_user_name, :to_user_name,
-                 :new_msg_id, :refer_new_msg_id, :refer_title, :self_send]
+    referenced_messages = if refer_ids.present?
+                            Message.includes(:wx_message)
+                                   .where(chat_room_id: chat_room_id)
+                                   .joins(:wx_message)
+                                   .where(wx_messages: { new_msg_id: refer_ids })
+                                   .to_a
+    else
+                            []
+    end
+
+    referenced_by_new_msg_id = referenced_messages.index_by { |msg| msg.wx_message&.new_msg_id }
+
+    message_json = messages.reverse.map do |message|
+      wx_message = message.wx_message
+      referenced = wx_message && referenced_by_new_msg_id[wx_message.refer_new_msg_id]
+
+      base = message.as_json(
+        include: {
+          wx_message: {
+            only: [ :msg_type, :content, :from_user_name, :to_user_name,
+                   :new_msg_id, :refer_new_msg_id, :refer_title, :self_send ]
+          }
         }
-      }
-    )
+      )
+
+      base.merge(
+        "referenced_message" => referenced&.as_json(
+          only: [ :id, :chat_room_id, :created_at, :message_time ],
+          include: {
+            wx_message: {
+              only: [ :msg_type, :content, :from_user_name, :to_user_name,
+                     :new_msg_id, :self_send ]
+            }
+          }
+        )
+      )
+    end
+
+    render json: message_json
   end
 
   def create
@@ -98,6 +131,4 @@ class MessagesController < ApplicationController
     params.require(:content)
     params.permit(:chat_room_id, :msg_type, :content, :extra)
   end
-
 end
-

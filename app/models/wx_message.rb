@@ -8,11 +8,16 @@ class WxMessage < ApplicationRecord
     text: 1,                # 文本消息 (M_DATA_TEXT)
     html: 2,                # HTML 消息 (MM_DATA_HTML)
     image: 3,               # 图片消息 (MM_DATA_IMG)
+    room_invitation: 5,     # 群聊邀请
+    file: 6, # 文件
 
     private_text: 11,       # 私聊文本 (MM_DATA_PRIVATEMSG_TEXT)
     private_html: 12,       # 私聊 HTML (MM_DATA_PRIVATEMSG_HTML)
     private_image: 13,      # 私聊图片 (MM_DATA_PRIVATEMSG_IMG)
 
+    real_time_location: 17,
+    chat_history: 19,
+    mini_app: 33,
     voice: 34,              # 语音消息 (MM_DATA_VOICEMSG)
     push_mail: 35,          # 推送邮件 (MM_DATA_PUSHMAIL)
     qmsg: 36,               # QMSG (MM_DATA_QMSG)
