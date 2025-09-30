@@ -1,0 +1,67 @@
+<template id="message-template-text">
+  <div class="relative inline-block max-w-[75%] rounded-2xl shadow-sm message-bubble">
+    <div class="px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words" data-role="content"></div>
+  </div>
+</template>
+
+<template id="message-template-voice">
+  <div class="relative inline-block max-w-[75%] rounded-2xl shadow-sm message-bubble" data-role="voice-root">
+    <div class="px-3 py-3 pr-16 flex flex-col gap-3 cursor-pointer" data-role="voice-container">
+      <div class="flex items-center gap-2" data-role="voice-header">
+        <img src="voice-svgrepo-com.svg" width="16" height="16" alt="voice icon">
+        <span data-role="voice-label"></span>
+      </div>
+      <div class="flex items-center justify-center gap-2 text-xs text-gray-500"
+           data-role="voice-controls">
+        <div class="relative h-1 bg-gray-200 rounded overflow-hidden flex-1 cursor-pointer hidden" data-role="voice-progress" style="min-width: 120px;">
+          <div class="absolute left-0 top-0 h-full w-0"
+               data-role="voice-progress-inner"></div>
+        </div>
+        <button type="button" class="text-xs text-blue-500 leading-none"
+                data-role="voice-speed">1.0x</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="message-template-card">
+  <div class="relative inline-block rounded-2xl shadow-lg w-1/2 bg-white text-gray-900 border border-gray-200 rounded-br-2xl rounded-tl-2xl rounded-bl-md message-bubble">
+    <a class="block rounded-2xl overflow-hidden hover:bg-gray-50 transition" data-role="card-link" target="_blank" rel="noopener noreferrer">
+      <div data-role="card-cover"></div>
+      <div class="p-2">
+        <h3 class="font-semibold text-sm text-gray-900 line-clamp-2" data-role="card-title"></h3>
+        <p class="text-xs text-gray-500 mt-1 line-clamp-2" data-role="card-desc"></p>
+        <div class="text-[10px] text-gray-400 mt-1" data-role="card-source"></div>
+      </div>
+    </a>
+  </div>
+</template>
+
+<template id="message-template-refer">
+  <div class="relative inline-block max-w-[75%] rounded-2xl shadow-sm message-bubble" data-role="refer-root">
+    <div class="px-3 pt-3 pr-16 text-sm font-medium text-gray-900 whitespace-pre-wrap break-words" data-role="refer-body"></div>
+    <div class="mt-2 mx-3 mb-3 p-2 border-l-4 border-blue-400 bg-blue-50/60 rounded cursor-pointer flex flex-col gap-1" data-role="refer-quoted">
+      <div class="text-[11px] text-gray-500" data-role="refer-quoted-meta"></div>
+      <div class="text-sm text-gray-800 whitespace-pre-wrap break-words" data-role="refer-quoted-content"></div>
+    </div>
+  </div>
+</template>
+
+<template id="message-template-xml">
+  <div class="p-3 relative inline-block max-w-[75%] rounded-2xl shadow-sm bg-white text-gray-900 border border-gray-200 message-bubble">
+    <div class="px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words overflow-hidden" style="max-height: 6rem" data-role="xml-content"></div>
+    <button class="mt-1 text-xs hover:underline ml-3" type="button" data-role="xml-toggle">展开</button>
+  </div>
+</template>
+
+<template id="message-template-emoji">
+  <div class="px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words bg-white border border-gray-200 rounded-2xl message-bubble">
+    <div data-role="emoji-content">Emoji 替代符，TODO</div>
+  </div>
+</template>
+
+<template id="message-template-fallback">
+  <div class="relative inline-block max-w-[75%] rounded-2xl shadow-sm message-bubble">
+    <div class="px-3 py-2 pr-14 pb-4 whitespace-pre-wrap break-words" data-role="content"></div>
+  </div>
+</template>
