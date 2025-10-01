@@ -132,14 +132,20 @@ export default class extends Controller {
     }
 
     getMessageType(msg) {
-        if (msg.msg_type === "voice") {
+        const msgType = msg.msg_type;
+
+        if (msgType === "voice" || Number(msgType) === 34) {
             return "voice";
         }
-        if (msg.msg_type === "refer" && msg.content?.trim().startsWith("<msg")) {
+        const isReferType = msgType === "refer" || Number(msgType) === 49;
+        if (isReferType && msg.content?.trim().startsWith("<msg")) {
             return "card";
         }
-        if (msg.msg_type === "refer") {
+        if (isReferType) {
             return "refer";
+        }
+        if (msgType === "emoji" || msgType === "47" || Number(msgType) === 47) {
+            return "emoji";
         }
         if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(/(\w+:|.*)\n</)?.length > 0) && msg.content?.length > 250) {
             if (!this.isRoom()) {
@@ -152,13 +158,6 @@ export default class extends Controller {
                 }
             }
             return "xml_unparsed";
-        }
-        if (this.currentWxidValue?.startsWith("gh_") && msg.msg_type === "refer" && msg.content?.trim().startsWith("<msg")) {
-            return "card";
-        }
-
-        if (msg.msg_type === "emoji") {
-            return "emoji";
         }
         return "text";
     }
@@ -196,6 +195,8 @@ export default class extends Controller {
         this.messages.forEach((wrapper, index) => {
             const msg = wrapper.wx_message;
             msg.id = wrapper.id;
+            msg._messageId = wrapper.id;
+            msg._cacheKey = wrapper.updated_at || wrapper.message_time || wrapper.created_at || msg.message_time;
             msg.referenced_message = wrapper.referenced_message;
 
             const senderInfo = this.lookupSenderInfo(msg, msg.content);
@@ -383,7 +384,70 @@ export default class extends Controller {
     renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
         const template = this.cloneTemplate("message-template-emoji");
         const emojiBubble = template || bubble;
-        return this.applyBubbleStyle(emojiBubble, msg, isNewGroup, senderInfo, isFirstMessage);
+        const content = emojiBubble.querySelector("[data-role='emoji-content']");
+
+        if (content) {
+            content.innerHTML = "";
+            content.classList.add("flex", "items-center", "justify-center", "p-1");
+
+            const placeholder = document.createElement("div");
+            placeholder.className = "min-w-[3.75rem] min-h-[3.75rem] flex items-center justify-center text-[11px] text-slate-400 px-2";
+            placeholder.textContent = "加载表情…";
+            content.appendChild(placeholder);
+
+            const image = document.createElement("img");
+            image.loading = "lazy";
+            image.decoding = "async";
+            image.alt = "表情";
+            image.referrerPolicy = "no-referrer";
+            image.className = "max-w-[208px] max-h-[208px] object-contain select-none";
+            image.style.userSelect = "none";
+            image.classList.add("hidden");
+            content.appendChild(image);
+
+            const showImage = () => {
+                placeholder.remove();
+                image.classList.remove("hidden");
+            };
+
+            const showFallback = (message) => {
+                image.remove();
+                placeholder.textContent = message;
+            };
+
+            image.addEventListener("load", showImage, {once: true});
+            image.addEventListener("error", () => {
+                showFallback("[表情加载失败]");
+            });
+
+            const messageId = msg._messageId || msg.id;
+            const cacheKey = msg._cacheKey;
+
+            if (messageId) {
+                const url = cacheKey ? `/message/emoji/${messageId}?t=${encodeURIComponent(cacheKey)}` : `/message/emoji/${messageId}`;
+                requestAnimationFrame(() => {
+                    image.src = url;
+                });
+            } else {
+                showFallback("[暂不支持的表情]");
+            }
+        }
+
+        const applied = this.applyBubbleStyle(emojiBubble, msg, isNewGroup, senderInfo, isFirstMessage);
+        applied.dataset.bubbleType = "emoji";
+        applied.style.background = "transparent";
+        applied.style.border = "none";
+        applied.style.boxShadow = "none";
+        applied.style.padding = "4px";
+        applied.style.paddingBottom = "32px";
+        applied.classList.remove("text-white", "text-gray-900", "border", "inline-flex", "items-center", "justify-center");
+        applied.classList.add("inline-block");
+
+        const senderName = applied.querySelector('[data-role="sender-name"]');
+        if (senderName) {
+            content.classList.add("mt-1");
+        }
+        return applied;
     }
 
     renderTextMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
@@ -954,6 +1018,13 @@ export default class extends Controller {
         }
         const bubbles = this.messageListTarget.querySelectorAll(".message-bubble");
         bubbles.forEach((bubble) => {
+            if (bubble.dataset.bubbleType === "emoji") {
+                bubble.style.background = "transparent";
+                bubble.style.border = "none";
+                bubble.style.boxShadow = "none";
+                bubble.classList.remove("text-white");
+                return;
+            }
             const senderType = bubble.dataset.senderType;
             if (senderType === "self") {
                 bubble.style.background = this.theme.selfBubbleColor;
