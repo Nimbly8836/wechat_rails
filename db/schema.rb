@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_26_070028) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_01_115212) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -129,6 +129,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_26_070028) do
     t.bigint "refer_new_msg_id"
     t.string "refer_title"
     t.boolean "self_send", default: false, null: false
+    t.text "emoji_md5"
     t.index ["msg_id", "new_msg_id", "msg_seq"], name: "index_wx_messages_on_msg_id_and_new_msg_id_and_msg_seq", unique: true
   end
 

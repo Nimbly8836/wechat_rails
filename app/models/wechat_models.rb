@@ -6,15 +6,17 @@ module WechatModels
   module SyncMessageModel
     def self.parse(api_hash, current_wxid)
       content = api_hash.dig("Content", "string")
-      refer_app_msg = parse_refer_app_msg(content)
+      msg_type = api_hash["MsgType"]
+      refer_app_msg = parse_refer_app_msg(content) if msg_type == 49
       refer_new_msg_id = refer_app_msg[:srv_id]
       title = refer_app_msg[:title]
       from_user_name = api_hash.dig("FromUserName", "string")
+      parsed_emoji = parse_emoji(content) if msg_type == 47
       WxMessage.new(
         msg_id: api_hash["MsgId"],
         from_user_name: from_user_name,
         to_user_name: api_hash.dig("ToUserName", "string"),
-        msg_type: api_hash["MsgType"],
+        msg_type: msg_type,
         content: content,
         status: api_hash["Status"],
         img_status: api_hash["ImgStatus"],
@@ -26,6 +28,7 @@ module WechatModels
         refer_new_msg_id: refer_new_msg_id,
         refer_title: title,
         self_send: from_user_name === current_wxid,
+        emoji_md5: parsed_emoji[:md5],
       )
     end
 
@@ -54,6 +57,21 @@ module WechatModels
         content: doc.at_xpath("//refermsg/content")&.text,
         srv_id: doc.at_xpath("//refermsg/svrid")&.text&.to_i,
         create_time: doc.at_xpath("//refermsg/createtime")&.text&.to_i
+      }
+    end
+
+    def self.parse_emoji(content)
+      doc = Nokogiri::XML(content)
+      emoji_node = doc.at_xpath("//emoji")
+      md5_text = doc.at_xpath("//emoji/md5")&.text
+      cdn_text = doc.at_xpath("//emoji/cdnurl")&.text
+
+      md5_attr = emoji_node&.attr("md5")
+      cdn_attr = emoji_node&.attr("cdnurl")
+
+      {
+        md5: md5_text.presence || md5_attr,
+        cdn_url: cdn_text.presence || cdn_attr,
       }
     end
 
