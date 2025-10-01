@@ -1287,7 +1287,8 @@ export default class extends Controller {
         key: msg.sender_key,
         name: msg.sender_name,
         avatar: msg.sender_avatar || "",
-        initial: (msg.sender_initial || msg.sender_name.slice(0, 1) || "?").toUpperCase()
+        initial: (msg.sender_initial || msg.sender_name.slice(0, 1)
+            || "?").toUpperCase()
       };
     }
 
@@ -1330,6 +1331,144 @@ export default class extends Controller {
       avatar: null,
       initial: (name || "?").slice(0, 1).toUpperCase()
     };
+  }
+
+  setupStickyAvatar() {
+    if (!this.hasMessageListTarget) {
+      return;
+    }
+
+    const host = this.messageListTarget.parentElement;
+    if (!host) {
+      return;
+    }
+    host.classList.add("relative");
+
+    if (!this.stickyAvatarEl) {
+      const el = document.createElement("div");
+      el.className = "sticky-avatar hidden pointer-events-none absolute left-4 bottom-4 z-20 flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full shadow px-3 py-2";
+
+      const avatarWrap = document.createElement("div");
+      avatarWrap.dataset.role = "sticky-avatar";
+      avatarWrap.className = "w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
+
+      const avatarImg = document.createElement("img");
+      avatarImg.className = "hidden w-full h-full object-cover";
+      avatarImg.alt = "avatar";
+
+      const avatarInitial = document.createElement("span");
+      avatarInitial.dataset.stickyInitial = "true";
+      avatarInitial.className = "text-gray-600 font-semibold";
+      avatarInitial.textContent = "?";
+
+      avatarWrap.appendChild(avatarImg);
+      avatarWrap.appendChild(avatarInitial);
+
+      const nameEl = document.createElement("span");
+      nameEl.dataset.stickyName = "true";
+      nameEl.className = "text-sm font-medium text-gray-700";
+
+      el.appendChild(avatarWrap);
+      el.appendChild(nameEl);
+
+      host.appendChild(el);
+      this.stickyAvatarEl = el;
+    }
+
+    if (!this._stickyScrollHandler) {
+      this._stickyScrollHandler = () => this.scheduleStickyAvatarUpdate();
+      this.messageListTarget.addEventListener("scroll",
+          this._stickyScrollHandler);
+      this.stickyAvatarCleanup = () => {
+        if (this._stickyScrollHandler) {
+          this.messageListTarget.removeEventListener("scroll",
+              this._stickyScrollHandler);
+          this._stickyScrollHandler = null;
+        }
+      };
+    }
+
+    this.scheduleStickyAvatarUpdate();
+  }
+
+  scheduleStickyAvatarUpdate() {
+    if (!this.stickyAvatarEl) {
+      return;
+    }
+    if (this.stickyAvatarTimer) {
+      return;
+    }
+    this.stickyAvatarTimer = requestAnimationFrame(() => {
+      this.stickyAvatarTimer = null;
+      this.updateStickyAvatar();
+    });
+  }
+
+  updateStickyAvatar() {
+    if (!this.stickyAvatarEl || !this.hasMessageListTarget) {
+      return;
+    }
+
+    const rows = Array.from(
+        this.messageListTarget.querySelectorAll('[data-message-id]'));
+    if (!rows.length) {
+      this.stickyAvatarEl.classList.add("hidden");
+      return;
+    }
+
+    const listRect = this.messageListTarget.getBoundingClientRect();
+    const targetY = listRect.bottom - 80;
+    let candidate = null;
+    let minDistance = Infinity;
+
+    rows.forEach((row) => {
+      const rect = row.getBoundingClientRect();
+      if (rect.bottom < listRect.top || rect.top > listRect.bottom) {
+        return;
+      }
+      const distance = Math.abs(rect.bottom - targetY);
+      if (distance < minDistance) {
+        minDistance = distance;
+        candidate = row;
+      }
+    });
+
+    if (!candidate) {
+      this.stickyAvatarEl.classList.add("hidden");
+      return;
+    }
+
+    const senderName = candidate.dataset.senderName
+        || (candidate.classList.contains("justify-end") ? "我" : "");
+    const senderAvatar = candidate.dataset.senderAvatar || "";
+
+    const avatarWrap = this.stickyAvatarEl.querySelector(
+        '[data-role="sticky-avatar"]');
+    const avatarImg = avatarWrap?.querySelector("img");
+    const initialsEl = avatarWrap?.querySelector('[data-sticky-initial]');
+    const nameEl = this.stickyAvatarEl.querySelector('[data-sticky-name]');
+
+    if (!avatarWrap || !avatarImg || !initialsEl || !nameEl) {
+      return;
+    }
+
+    if (!senderName && !senderAvatar) {
+      this.stickyAvatarEl.classList.add("hidden");
+      return;
+    }
+
+    if (senderAvatar) {
+      avatarImg.src = senderAvatar;
+      avatarImg.classList.remove("hidden");
+      initialsEl.classList.add("hidden");
+    } else {
+      avatarImg.classList.add("hidden");
+      initialsEl.classList.remove("hidden");
+      initialsEl.textContent = (senderName || "?").slice(0, 1).toUpperCase();
+    }
+
+    nameEl.textContent = senderName || "";
+    this.stickyAvatarEl.classList.remove("hidden");
   }
 
 }
