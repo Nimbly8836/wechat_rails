@@ -385,7 +385,74 @@ export default class extends Controller {
     inner.appendChild(this.buildLinkedText(content));
     bubble.appendChild(inner);
     return this.applyBubbleStyle(bubble, msg, isNewGroup, senderInfo);
-    return this.applyBubbleStyle(bubble, msg, isNewGroup, senderInfo);
+  }
+
+  renderReferMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-refer");
+    const referBubble = template || bubble;
+    const body = referBubble.querySelector("[data-role='refer-body']");
+    const quoted = referBubble.querySelector("[data-role='refer-quoted']");
+    const quotedMeta = referBubble.querySelector(
+        "[data-role='refer-quoted-meta']");
+    const quotedContent = referBubble.querySelector(
+        "[data-role='refer-quoted-content']");
+
+    const parsed = this.parseWxXmlMessage(msg.content || "");
+    const title = (msg.refer_title || parsed.title || "引用的消息").trim();
+    if (body) {
+      body.textContent = title;
+    }
+
+    const referenced = msg.referenced_message;
+    if (referenced && referenced.wx_message) {
+      const refWx = referenced.wx_message;
+      this.replaceRoomSenderWxid(refWx);
+
+      if (quoted) {
+        quoted.classList.remove("cursor-not-allowed", "opacity-60");
+        if (referenced.id) {
+          quoted.classList.add("cursor-pointer");
+          quoted.dataset.referMessageId = referenced.id;
+          quoted.addEventListener("click", (event) => {
+            event.stopPropagation();
+            this.focusMessageById(referenced.id);
+          });
+        } else {
+          quoted.classList.remove("cursor-pointer");
+          delete quoted.dataset.referMessageId;
+        }
+      }
+
+      if (quotedMeta) {
+        quotedMeta.textContent = `引用的${this.humanizeMessageType(
+            refWx.msg_type)}消息`;
+      }
+
+      if (quotedContent) {
+        quotedContent.innerHTML = "";
+        if (refWx.msg_type === "text" && refWx.content) {
+          quotedContent.appendChild(this.buildLinkedText(refWx.content));
+        } else {
+          quotedContent.textContent = `[${this.humanizeMessageType(
+              refWx.msg_type)}]`;
+        }
+      }
+    } else {
+      if (quoted) {
+        quoted.classList.add("cursor-not-allowed", "opacity-60");
+        quoted.classList.remove("cursor-pointer");
+        delete quoted.dataset.referMessageId;
+      }
+      if (quotedMeta) {
+        quotedMeta.textContent = "引用的消息";
+      }
+      if (quotedContent) {
+        quotedContent.textContent = "该消息尚未加载";
+      }
+    }
+
+    return this.applyBubbleStyle(referBubble, msg, isNewGroup, senderInfo,
+        isFirstMessage);
   }
 
   applyBubbleStyle(bubble, msg, isNewGroup, senderInfo) {
