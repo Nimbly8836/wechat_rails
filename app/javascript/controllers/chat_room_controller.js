@@ -1281,4 +1281,55 @@ export default class extends Controller {
     return template.content.firstElementChild.cloneNode(true);
   }
 
+  lookupSenderInfo(msg, rawContent = "") {
+    if (msg.sender_key && msg.sender_name) {
+      return {
+        key: msg.sender_key,
+        name: msg.sender_name,
+        avatar: msg.sender_avatar || "",
+        initial: (msg.sender_initial || msg.sender_name.slice(0, 1) || "?").toUpperCase()
+      };
+    }
+
+    if (msg.self_send) {
+      return {
+        key: `self:${msg.to_user_name || 'me'}`,
+        name: "我",
+        avatar: null,
+        initial: "我"
+      };
+    }
+
+    if (this.isRoom()) {
+      let wxid = null;
+      if (msg.from_user_name && !msg.from_user_name.endsWith("@chatroom")) {
+        wxid = msg.from_user_name;
+      }
+      if (!wxid) {
+        const match = (rawContent || msg.content || "").match(/^([^:\n]+):\n/);
+        wxid = match ? match[1] : null;
+      }
+      wxid = wxid || msg.to_user_name || msg.from_user_name;
+      const member = this.chatMembers?.find(m => m.user_name === wxid);
+      const name = member?.remark || member?.nick_name || wxid;
+      const avatar = member?.small_head_img_url || "";
+      const initial = (name || wxid || "?").slice(0, 1).toUpperCase();
+      return {
+        key: `room:${wxid}`,
+        name,
+        avatar,
+        initial
+      };
+    }
+
+    const wxid = msg.from_user_name || msg.to_user_name || "contact";
+    const name = wxid;
+    return {
+      key: `direct:${wxid}`,
+      name,
+      avatar: null,
+      initial: (name || "?").slice(0, 1).toUpperCase()
+    };
+  }
+
 }
