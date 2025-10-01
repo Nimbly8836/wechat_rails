@@ -29,19 +29,113 @@
 
   <!-- 二级菜单 -->
   <div data-chat-room-target="menu"
-       class="hidden absolute right-3 top-14 w-48 bg-blue-100 shadow-lg rounded-xl border
-       border-gray-100 overflow-hidden z-50">
-    <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">设置界面</button>
-    <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">同步信息</button>
-    <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+       class="hidden absolute right-3 top-14 w-60 bg-slate-900/95 text-slate-100 shadow-2xl rounded-2xl ring-1 ring-white/10 overflow-hidden z-50 backdrop-blur">
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#openAppearanceSettings">
+      <span aria-hidden="true">🎨</span>
+      <span>外观设置</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#handleMenuClose">
+      <span aria-hidden="true">⚙️</span>
+      <span>设置界面</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#handleMenuClose">
+      <span aria-hidden="true">🔄</span>
+      <span>同步信息</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
             data-action="click->chat-room#syncMembers">
-      同步群组联系人
+      <span aria-hidden="true">👥</span>
+      <span>同步群组联系人</span>
     </button>
-    <button class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-            data-action="click->chat-room#syncContact"
-    >
-      更新聊天室信息
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#syncContact">
+      <span aria-hidden="true">🧭</span>
+      <span>更新聊天室信息</span>
     </button>
+  </div>
+
+  <div data-chat-room-target="themePanel"
+       class="hidden absolute right-3 top-36 w-64 bg-white/95 text-slate-900 shadow-xl rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-40">
+    <div class="px-5 py-4 space-y-4">
+      <div>
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>聊天室背景</span>
+          <input type="color" value="#ffffff"
+                 class="h-7 w-7 cursor-pointer border border-slate-200 rounded-full bg-transparent"
+                 data-chat-room-target="backgroundInput"
+                 data-action="input->chat-room#updateBackgroundColor"/>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">选择一个喜欢的背景色让聊天更有氛围。</p>
+      </div>
+      <div>
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>背景图片</span>
+          <button type="button"
+                  class="text-[11px] text-slate-400 hover:text-rose-500 transition"
+                  data-action="click->chat-room#clearBackgroundImage">
+            清除
+          </button>
+        </div>
+        <input type="url"
+               placeholder="输入图片链接，例如 https://example.com/bg.jpg"
+               class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+               data-chat-room-target="backgroundImageInput"
+               data-action="input->chat-room#updateBackgroundImage"/>
+        <p class="mt-2 text-xs text-slate-500">支持网络图片链接，留空可恢复纯色背景。</p>
+      </div>
+      <div>
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>我的气泡</span>
+          <input type="color" value="#6366f1"
+                 class="h-7 w-7 cursor-pointer border border-slate-200 rounded-full bg-transparent"
+                 data-chat-room-target="bubbleInput"
+                 data-action="input->chat-room#updateBubbleColor"/>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">即时预览你发出的消息颜色。</p>
+      </div>
+      <div>
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>聊天字体</span>
+        </div>
+        <select
+          class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+          data-chat-room-target="fontSelect"
+          data-action="change->chat-room#updateFontFamily">
+          <option value="inherit">系统默认</option>
+          <option value='"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif'>圆润无衬线</option>
+          <option value='"Source Han Serif SC", "Songti SC", serif'>优雅衬线</option>
+          <option value='"LXGW WenKai", cursive'>手写风</option>
+          <option value='"JetBrains Mono", monospace'>等宽代码体</option>
+          <option value="custom">自定义</option>
+        </select>
+        <input type="text"
+               placeholder="自定义字体栈，例如 'Roboto, sans-serif'"
+               class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+               data-chat-room-target="fontCustomInput"
+               data-action="input->chat-room#updateCustomFont"/>
+        <p class="mt-2 text-xs text-slate-500">随时切换聊天字体风格，打造独特体验。</p>
+      </div>
+      <div class="flex items-center justify-end gap-2">
+        <button type="button"
+                class="text-sm text-slate-400 hover:text-slate-600 transition"
+                data-action="click->chat-room#handleMenuClose click->chat-room#closeThemePanel">
+          取消
+        </button>
+        <button type="button"
+                class="px-3 py-1.5 text-sm font-medium rounded-full bg-slate-900 text-white hover:bg-slate-700 transition"
+                data-action="click->chat-room#closeThemePanel">
+          完成
+        </button>
+      </div>
+    </div>
   </div>
 
   <div id="show-more-message"

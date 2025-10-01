@@ -29,7 +29,7 @@ overflow-hidden"
     <h2 class="mt-4 text-2xl font-semibold text-gray-800">
       <%= @contact.nick_name.presence || "未设置昵称" %>
     </h2>
-    <p class=" text-sm text-gray-500">用户名: <%= @contact.user_name %></p>
+    <p class=" text-sm text-gray-500">备注: <%= @contact.remark %></p>
     <p class="text-sm text-gray-500"><%= @contact.country %> <%= @contact.city %></p>
     <p class="mt-2 text-gray-600 text-sm italic"><%= @contact.signature.presence || "这个人很神秘，什么都没有写" %></p>
   </div>
@@ -57,18 +57,8 @@ overflow-hidden"
   <div class="pt-12 pb-6 px-6 text-center">
     <button type="button"
             data-action="click->contact#toggleDetails"
-            class="bg-transparent
-            text-center
-            hover:bg-blue-500 t
-            ext-blue-700
-            font-semibold
-            py-2 px-4
-            hover:text-white
-            border border-blue-500
-            hover:border-transparent
-            text-sm text-gray-600
-            rounded-full">
-      查看更多 ▾
+            class="w-screen text-center text-sm text-gray-600 hover:text-gray-400 transition">
+      查看更多信息 ▾
     </button>
 
     <div data-contact-target="details" class="mt-4 hidden space-y-2 text-sm text-gray-700">
