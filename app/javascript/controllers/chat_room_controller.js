@@ -1,10 +1,37 @@
 import {Controller} from "@hotwired/stimulus";
 
 export default class extends Controller {
-    static targets = ["messageList", "input", "emptyMessage", "menu", "showMore"];
+    static targets = ["messageList", "input", "emptyMessage", "menu", "showMore",
+        "themePanel", "backgroundInput", "bubbleInput", "backgroundImageInput",
+        "fontSelect", "fontCustomInput"];
     static values = {currentWxid: String, id: Number, members: Array};
 
     connect() {
+        const defaultTheme = {
+            backgroundColor: "#ffffff",
+            backgroundImage: "",
+            selfBubbleColor: "#6366f1",
+            selfBubbleTextColor: "#ffffff",
+            otherBubbleColor: "rgba(255,255,255,0.92)",
+            otherBubbleBorderColor: "rgba(148,163,184,0.45)",
+            fontFamily: "inherit"
+        };
+        this.theme = {...defaultTheme, ...(this.theme || {})};
+
+        this.boundCloseMenu = this.closeMenu.bind(this);
+        this.boundCloseThemePanel = this.closeThemePanel.bind(this);
+        this.boundPreventMenuHide = (event) => event.stopPropagation();
+        this.boundPreventThemeHide = (event) => event.stopPropagation();
+
+        if (this.hasMenuTarget) {
+            this.menuTarget.addEventListener("click", this.boundPreventMenuHide);
+        }
+
+        if (this.hasThemePanelTarget) {
+            this.themePanelTarget.addEventListener("click",
+                this.boundPreventThemeHide);
+        }
+
         this.debouncedLoadNewMessages = this.debounce(
             this.loadNewMessages.bind(this), 400);
         this.voiceBlobUrls = new Map();
@@ -14,9 +41,6 @@ export default class extends Controller {
         this.voicePlaybackOptions = [0.5, 1.0, 1.5, 2.0];
         this.highlightedRow = null;
         this.highlightTimer = null;
-        this.stickyAvatarEl = null;
-        this.stickyAvatarUpdateId = null;
-        this._stickyScrollHandler = null;
 
         window.addEventListener("chat:notify", (e) => {
             const payload = e.detail;
@@ -36,6 +60,9 @@ export default class extends Controller {
         }
         this.messages = [];
         this.loadMessages();
+
+        this.applyTheme({refreshBubbles: false});
+        this.syncThemeInputs();
 
         this.inputTarget.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -64,18 +91,17 @@ export default class extends Controller {
             clearTimeout(this.highlightTimer);
             this.highlightTimer = null;
         }
-        if (this.stickyAvatarUpdateId) {
-            cancelAnimationFrame(this.stickyAvatarUpdateId);
-            this.stickyAvatarUpdateId = null;
+
+        document.removeEventListener("click", this.boundCloseMenu);
+        document.removeEventListener("click", this.boundCloseThemePanel);
+
+        if (this.hasMenuTarget) {
+            this.menuTarget.removeEventListener("click", this.boundPreventMenuHide);
         }
-        if (this.stickyAvatarEl) {
-            this.stickyAvatarEl.remove();
-            this.stickyAvatarEl = null;
-        }
-        if (this._stickyScrollHandler) {
-            this.messageListTarget.removeEventListener("scroll",
-                this._stickyScrollHandler);
-            this._stickyScrollHandler = null;
+
+        if (this.hasThemePanelTarget) {
+            this.themePanelTarget.removeEventListener("click",
+                this.boundPreventThemeHide);
         }
     }
 
@@ -94,8 +120,6 @@ export default class extends Controller {
         } else {
             this.showMoreTarget.style.display = "none";
         }
-
-        this.scheduleStickyAvatarUpdate();
     }
 
     autoResize() {
@@ -110,7 +134,6 @@ export default class extends Controller {
             .then(data => {
                 this.messages = data;
                 this.renderMessages();
-                this.setupStickyAvatar();
             })
             .catch(error => console.error("加载消息失败:", error));
     }
@@ -171,9 +194,6 @@ export default class extends Controller {
             if (this.hasEmptyMessageTarget) {
                 this.emptyMessageTarget.style.display = "block";
             }
-            if (this.stickyAvatarEl) {
-                this.stickyAvatarEl.classList.add("hidden");
-            }
             return;
         }
         if (this.hasEmptyMessageTarget) {
@@ -213,9 +233,6 @@ export default class extends Controller {
         } else {
             container.scrollTop = container.scrollHeight;
         }
-
-        this.setupStickyAvatar();
-        this.scheduleStickyAvatarUpdate();
     }
 
     replaceRoomSenderWxid(msg) {
@@ -225,9 +242,7 @@ export default class extends Controller {
                 const wxid = title_send_wxid.slice(0, -2);
                 const member_info = this.chatMembers.find(it => it.user_name === wxid);
                 if (member_info) {
-                    // msg.content = msg.content.replace(wxid + ":\n", "");
-                    msg.content = msg.content.replace(wxid + ":\n",
-                        member_info.remark || member_info.nick_name);
+                    msg.content = msg.content.replace(wxid + ":\n", "");
                 }
             }
         }
@@ -241,7 +256,8 @@ export default class extends Controller {
             row.dataset.messageId = msg.id;
         }
 
-        if (!msg.self_send) {
+        // 只在群聊中显示其他人的头像
+        if (!msg.self_send && this.isRoom()) {
             const wrapper = document.createElement("div");
             wrapper.className = "mr-2 flex justify-center items-start";
             wrapper.style.width = "3rem";
@@ -257,6 +273,7 @@ export default class extends Controller {
                 delete row.dataset.senderAvatar;
             }
 
+            // 只在新组时显示头像
             if (isNewGroup) {
                 const avatar = document.createElement("div");
                 avatar.className = "w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
@@ -273,11 +290,24 @@ export default class extends Controller {
                 }
                 wrapper.appendChild(avatar);
             } else {
+                // 连续消息不显示头像，但保留空间
                 wrapper.style.visibility = "hidden";
                 wrapper.style.opacity = "0";
             }
 
             row.appendChild(wrapper);
+        } else if (!msg.self_send) {
+            // 私聊中不显示头像，但仍记录发送者信息
+            const senderName = senderInfo?.name || msg.sender_name || "";
+            const senderAvatar = senderInfo?.avatar || msg.sender_avatar || "";
+            if (senderName) {
+                row.dataset.senderName = senderName;
+            }
+            if (senderAvatar) {
+                row.dataset.senderAvatar = senderAvatar;
+            } else {
+                delete row.dataset.senderAvatar;
+            }
         } else {
             row.dataset.senderName = "我";
             delete row.dataset.senderAvatar;
@@ -290,9 +320,9 @@ export default class extends Controller {
         const bubble = document.createElement("div");
         const type = this.getMessageType(msg);
 
-        if (type !== "refer") {
-            this.replaceRoomSenderWxid(msg);
-        }
+        // if (type !== "refer") {
+        this.replaceRoomSenderWxid(msg);
+        // }
 
         switch (type) {
             case "voice":
@@ -411,6 +441,7 @@ export default class extends Controller {
         const fallbackDuration = Number(
                 xml.querySelector("voicemsg")?.getAttribute("voicelength") || 0) / 1000
             || 10;
+        console.log("fallbackDuration", fallbackDuration);
 
         if (label) {
             label.dataset.originalText = label.textContent;
@@ -525,16 +556,20 @@ export default class extends Controller {
                 }
             }
         } else {
-            if (quoted) {
-                quoted.classList.add("cursor-not-allowed", "opacity-60");
-                quoted.classList.remove("cursor-pointer");
-                delete quoted.dataset.referMessageId;
-            }
-            if (quotedMeta) {
-                quotedMeta.textContent = "引用的消息";
-            }
-            if (quotedContent) {
-                quotedContent.textContent = "该消息尚未加载";
+            if (parsed.refContent) {
+                quotedContent.textContent = parsed.refContent;
+            } else {
+                if (quoted) {
+                    quoted.classList.add("cursor-not-allowed", "opacity-60");
+                    quoted.classList.remove("cursor-pointer");
+                    delete quoted.dataset.referMessageId;
+                }
+                if (quotedMeta) {
+                    quotedMeta.textContent = "引用的消息";
+                }
+                if (quotedContent) {
+                    quotedContent.textContent = "该消息尚未加载";
+                }
             }
         }
 
@@ -550,7 +585,8 @@ export default class extends Controller {
 
         bubble.classList.add("relative", "inline-block", "max-w-[75%]",
             "rounded-2xl", "shadow-sm", "message-bubble");
-        bubble.style.marginTop = isNewGroup ? "12px" : "6px";
+
+        bubble.style.marginTop = isNewGroup ? "6px" : "";
 
         bubble.classList.remove(
             "bg-blue-500", "text-white", "rounded-bl-2xl", "rounded-tr-2xl",
@@ -558,14 +594,34 @@ export default class extends Controller {
             "border-gray-200", "rounded-br-2xl", "rounded-tl-2xl",
             "rounded-bl-md");
 
+        bubble.style.background = "";
+        bubble.style.color = "";
+        bubble.style.border = "";
+        bubble.style.boxShadow = "";
+        delete bubble.dataset.senderType;
+
         if (msg.self_send) {
+            bubble.dataset.senderType = "self";
             bubble.classList.add(
-                "bg-blue-500", "text-white", "rounded-bl-2xl", "rounded-tr-2xl",
+                "text-white", "rounded-bl-2xl", "rounded-tr-2xl",
                 "rounded-br-md");
+            bubble.classList.remove("rounded-br-2xl", "rounded-tl-2xl",
+                "rounded-bl-md");
+            bubble.style.background = this.theme.selfBubbleColor;
+            bubble.style.color = this.theme.selfBubbleTextColor;
+            bubble.style.border = "none";
+            bubble.style.boxShadow = "0 14px 32px -20px rgba(99,102,241,0.65)";
         } else {
+            bubble.dataset.senderType = "other";
             bubble.classList.add(
-                "bg-white", "text-gray-900", "border", "border-gray-200",
-                "rounded-br-2xl", "rounded-tl-2xl", "rounded-bl-md");
+                "text-gray-900", "border", "rounded-br-2xl",
+                "rounded-tl-2xl", "rounded-bl-md");
+            bubble.classList.remove("rounded-bl-2xl", "rounded-tr-2xl",
+                "rounded-br-md");
+            bubble.style.background = this.theme.otherBubbleColor;
+            bubble.style.color = "#111827";
+            bubble.style.border = `1px solid ${this.theme.otherBubbleBorderColor}`;
+            bubble.style.boxShadow = "0 12px 28px -22px rgba(2,6,23,0.45)";
         }
 
         const existingName = bubble.querySelector('[data-role="sender-name"]');
@@ -664,7 +720,7 @@ export default class extends Controller {
             body: JSON.stringify({
                 chat_room_id: this.idValue,
                 content: content,
-                msg_type: 0,
+                msg_type: 1,
                 extra: {}
             })
         })
@@ -705,7 +761,8 @@ export default class extends Controller {
                     "publisher > nickname")?.textContent?.trim()
                 || xml.querySelector("appname")?.textContent?.trim();
             const msgType = xml.querySelector("type")?.textContent?.trim() || 0;
-            return {type: "xml", title, desc, url, cover, source, msgType};
+            const refContent = xml.querySelector("refermsg")?.querySelector("content")?.textContent.trim();
+            return {type: "xml", title, desc, url, cover, source, msgType, refContent};
         } catch (e) {
             console.error("XML parse error:", e);
             return {type: "text", content: xmlString};
@@ -715,15 +772,250 @@ export default class extends Controller {
     toggleMenu(event) {
         event.stopPropagation();
 
-        if (this.menuTarget.classList.contains("hidden")) {
+        if (!this.hasMenuTarget) {
+            return;
+        }
+
+        const shouldShow = this.menuTarget.classList.contains("hidden");
+        if (shouldShow) {
             this.menuTarget.classList.remove("hidden");
-            document.addEventListener("click", this.closeMenu);
+            document.addEventListener("click", this.boundCloseMenu);
         } else {
             this.closeMenu();
         }
     }
 
-    syncMembers() {
+    closeMenu(event = null) {
+        if (!this.hasMenuTarget) {
+            return;
+        }
+
+        if (event) {
+            const target = event.target;
+            if (this.menuTarget.contains(target)) {
+                return;
+            }
+            if (this.hasThemePanelTarget && this.themePanelTarget.contains(target)) {
+                return;
+            }
+        }
+
+        if (!this.menuTarget.classList.contains("hidden")) {
+            this.menuTarget.classList.add("hidden");
+        }
+
+        document.removeEventListener("click", this.boundCloseMenu);
+    }
+
+    handleMenuClose(event = null) {
+        event?.stopPropagation();
+        this.closeMenu();
+    }
+
+    openAppearanceSettings(event) {
+        event.stopPropagation();
+        this.closeMenu();
+
+        if (!this.hasThemePanelTarget) {
+            return;
+        }
+
+        this.themePanelTarget.classList.remove("hidden");
+        this.syncThemeInputs();
+        document.addEventListener("click", this.boundCloseThemePanel);
+    }
+
+    closeThemePanel(event = null) {
+        if (!this.hasThemePanelTarget) {
+            return;
+        }
+        if (!this.themePanelTarget.classList.contains("hidden")) {
+            this.themePanelTarget.classList.add("hidden");
+        }
+
+        document.removeEventListener("click", this.boundCloseThemePanel);
+    }
+
+    updateBackgroundColor(event) {
+        const value = event?.target?.value;
+        if (!value) {
+            return;
+        }
+        this.theme.backgroundColor = value;
+        this.applyTheme();
+    }
+
+    updateBubbleColor(event) {
+        const value = event?.target?.value;
+        if (!value) {
+            return;
+        }
+        this.theme.selfBubbleColor = value;
+        this.applyTheme();
+    }
+
+    updateBackgroundImage(event) {
+        const value = event?.target?.value ?? "";
+        this.theme.backgroundImage = value.trim();
+        this.applyTheme();
+    }
+
+    clearBackgroundImage(event) {
+        event?.preventDefault();
+        this.theme.backgroundImage = "";
+        this.applyTheme();
+        this.syncThemeInputs();
+    }
+
+    updateFontFamily(event) {
+        const value = event?.target?.value ?? "inherit";
+        if (value === "custom") {
+            if (this.hasFontCustomInputTarget) {
+                this.fontCustomInputTarget.focus();
+            }
+            return;
+        }
+
+        this.theme.fontFamily = value || "inherit";
+        this.applyTheme({refreshBubbles: false});
+        if (this.hasFontCustomInputTarget) {
+            this.fontCustomInputTarget.value = "";
+        }
+    }
+
+    updateCustomFont(event) {
+        const rawValue = event?.target?.value ?? "";
+        const value = rawValue.trim();
+        if (!value) {
+            this.theme.fontFamily = "inherit";
+            if (this.hasFontSelectTarget) {
+                this.fontSelectTarget.value = "inherit";
+            }
+        } else {
+            this.theme.fontFamily = value;
+            if (this.hasFontSelectTarget) {
+                this.fontSelectTarget.value = "custom";
+            }
+        }
+        this.applyTheme({refreshBubbles: false});
+    }
+
+    applyTheme({refreshBubbles = true} = {}) {
+        const backgroundColor = this.theme.backgroundColor || "#ffffff";
+        const backgroundImage = this.theme.backgroundImage || "";
+        const fontFamily = this.theme.fontFamily || "inherit";
+
+        const resolveBackgroundImage = (image) => {
+            if (!image) {
+                return "";
+            }
+            const trimmed = image.trim();
+            if (!trimmed) {
+                return "";
+            }
+            if (/^url\(/i.test(trimmed)) {
+                return trimmed;
+            }
+            const sanitized = trimmed.replace(/"/g, "'");
+            return `url("${sanitized}")`;
+        };
+
+        const backgroundImageValue = resolveBackgroundImage(backgroundImage);
+
+        if (this.element) {
+            this.element.style.backgroundColor = backgroundColor;
+            if (backgroundImageValue) {
+                this.element.style.backgroundImage = backgroundImageValue;
+                this.element.style.backgroundSize = "cover";
+                this.element.style.backgroundRepeat = "no-repeat";
+                this.element.style.backgroundPosition = "center";
+            } else {
+                this.element.style.backgroundImage = "";
+            }
+            this.element.style.fontFamily = fontFamily;
+        }
+
+        if (this.hasMessageListTarget) {
+            const list = this.messageListTarget;
+            if (backgroundImageValue) {
+                list.style.backgroundColor = "transparent";
+                list.style.backgroundImage = backgroundImageValue;
+                list.style.backgroundSize = "cover";
+                list.style.backgroundRepeat = "no-repeat";
+                list.style.backgroundAttachment = "fixed";
+                list.style.backgroundPosition = "center";
+            } else {
+                list.style.backgroundColor = backgroundColor;
+                list.style.backgroundImage = "";
+                list.style.backgroundAttachment = "";
+                list.style.backgroundSize = "";
+                list.style.backgroundRepeat = "";
+                list.style.backgroundPosition = "";
+            }
+            list.style.fontFamily = fontFamily;
+        }
+
+        if (refreshBubbles) {
+            this.refreshBubbleStyles();
+        }
+    }
+
+    refreshBubbleStyles() {
+        if (!this.hasMessageListTarget) {
+            return;
+        }
+        const bubbles = this.messageListTarget.querySelectorAll(".message-bubble");
+        bubbles.forEach((bubble) => {
+            const senderType = bubble.dataset.senderType;
+            if (senderType === "self") {
+                bubble.style.background = this.theme.selfBubbleColor;
+                bubble.style.color = this.theme.selfBubbleTextColor;
+                bubble.style.border = "none";
+                bubble.classList.add("text-white");
+            } else {
+                bubble.style.background = this.theme.otherBubbleColor;
+                bubble.style.color = "#111827";
+                bubble.style.border = `1px solid ${this.theme.otherBubbleBorderColor}`;
+                bubble.classList.remove("text-white");
+            }
+        });
+    }
+
+    syncThemeInputs() {
+        if (this.hasBackgroundInputTarget && this.backgroundInputTarget.value !== this.theme.backgroundColor) {
+            this.backgroundInputTarget.value = this.theme.backgroundColor;
+        }
+        if (this.hasBubbleInputTarget && this.bubbleInputTarget.value !== this.theme.selfBubbleColor) {
+            this.bubbleInputTarget.value = this.theme.selfBubbleColor;
+        }
+        if (this.hasBackgroundImageInputTarget) {
+            this.backgroundImageInputTarget.value = this.theme.backgroundImage || "";
+        }
+        const fontValue = this.theme.fontFamily || "inherit";
+        const presetFonts = new Set([
+            "inherit",
+            '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+            '"Source Han Serif SC", "Songti SC", serif',
+            '"LXGW WenKai", cursive',
+            '"JetBrains Mono", monospace'
+        ]);
+        if (this.hasFontSelectTarget) {
+            if (presetFonts.has(fontValue)) {
+                this.fontSelectTarget.value = fontValue;
+            } else {
+                this.fontSelectTarget.value = "custom";
+            }
+        }
+        if (this.hasFontCustomInputTarget) {
+            this.fontCustomInputTarget.value = presetFonts.has(fontValue) || fontValue === "inherit"
+                ? ""
+                : fontValue;
+        }
+    }
+
+    syncMembers(event = null) {
+        event?.stopPropagation();
+        this.closeMenu();
         fetch(`/chat_room/${this.idValue}/sync_chat_members`, {
             method: "PUT",
             headers: {
@@ -737,7 +1029,9 @@ export default class extends Controller {
         });
     }
 
-    syncContact() {
+    syncContact(event = null) {
+        event?.stopPropagation();
+        this.closeMenu();
         fetch(`/chat_room/${this.idValue}/sync_chat_contact`, {
             method: "PUT",
             headers: {
@@ -1179,88 +1473,6 @@ export default class extends Controller {
                 this.highlightedRow = null;
             }
         }, 2000);
-
-        this.scheduleStickyAvatarUpdate();
-    }
-
-    scheduleStickyAvatarUpdate() {
-        if (!this.stickyAvatarEl) {
-            return;
-        }
-        if (this.stickyAvatarTimer) {
-            return;
-        }
-        this.stickyAvatarTimer = requestAnimationFrame(() => {
-            this.stickyAvatarTimer = null;
-            this.updateStickyAvatar();
-        });
-    }
-
-    updateStickyAvatar() {
-        if (!this.stickyAvatarEl || !this.hasMessageListTarget) {
-            return;
-        }
-
-        const rows = Array.from(
-            this.messageListTarget.querySelectorAll('[data-message-id]'));
-        if (!rows.length) {
-            this.stickyAvatarEl.classList.add("hidden");
-            return;
-        }
-
-        const listRect = this.messageListTarget.getBoundingClientRect();
-        const targetY = listRect.bottom - 80;
-        let candidate = null;
-        let minDistance = Infinity;
-
-        rows.forEach((row) => {
-            const rect = row.getBoundingClientRect();
-            if (rect.bottom < listRect.top || rect.top > listRect.bottom) {
-                return;
-            }
-            const distance = Math.abs(rect.bottom - targetY);
-            if (distance < minDistance) {
-                minDistance = distance;
-                candidate = row;
-            }
-        });
-
-        if (!candidate) {
-            this.stickyAvatarEl.classList.add("hidden");
-            return;
-        }
-
-        const senderName = candidate.dataset.senderName
-            || (candidate.classList.contains("justify-end") ? "我" : "");
-        const senderAvatar = candidate.dataset.senderAvatar || "";
-
-        const avatarWrap = this.stickyAvatarEl.querySelector(
-            '[data-role="sticky-avatar"]');
-        const avatarImg = avatarWrap?.querySelector("img");
-        const initialsEl = avatarWrap?.querySelector('[data-sticky-initial]');
-        const nameEl = this.stickyAvatarEl.querySelector('[data-sticky-name]');
-
-        if (!avatarWrap || !avatarImg || !initialsEl || !nameEl) {
-            return;
-        }
-
-        if (!senderName && !senderAvatar) {
-            this.stickyAvatarEl.classList.add("hidden");
-            return;
-        }
-
-        if (senderAvatar) {
-            avatarImg.src = senderAvatar;
-            avatarImg.classList.remove("hidden");
-            initialsEl.classList.add("hidden");
-        } else {
-            avatarImg.classList.add("hidden");
-            initialsEl.classList.remove("hidden");
-            initialsEl.textContent = (senderName || "?").slice(0, 1).toUpperCase();
-        }
-
-        nameEl.textContent = senderName || "";
-        this.stickyAvatarEl.classList.remove("hidden");
     }
 
     humanizeMessageType(msgType) {
@@ -1338,142 +1550,5 @@ export default class extends Controller {
         };
     }
 
-    setupStickyAvatar() {
-        if (!this.hasMessageListTarget) {
-            return;
-        }
-
-        const host = this.messageListTarget.parentElement;
-        if (!host) {
-            return;
-        }
-        host.classList.add("relative");
-
-        if (!this.stickyAvatarEl) {
-            const el = document.createElement("div");
-            el.className = "sticky-avatar hidden pointer-events-none absolute left-4 bottom-4 z-20 flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full shadow px-3 py-2";
-
-            const avatarWrap = document.createElement("div");
-            avatarWrap.dataset.role = "sticky-avatar";
-            avatarWrap.className = "w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
-
-            const avatarImg = document.createElement("img");
-            avatarImg.className = "hidden w-full h-full object-cover";
-            avatarImg.alt = "avatar";
-
-            const avatarInitial = document.createElement("span");
-            avatarInitial.dataset.stickyInitial = "true";
-            avatarInitial.className = "text-gray-600 font-semibold";
-            avatarInitial.textContent = "?";
-
-            avatarWrap.appendChild(avatarImg);
-            avatarWrap.appendChild(avatarInitial);
-
-            const nameEl = document.createElement("span");
-            nameEl.dataset.stickyName = "true";
-            nameEl.className = "text-sm font-medium text-gray-700";
-
-            el.appendChild(avatarWrap);
-            el.appendChild(nameEl);
-
-            host.appendChild(el);
-            this.stickyAvatarEl = el;
-        }
-
-        if (!this._stickyScrollHandler) {
-            this._stickyScrollHandler = () => this.scheduleStickyAvatarUpdate();
-            this.messageListTarget.addEventListener("scroll",
-                this._stickyScrollHandler);
-            this.stickyAvatarCleanup = () => {
-                if (this._stickyScrollHandler) {
-                    this.messageListTarget.removeEventListener("scroll",
-                        this._stickyScrollHandler);
-                    this._stickyScrollHandler = null;
-                }
-            };
-        }
-
-        this.scheduleStickyAvatarUpdate();
-    }
-
-    scheduleStickyAvatarUpdate() {
-        if (!this.stickyAvatarEl) {
-            return;
-        }
-        if (this.stickyAvatarTimer) {
-            return;
-        }
-        this.stickyAvatarTimer = requestAnimationFrame(() => {
-            this.stickyAvatarTimer = null;
-            this.updateStickyAvatar();
-        });
-    }
-
-    updateStickyAvatar() {
-        if (!this.stickyAvatarEl || !this.hasMessageListTarget) {
-            return;
-        }
-
-        const rows = Array.from(
-            this.messageListTarget.querySelectorAll('[data-message-id]'));
-        if (!rows.length) {
-            this.stickyAvatarEl.classList.add("hidden");
-            return;
-        }
-
-        const listRect = this.messageListTarget.getBoundingClientRect();
-        const targetY = listRect.bottom - 80;
-        let candidate = null;
-        let minDistance = Infinity;
-
-        rows.forEach((row) => {
-            const rect = row.getBoundingClientRect();
-            if (rect.bottom < listRect.top || rect.top > listRect.bottom) {
-                return;
-            }
-            const distance = Math.abs(rect.bottom - targetY);
-            if (distance < minDistance) {
-                minDistance = distance;
-                candidate = row;
-            }
-        });
-
-        if (!candidate) {
-            this.stickyAvatarEl.classList.add("hidden");
-            return;
-        }
-
-        const senderName = candidate.dataset.senderName
-            || (candidate.classList.contains("justify-end") ? "我" : "");
-        const senderAvatar = candidate.dataset.senderAvatar || "";
-
-        const avatarWrap = this.stickyAvatarEl.querySelector(
-            '[data-role="sticky-avatar"]');
-        const avatarImg = avatarWrap?.querySelector("img");
-        const initialsEl = avatarWrap?.querySelector('[data-sticky-initial]');
-        const nameEl = this.stickyAvatarEl.querySelector('[data-sticky-name]');
-
-        if (!avatarWrap || !avatarImg || !initialsEl || !nameEl) {
-            return;
-        }
-
-        if (!senderName && !senderAvatar) {
-            this.stickyAvatarEl.classList.add("hidden");
-            return;
-        }
-
-        if (senderAvatar) {
-            avatarImg.src = senderAvatar;
-            avatarImg.classList.remove("hidden");
-            initialsEl.classList.add("hidden");
-        } else {
-            avatarImg.classList.add("hidden");
-            initialsEl.classList.remove("hidden");
-            initialsEl.textContent = (senderName || "?").slice(0, 1).toUpperCase();
-        }
-
-        nameEl.textContent = senderName || "";
-        this.stickyAvatarEl.classList.remove("hidden");
-    }
 
 }
