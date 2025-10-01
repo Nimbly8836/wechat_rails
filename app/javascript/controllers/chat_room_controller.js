@@ -15,8 +15,6 @@ export default class extends Controller {
     this.voicePlaybackOptions = [0.5, 1.0, 1.5, 2.0];
     this.highlightedRow = null;
     this.highlightTimer = null;
-    this.stickyAvatarEl = null;
-    this.stickyAvatarUpdateId = null;
 
     window.addEventListener("chat:notify", (e) => {
       const payload = e.detail;
@@ -69,19 +67,6 @@ export default class extends Controller {
       clearTimeout(this.highlightTimer);
       this.highlightTimer = null;
     }
-    if (this.stickyAvatarUpdateId) {
-      cancelAnimationFrame(this.stickyAvatarUpdateId);
-      this.stickyAvatarUpdateId = null;
-    }
-    if (this.stickyAvatarEl) {
-      this.stickyAvatarEl.remove();
-      this.stickyAvatarEl = null;
-    }
-    if (this._stickyScrollHandler) {
-      this.messageListTarget.removeEventListener("scroll",
-          this._stickyScrollHandler);
-      this._stickyScrollHandler = null;
-    }
   }
 
   isRoom() {
@@ -100,10 +85,6 @@ export default class extends Controller {
     } else {
       this.showMoreTarget.style.display = "none";
     }
-
-    this.scheduleStickyAvatarUpdate();
-
-    this.scheduleStickyAvatarUpdate();
   }
 
   autoResize() {
@@ -119,8 +100,6 @@ export default class extends Controller {
         .then(data => {
           this.messages = data;
           this.renderMessages();
-          this.setupStickyAvatar();
-          this.setupStickyAvatar();
         })
         .catch(error => {
           console.error("加载消息失败:", error)
@@ -181,9 +160,6 @@ export default class extends Controller {
       if (this.hasEmptyMessageTarget) {
         this.emptyMessageTarget.style.display = "block";
       }
-      if (this.stickyAvatarEl) {
-        this.stickyAvatarEl.classList.add("hidden");
-      }
       return;
     }
     if (this.hasEmptyMessageTarget) {
@@ -217,20 +193,17 @@ export default class extends Controller {
     } else {
       container.scrollTop = container.scrollHeight;
     }
-
-    this.setupStickyAvatar();
-    this.scheduleStickyAvatarUpdate();
   }
 
   replaceRoomSenderWxid(msg) {
-    if (this.chatMembers && msg.content) {
+    if (this.isRoom() && this.chatMembers && msg.content) {
       const title_send_wxid = msg.content.match(/\w+:\n/)?.[0]
       if (title_send_wxid) {
         const wxid = title_send_wxid.slice(0, -2);
         const member_info = this.chatMembers.find(it => it.user_name === wxid)
         if (member_info) {
-          msg.content = msg.content.replace(wxid + ":",
-              member_info.remark || member_info.nick_name)
+          // 完全删除名称和换行，因为名称已经在bubble标题中显示
+          msg.content = msg.content.replace(title_send_wxid, "")
         }
       }
     }
@@ -244,7 +217,7 @@ export default class extends Controller {
       row.dataset.messageId = msg.id;
     }
 
-    if (!msg.self_send) {
+    if (!msg.self_send && this.isRoom()) {
       const wrapper = document.createElement("div");
       wrapper.className = "mr-2 flex justify-center items-start";
       wrapper.style.width = "3rem";
@@ -279,8 +252,12 @@ export default class extends Controller {
 
       row.appendChild(wrapper);
     } else {
-      row.dataset.senderName = "我";
-      delete row.dataset.senderAvatar;
+      row.dataset.senderName = msg.self_send ? "我" : (senderInfo.name || "");
+      if (!msg.self_send && senderInfo.avatar) {
+        row.dataset.senderAvatar = senderInfo.avatar;
+      } else {
+        delete row.dataset.senderAvatar;
+      }
     }
 
     return row;
@@ -1023,130 +1000,7 @@ export default class extends Controller {
     };
   }
 
-  setupStickyAvatar() {
-    if (!this.hasMessageListTarget) {
-      return;
-    }
 
-    const host = this.messageListTarget.parentElement;
-    if (!host) {
-      return;
-    }
-    host.classList.add("relative");
-
-    if (!this.stickyAvatarEl) {
-      const el = document.createElement("div");
-      el.className = "sticky-avatar hidden pointer-events-none absolute left-4 bottom-4 z-20 flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full shadow px-3 py-2";
-
-      const avatarWrap = document.createElement("div");
-      avatarWrap.dataset.role = "sticky-avatar";
-      avatarWrap.className = "w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
-
-      const avatarImg = document.createElement("img");
-      avatarImg.className = "hidden w-full h-full object-cover";
-      avatarWrap.appendChild(avatarImg);
-
-      const avatarInitial = document.createElement("span");
-      avatarInitial.dataset.stickyInitial = "true";
-      avatarInitial.className = "text-gray-600 font-semibold";
-      avatarInitial.textContent = "?";
-      avatarWrap.appendChild(avatarInitial);
-
-      const nameEl = document.createElement("span");
-      nameEl.dataset.stickyName = "true";
-      nameEl.className = "text-sm font-medium text-gray-700";
-
-      el.appendChild(avatarWrap);
-      el.appendChild(nameEl);
-
-      host.appendChild(el);
-      this.stickyAvatarEl = el;
-
-      this._stickyScrollHandler = () => this.scheduleStickyAvatarUpdate();
-      this.messageListTarget.addEventListener("scroll",
-          this._stickyScrollHandler);
-    }
-  }
-
-  scheduleStickyAvatarUpdate() {
-    if (!this.stickyAvatarEl) {
-      return;
-    }
-    if (this.stickyAvatarUpdateId) {
-      return;
-    }
-    this.stickyAvatarUpdateId = requestAnimationFrame(() => {
-      this.stickyAvatarUpdateId = null;
-      this.updateStickyAvatar();
-    });
-  }
-
-  updateStickyAvatar() {
-    if (!this.stickyAvatarEl || !this.hasMessageListTarget) {
-      return;
-    }
-
-    const rows = Array.from(
-        this.messageListTarget.querySelectorAll('[data-message-id]'));
-    if (!rows.length) {
-      this.stickyAvatarEl.classList.add("hidden");
-      return;
-    }
-
-    const listRect = this.messageListTarget.getBoundingClientRect();
-    const targetY = listRect.bottom - 80;
-    let candidate = null;
-    let minDistance = Infinity;
-
-    rows.forEach((row) => {
-      const rect = row.getBoundingClientRect();
-      if (rect.bottom < listRect.top || rect.top > listRect.bottom) {
-        return;
-      }
-      const distance = Math.abs(rect.bottom - targetY);
-      if (distance < minDistance) {
-        minDistance = distance;
-        candidate = row;
-      }
-    });
-
-    if (!candidate) {
-      this.stickyAvatarEl.classList.add("hidden");
-      return;
-    }
-
-    const senderName = candidate.dataset.senderName
-        || (candidate.classList.contains("justify-end") ? "我" : "");
-    const senderAvatar = candidate.dataset.senderAvatar || "";
-
-    const avatarWrap = this.stickyAvatarEl.querySelector(
-        '[data-role="sticky-avatar"]');
-    const avatarImg = avatarWrap?.querySelector("img");
-    const initialsEl = avatarWrap?.querySelector('[data-sticky-initial]');
-    const nameEl = this.stickyAvatarEl.querySelector('[data-sticky-name]');
-
-    if (!avatarWrap || !avatarImg || !initialsEl || !nameEl) {
-      return;
-    }
-
-    if (!senderName && !senderAvatar) {
-      this.stickyAvatarEl.classList.add("hidden");
-      return;
-    }
-
-    if (senderAvatar) {
-      avatarImg.src = senderAvatar;
-      avatarImg.classList.remove("hidden");
-      initialsEl.classList.add("hidden");
-    } else {
-      avatarImg.classList.add("hidden");
-      initialsEl.classList.remove("hidden");
-      initialsEl.textContent = (senderName || "?").slice(0, 1).toUpperCase();
-    }
-
-    nameEl.textContent = senderName || "";
-    this.stickyAvatarEl.classList.remove("hidden");
-  }
 
   buildLinkedText(text) {
     const fragment = document.createDocumentFragment();
