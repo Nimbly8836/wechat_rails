@@ -1,9 +1,7 @@
 import {Controller} from "@hotwired/stimulus";
 
 export default class extends Controller {
-    static targets = ["messageList", "input", "emptyMessage", "menu", "showMore",
-        "themePanel", "backgroundInput", "bubbleInput", "backgroundImageInput",
-        "fontSelect", "fontCustomInput"];
+    static targets = ["messageList", "input", "emptyMessage", "menu", "showMore", "themePanel", "backgroundInput", "bubbleInput", "backgroundImageInput", "fontSelect", "fontCustomInput"];
     static values = {currentWxid: String, id: Number, members: Array};
 
     connect() {
@@ -28,12 +26,10 @@ export default class extends Controller {
         }
 
         if (this.hasThemePanelTarget) {
-            this.themePanelTarget.addEventListener("click",
-                this.boundPreventThemeHide);
+            this.themePanelTarget.addEventListener("click", this.boundPreventThemeHide);
         }
 
-        this.debouncedLoadNewMessages = this.debounce(
-            this.loadNewMessages.bind(this), 400);
+        this.debouncedLoadNewMessages = this.debounce(this.loadNewMessages.bind(this), 400);
         this.voiceBlobUrls = new Map();
         this.currentVoicePlayback = null;
         this.voicePlaybackRates = new Map();
@@ -71,8 +67,7 @@ export default class extends Controller {
             }
         });
 
-        this.messageListTarget.addEventListener("scroll",
-            this.handleScroll.bind(this));
+        this.messageListTarget.addEventListener("scroll", this.handleScroll.bind(this));
 
         this.inputTarget.addEventListener("input", this.autoResize.bind(this));
         this.autoResize();
@@ -100,8 +95,7 @@ export default class extends Controller {
         }
 
         if (this.hasThemePanelTarget) {
-            this.themePanelTarget.removeEventListener("click",
-                this.boundPreventThemeHide);
+            this.themePanelTarget.removeEventListener("click", this.boundPreventThemeHide);
         }
     }
 
@@ -114,8 +108,7 @@ export default class extends Controller {
             return;
         }
 
-        if (this.messageListTarget.scrollTop <= 0 &&
-            this.messageListTarget.scrollHeight >= 100) {
+        if (this.messageListTarget.scrollTop <= 0 && this.messageListTarget.scrollHeight >= 100) {
             this.showMoreTarget.style.display = "block";
         } else {
             this.showMoreTarget.style.display = "none";
@@ -148,8 +141,7 @@ export default class extends Controller {
         if (msg.msg_type === "refer") {
             return "refer";
         }
-        if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(
-            /(\w+:|.*)\n</)?.length > 0) && msg.content?.length > 250) {
+        if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(/(\w+:|.*)\n</)?.length > 0) && msg.content?.length > 250) {
             if (!this.isRoom()) {
                 const parse = this.parseWxXmlMessage(msg.content);
                 if (parse.msgType === "5") {
@@ -161,8 +153,7 @@ export default class extends Controller {
             }
             return "xml_unparsed";
         }
-        if (this.currentWxidValue?.startsWith("gh_") &&
-            msg.msg_type === "refer" && msg.content?.trim().startsWith("<msg")) {
+        if (this.currentWxidValue?.startsWith("gh_") && msg.msg_type === "refer" && msg.content?.trim().startsWith("<msg")) {
             return "card";
         }
 
@@ -213,19 +204,17 @@ export default class extends Controller {
             msg.sender_initial = senderInfo?.initial;
             msg.sender_key = senderInfo?.key;
 
-            const senderKey = msg.sender_key || (msg.self_send
-                ? `self:${msg.to_user_name || 'me'}` : msg.from_user_name || "");
+            const senderKey = msg.sender_key || (msg.self_send ? `self:${msg.to_user_name || 'me'}` : msg.from_user_name || "");
             const isNewGroup = lastSenderKey === null || lastSenderKey !== senderKey;
             lastSenderKey = senderKey;
 
             const row = this.buildRow(isNewGroup, msg, senderInfo);
-            const bubble = this.renderMessageBubble(msg, isNewGroup, senderInfo,
-                index === 0);
+            const bubble = this.renderMessageBubble(msg, isNewGroup, senderInfo, index === 0);
             row.appendChild(bubble);
             container.appendChild(row);
 
             this.renderStatus(wrapper, bubble, msg);
-            this.addTimestamp(bubble, wrapper);
+            this.addTimestamp(bubble, wrapper, msg);
         });
 
         if (bottomOffset !== null) {
@@ -250,8 +239,7 @@ export default class extends Controller {
 
     buildRow(isNewGroup, msg, senderInfo) {
         const row = document.createElement("div");
-        row.className = `w-full flex ${msg.self_send ? "justify-end"
-            : "justify-start"} items-end`;
+        row.className = `w-full flex ${msg.self_send ? "justify-end" : "justify-start"} items-end`;
         if (msg.id) {
             row.dataset.messageId = msg.id;
         }
@@ -326,24 +314,18 @@ export default class extends Controller {
 
         switch (type) {
             case "voice":
-                return this.renderVoiceMessage(bubble, msg, isNewGroup, senderInfo,
-                    isFirstMessage);
+                return this.renderVoiceMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "card":
-                return this.renderCardMessage(bubble, msg, isNewGroup, senderInfo,
-                    isFirstMessage);
+                return this.renderCardMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "xml_unparsed":
-                return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo,
-                    isFirstMessage);
+                return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "emoji":
-                return this.renderEmojiMessage(bubble, msg, isNewGroup, senderInfo,
-                    isFirstMessage);
+                return this.renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "refer":
-                return this.renderReferMessage(bubble, msg, isNewGroup, senderInfo,
-                    isFirstMessage);
+                return this.renderReferMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "text":
             default:
-                return this.renderTextMessage(bubble, msg, isNewGroup, senderInfo,
-                    isFirstMessage);
+                return this.renderTextMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
         }
     }
 
@@ -361,9 +343,7 @@ export default class extends Controller {
             link.href = parsed.url || "#";
         }
         if (cover) {
-            cover.innerHTML = parsed.cover
-                ? `<img src="${parsed.cover}" class="max-h-48 w-full object-cover" referrerpolicy="no-referrer"/>`
-                : "";
+            cover.innerHTML = parsed.cover ? `<img src="${parsed.cover}" class="max-h-48 w-full object-cover" referrerpolicy="no-referrer"/>` : "";
         }
         if (title) {
             title.textContent = parsed.title || "";
@@ -375,8 +355,7 @@ export default class extends Controller {
             source.textContent = parsed.source ? `来自：${parsed.source}` : "";
         }
 
-        return this.applyBubbleStyle(cardBubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+        return this.applyBubbleStyle(cardBubble, msg, isNewGroup, senderInfo, isFirstMessage);
     }
 
     renderXmlMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
@@ -398,15 +377,13 @@ export default class extends Controller {
                 }
             });
         }
-        return this.applyBubbleStyle(xmlBubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+        return this.applyBubbleStyle(xmlBubble, msg, isNewGroup, senderInfo, isFirstMessage);
     }
 
     renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
         const template = this.cloneTemplate("message-template-emoji");
         const emojiBubble = template || bubble;
-        return this.applyBubbleStyle(emojiBubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+        return this.applyBubbleStyle(emojiBubble, msg, isNewGroup, senderInfo, isFirstMessage);
     }
 
     renderTextMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
@@ -418,33 +395,38 @@ export default class extends Controller {
             inner.innerHTML = "";
             inner.appendChild(this.buildLinkedText(content));
         }
-        return this.applyBubbleStyle(textBubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+        return this.applyBubbleStyle(textBubble, msg, isNewGroup, senderInfo, isFirstMessage);
     }
 
     renderVoiceMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
         const template = this.cloneTemplate("message-template-voice");
         const voiceBubble = template || bubble;
-        const container = voiceBubble.querySelector(
-            "[data-role='voice-container']");
+        const container = voiceBubble.querySelector("[data-role='voice-container']");
         const label = voiceBubble.querySelector("[data-role='voice-label']");
         const wrapper = voiceBubble.querySelector("[data-role='voice-wrapper']");
-        const progressBar = voiceBubble.querySelector(
-            "[data-role='voice-progress']");
-        const progressInner = voiceBubble.querySelector(
-            "[data-role='voice-progress-inner']");
+        const progressBar = voiceBubble.querySelector("[data-role='voice-progress']");
+        const progressInner = voiceBubble.querySelector("[data-role='voice-progress-inner']");
         const speedButton = voiceBubble.querySelector("[data-role='voice-speed']");
         const controls = voiceBubble.querySelector("[data-role='voice-controls']");
 
         const parser = new DOMParser();
         const xml = parser.parseFromString(msg.content, "application/xml");
-        const fallbackDuration = Number(
-                xml.querySelector("voicemsg")?.getAttribute("voicelength") || 0) / 1000
-            || 10;
-        console.log("fallbackDuration", fallbackDuration);
+        const fallbackDuration = Number(xml.querySelector("voicemsg")?.getAttribute("voicelength") || 0) / 1000 || 10;
+
+        if (progressBar) {
+            progressBar.classList.remove("hidden");
+            progressBar.style.background = "rgba(148,163,184,0.35)";
+        }
+
+        if (progressInner) {
+            progressInner.style.background = msg.self_send ? this.theme.selfBubbleTextColor || "#ffffff" : "#6366f1";
+            progressInner.style.transition = "width 120ms ease-out";
+        }
 
         if (label) {
-            label.dataset.originalText = label.textContent;
+            const durationLabel = this.formatVoiceDuration(fallbackDuration);
+            label.dataset.originalText = durationLabel;
+            label.textContent = durationLabel;
         }
 
         if (speedButton) {
@@ -456,17 +438,12 @@ export default class extends Controller {
         }
 
         const context = {
-            messageId: msg.id,
-            fallbackDuration,
-            progressBar,
-            progressInner,
-            speedButton,
+            messageId: msg.id, fallbackDuration, progressBar, progressInner, speedButton,
         };
 
         const pendingRatio = this.pendingVoiceSeeks.get(msg.id);
-        if (typeof pendingRatio === "number") {
-            progressInner.style.width = `${Math.min(Math.max(pendingRatio, 0), 1)
-            * 100}%`;
+        if (typeof pendingRatio === "number" && progressInner) {
+            progressInner.style.width = `${Math.min(Math.max(pendingRatio, 0), 1) * 100}%`;
         }
 
         if (controls && progressBar && speedButton) {
@@ -483,8 +460,7 @@ export default class extends Controller {
         }
 
         if (container && label) {
-            container.addEventListener("click", () =>
-                this.handleVoiceClick(msg.id, container, label, context));
+            container.addEventListener("click", () => this.handleVoiceClick(msg.id, container, label, context));
         }
 
         if (progressBar) {
@@ -501,8 +477,7 @@ export default class extends Controller {
             });
         }
 
-        return this.applyBubbleStyle(voiceBubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+        return this.applyBubbleStyle(voiceBubble, msg, isNewGroup, senderInfo, isFirstMessage);
     }
 
     renderReferMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
@@ -510,10 +485,8 @@ export default class extends Controller {
         const referBubble = template || bubble;
         const body = referBubble.querySelector("[data-role='refer-body']");
         const quoted = referBubble.querySelector("[data-role='refer-quoted']");
-        const quotedMeta = referBubble.querySelector(
-            "[data-role='refer-quoted-meta']");
-        const quotedContent = referBubble.querySelector(
-            "[data-role='refer-quoted-content']");
+        const quotedMeta = referBubble.querySelector("[data-role='refer-quoted-meta']");
+        const quotedContent = referBubble.querySelector("[data-role='refer-quoted-content']");
 
         const parsed = this.parseWxXmlMessage(msg.content || "");
         const title = (msg.refer_title || parsed.title || "引用的消息").trim();
@@ -542,8 +515,7 @@ export default class extends Controller {
             }
 
             if (quotedMeta) {
-                quotedMeta.textContent = `引用的${this.humanizeMessageType(
-                    refWx.msg_type)}消息`;
+                quotedMeta.textContent = `引用的${this.humanizeMessageType(refWx.msg_type)}消息`;
             }
 
             if (quotedContent) {
@@ -551,8 +523,7 @@ export default class extends Controller {
                 if (refWx.msg_type === "text" && refWx.content) {
                     quotedContent.appendChild(this.buildLinkedText(refWx.content));
                 } else {
-                    quotedContent.textContent = `[${this.humanizeMessageType(
-                        refWx.msg_type)}]`;
+                    quotedContent.textContent = `[${this.humanizeMessageType(refWx.msg_type)}]`;
                 }
             }
         } else {
@@ -573,26 +544,20 @@ export default class extends Controller {
             }
         }
 
-        return this.applyBubbleStyle(referBubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+        return this.applyBubbleStyle(referBubble, msg, isNewGroup, senderInfo, isFirstMessage);
     }
 
-    applyBubbleStyle(bubble, msg, isNewGroup = true, senderInfo = null,
-                     isFirstMessage = false) {
+    applyBubbleStyle(bubble, msg, isNewGroup = true, senderInfo = null, isFirstMessage = false) {
         if (!bubble) {
             return bubble;
         }
 
-        bubble.classList.add("relative", "inline-block", "max-w-[75%]",
-            "rounded-2xl", "shadow-sm", "message-bubble");
+        bubble.classList.add("relative", "inline-block", "max-w-[75%]", "rounded-2xl", "shadow-sm", "message-bubble");
 
         bubble.style.marginTop = isNewGroup ? "6px" : "";
+        bubble.style.paddingBottom = "";
 
-        bubble.classList.remove(
-            "bg-blue-500", "text-white", "rounded-bl-2xl", "rounded-tr-2xl",
-            "rounded-br-md", "bg-white", "text-gray-900", "border",
-            "border-gray-200", "rounded-br-2xl", "rounded-tl-2xl",
-            "rounded-bl-md");
+        bubble.classList.remove("bg-blue-500", "text-white", "rounded-bl-2xl", "rounded-tr-2xl", "rounded-br-md", "bg-white", "text-gray-900", "border", "border-gray-200", "rounded-br-2xl", "rounded-tl-2xl", "rounded-bl-md");
 
         bubble.style.background = "";
         bubble.style.color = "";
@@ -602,22 +567,16 @@ export default class extends Controller {
 
         if (msg.self_send) {
             bubble.dataset.senderType = "self";
-            bubble.classList.add(
-                "text-white", "rounded-bl-2xl", "rounded-tr-2xl",
-                "rounded-br-md");
-            bubble.classList.remove("rounded-br-2xl", "rounded-tl-2xl",
-                "rounded-bl-md");
+            bubble.classList.add("text-white", "rounded-bl-2xl", "rounded-tr-2xl", "rounded-br-md");
+            bubble.classList.remove("rounded-br-2xl", "rounded-tl-2xl", "rounded-bl-md");
             bubble.style.background = this.theme.selfBubbleColor;
             bubble.style.color = this.theme.selfBubbleTextColor;
             bubble.style.border = "none";
             bubble.style.boxShadow = "0 14px 32px -20px rgba(99,102,241,0.65)";
         } else {
             bubble.dataset.senderType = "other";
-            bubble.classList.add(
-                "text-gray-900", "border", "rounded-br-2xl",
-                "rounded-tl-2xl", "rounded-bl-md");
-            bubble.classList.remove("rounded-bl-2xl", "rounded-tr-2xl",
-                "rounded-br-md");
+            bubble.classList.add("text-gray-900", "border", "rounded-br-2xl", "rounded-tl-2xl", "rounded-bl-md");
+            bubble.classList.remove("rounded-bl-2xl", "rounded-tr-2xl", "rounded-br-md");
             bubble.style.background = this.theme.otherBubbleColor;
             bubble.style.color = "#111827";
             bubble.style.border = `1px solid ${this.theme.otherBubbleBorderColor}`;
@@ -669,19 +628,62 @@ export default class extends Controller {
         }
     }
 
-    addTimestamp(bubble, wrapper) {
+    addTimestamp(bubble, wrapper, msg = null) {
         const time = document.createElement("span");
-        time.className = "absolute bottom-1 right-2 text-[10px] leading-[10px] text-gray-400";
-        const ts = wrapper.wx_message.message_time;
-        time.textContent = ts
-            ? new Date(ts).toLocaleString("zh-Hans-CN", {
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit"
-            })
-            : "";
+        time.className = "absolute bottom-2 right-3 text-[10px] leading-none tracking-wide";
+        const ts = wrapper.message_time || wrapper.created_at || wrapper.wx_message?.message_time;
+        time.textContent = ts ? this.formatTimestamp(ts) : "";
+
+        if (!bubble.dataset.timestampPrepared) {
+            bubble.style.minWidth = bubble.style.minWidth || "140px";
+            bubble.style.minHeight = bubble.style.minHeight || "52px";
+            bubble.style.paddingBottom = bubble.style.paddingBottom || "28px";
+            bubble.dataset.timestampPrepared = "true";
+        }
+
+        const isSelf = msg?.self_send;
+        time.style.padding = "3px 8px";
+        time.style.borderRadius = "9999px";
+        time.style.background = isSelf ? "rgba(255,255,255,0.18)" : "rgba(15,23,42,0.08)";
+        time.style.color = isSelf ? "rgba(255,255,255,0.85)" : "rgba(100,116,139,0.95)";
+        time.style.boxShadow = isSelf ? "0 4px 12px -8px rgba(15,23,42,0.45)" : "0 4px 10px -8px rgba(15,23,42,0.25)";
+
         bubble.appendChild(time);
+    }
+
+    formatTimestamp(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return "";
+        }
+
+        const now = new Date();
+        const sameDay = date.toDateString() === now.toDateString();
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        const sameYear = date.getFullYear() === now.getFullYear();
+
+        const timePart = date.toLocaleTimeString("zh-Hans-CN", {
+            hour: "2-digit", minute: "2-digit"
+        });
+
+        if (sameDay) {
+            return timePart;
+        }
+
+        if (date.toDateString() === yesterday.toDateString()) {
+            return `昨 ${timePart}`;
+        }
+
+        if (sameYear) {
+            return date.toLocaleDateString("zh-Hans-CN", {
+                month: "2-digit", day: "2-digit"
+            }) + ` ${timePart}`;
+        }
+
+        return date.toLocaleDateString("zh-Hans-CN", {
+            year: "2-digit", month: "2-digit", day: "2-digit"
+        }) + ` ${timePart}`;
     }
 
     sendMessage() {
@@ -698,10 +700,7 @@ export default class extends Controller {
             sending: true,
             send_failed: false,
             wx_message: {
-                msg_type: "text",
-                content: content,
-                to_user_name: this.currentWxidValue,
-                self_send: true,
+                msg_type: "text", content: content, to_user_name: this.currentWxidValue, self_send: true,
             }
         };
 
@@ -711,17 +710,11 @@ export default class extends Controller {
         this.autoResize();
 
         fetch(`/chat_room/${this.idValue}/messages`, {
-            method: "POST",
-            headers: {
+            method: "POST", headers: {
                 "Content-Type": "application/json",
-                "X-CSRF-Token": document.querySelector(
-                    'meta[name="csrf-token"]').content
-            },
-            body: JSON.stringify({
-                chat_room_id: this.idValue,
-                content: content,
-                msg_type: 1,
-                extra: {}
+                "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+            }, body: JSON.stringify({
+                chat_room_id: this.idValue, content: content, msg_type: 1, extra: {}
             })
         })
             .then(res => res.json())
@@ -729,9 +722,7 @@ export default class extends Controller {
                 const index = this.messages.findIndex(m => m.id === tempId);
                 if (index !== -1) {
                     this.messages[index] = {
-                        ...newMsg.result,
-                        sending: false,
-                        send_failed: false
+                        ...newMsg.result, sending: false, send_failed: false
                     };
                     this.renderMessages();
                 }
@@ -755,11 +746,8 @@ export default class extends Controller {
             const title = xml.querySelector("title")?.textContent?.trim() || "";
             const desc = xml.querySelector("des")?.textContent?.trim() || "";
             const url = xml.querySelector("url")?.textContent?.trim() || "";
-            const cover = xml.querySelector("thumburl")?.textContent?.trim()
-                || xml.querySelector("cover")?.textContent?.trim();
-            const source = xml.querySelector(
-                    "publisher > nickname")?.textContent?.trim()
-                || xml.querySelector("appname")?.textContent?.trim();
+            const cover = xml.querySelector("thumburl")?.textContent?.trim() || xml.querySelector("cover")?.textContent?.trim();
+            const source = xml.querySelector("publisher > nickname")?.textContent?.trim() || xml.querySelector("appname")?.textContent?.trim();
             const msgType = xml.querySelector("type")?.textContent?.trim() || 0;
             const refContent = xml.querySelector("refermsg")?.querySelector("content")?.textContent.trim();
             return {type: "xml", title, desc, url, cover, source, msgType, refContent};
@@ -972,11 +960,19 @@ export default class extends Controller {
                 bubble.style.color = this.theme.selfBubbleTextColor;
                 bubble.style.border = "none";
                 bubble.classList.add("text-white");
+                const progressInner = bubble.querySelector('[data-role="voice-progress-inner"]');
+                if (progressInner) {
+                    progressInner.style.background = this.theme.selfBubbleTextColor || "#ffffff";
+                }
             } else {
                 bubble.style.background = this.theme.otherBubbleColor;
                 bubble.style.color = "#111827";
                 bubble.style.border = `1px solid ${this.theme.otherBubbleBorderColor}`;
                 bubble.classList.remove("text-white");
+                const progressInner = bubble.querySelector('[data-role="voice-progress-inner"]');
+                if (progressInner) {
+                    progressInner.style.background = "#6366f1";
+                }
             }
         });
     }
@@ -992,13 +988,7 @@ export default class extends Controller {
             this.backgroundImageInputTarget.value = this.theme.backgroundImage || "";
         }
         const fontValue = this.theme.fontFamily || "inherit";
-        const presetFonts = new Set([
-            "inherit",
-            '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
-            '"Source Han Serif SC", "Songti SC", serif',
-            '"LXGW WenKai", cursive',
-            '"JetBrains Mono", monospace'
-        ]);
+        const presetFonts = new Set(["inherit", '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif', '"Source Han Serif SC", "Songti SC", serif', '"LXGW WenKai", cursive', '"JetBrains Mono", monospace']);
         if (this.hasFontSelectTarget) {
             if (presetFonts.has(fontValue)) {
                 this.fontSelectTarget.value = fontValue;
@@ -1007,9 +997,7 @@ export default class extends Controller {
             }
         }
         if (this.hasFontCustomInputTarget) {
-            this.fontCustomInputTarget.value = presetFonts.has(fontValue) || fontValue === "inherit"
-                ? ""
-                : fontValue;
+            this.fontCustomInputTarget.value = presetFonts.has(fontValue) || fontValue === "inherit" ? "" : fontValue;
         }
     }
 
@@ -1017,8 +1005,7 @@ export default class extends Controller {
         event?.stopPropagation();
         this.closeMenu();
         fetch(`/chat_room/${this.idValue}/sync_chat_members`, {
-            method: "PUT",
-            headers: {
+            method: "PUT", headers: {
                 "Content-Type": "application/json",
                 "X-CSRF-Token": document.querySelector(
                     'meta[name="csrf-token"]').content
@@ -1031,15 +1018,11 @@ export default class extends Controller {
 
     syncContact(event = null) {
         event?.stopPropagation();
-        this.closeMenu();
-        fetch(`/chat_room/${this.idValue}/sync_chat_contact`, {
-            method: "PUT",
-            headers: {
+        msg_type: 0, fetch(`/chat_room/${this.idValue}/sync_chat_contact`, {
+            method: "PUT", headers: {
                 "Content-Type": "application/json",
-                "X-CSRF-Token": document.querySelector(
-                    'meta[name="csrf-token"]').content
-            },
-            body: JSON.stringify({
+                "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+            }, body: JSON.stringify({
                 chat_room_id: this.idValue,
             })
         });
@@ -1052,7 +1035,7 @@ export default class extends Controller {
 
         const firstMsgId = this.messages[0].id;
         const container = this.messageListTarget;
-        const oldHeight = container.scrollHeight;
+        const preserveBottomOffset = container.scrollHeight - container.scrollTop;
 
         fetch(`/chat_room/${this.idValue}/messages?before_id=${firstMsgId}`)
             .then(res => res.json())
@@ -1062,18 +1045,7 @@ export default class extends Controller {
                 }
 
                 this.messages = [...data, ...this.messages];
-
-                data.forEach(m => {
-                    const msg = m.wx_message;
-                    const row = this.buildRow(true, msg);
-                    const bubble = this.renderMessageBubble(msg);
-                    row.appendChild(bubble);
-                    container.prepend(row);
-                    this.renderStatus(m, bubble, msg);
-                });
-
-                const newHeight = container.scrollHeight;
-                container.scrollTop = newHeight - oldHeight;
+                this.renderMessages({preserveBottomOffset});
             })
             .catch(console.error);
     }
@@ -1086,9 +1058,7 @@ export default class extends Controller {
         const container = this.messageListTarget;
         const oldHeight = container.scrollHeight;
 
-        fetch(
-            `/chat_room/${this.idValue}/messages?after_id=${this.messages[this.messages.length
-            - 1].id}`)
+        fetch(`/chat_room/${this.idValue}/messages?after_id=${this.messages[this.messages.length - 1].id}`)
             .then(res => res.json())
             .then(data => {
                 if (!data.length) {
@@ -1150,11 +1120,7 @@ export default class extends Controller {
         const original = label.dataset.originalText;
 
         const {
-            messageId,
-            progressBar,
-            progressInner,
-            fallbackDuration,
-            speedButton,
+            messageId, progressBar, progressInner, fallbackDuration, speedButton,
         } = context;
 
         const playbackState = {
@@ -1180,7 +1146,9 @@ export default class extends Controller {
         const hideProgress = () => {
             const pending = this.pendingVoiceSeeks.get(messageId);
             const ratio = typeof pending === "number" ? pending : 0;
-            progressInner.style.width = `${Math.min(Math.max(ratio, 0), 1) * 100}%`;
+            if (progressInner) {
+                progressInner.style.width = `${Math.min(Math.max(ratio, 0), 1) * 100}%`;
+            }
             stopAnimation();
         };
 
@@ -1197,10 +1165,8 @@ export default class extends Controller {
         playbackState.cleanup = cleanup;
 
         const updateProgress = () => {
-            const duration = Number.isFinite(audio.duration) && audio.duration > 0
-                ? audio.duration
-                : fallbackDuration;
-            if (duration > 0) {
+            const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : fallbackDuration;
+            if (duration > 0 && progressInner) {
                 const percent = Math.min(1, audio.currentTime / duration) * 100;
                 progressInner.style.width = `${percent}%`;
             }
@@ -1215,10 +1181,14 @@ export default class extends Controller {
             const clamped = Math.min(Math.max(pending, 0), 1);
             if (Number.isFinite(audio.duration) && audio.duration > 0) {
                 audio.currentTime = clamped * audio.duration;
-                progressInner.style.width = `${clamped * 100}%`;
+                if (progressInner) {
+                    progressInner.style.width = `${clamped * 100}%`;
+                }
                 this.pendingVoiceSeeks.delete(messageId);
             } else {
-                progressInner.style.width = `${clamped * 100}%`;
+                if (progressInner) {
+                    progressInner.style.width = `${clamped * 100}%`;
+                }
             }
         };
 
@@ -1284,9 +1254,10 @@ export default class extends Controller {
             return;
         }
 
-        const ratio = Math.min(
-            Math.max((event.clientX - rect.left) / rect.width, 0), 1);
-        progressInner.style.width = `${ratio * 100}%`;
+        const ratio = Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1);
+        if (progressInner) {
+            progressInner.style.width = `${ratio * 100}%`;
+        }
         this.pendingVoiceSeeks.set(messageId, ratio);
 
         if (this.currentVoicePlayback?.messageId !== messageId) {
@@ -1337,6 +1308,16 @@ export default class extends Controller {
         }
     }
 
+    formatVoiceDuration(seconds) {
+        const safe = Math.max(1, Math.round(Number(seconds) || 0));
+        if (safe >= 60) {
+            const minutes = Math.floor(safe / 60);
+            const remaining = safe % 60;
+            return `${minutes}:${String(remaining).padStart(2, "0")}`;
+        }
+        return `${safe}″`;
+    }
+
     stopCurrentVoicePlayback() {
         if (!this.currentVoicePlayback) {
             return;
@@ -1369,8 +1350,7 @@ export default class extends Controller {
             const cleanHref = this.normalizeHref(href);
 
             if (cleanHref) {
-                const anchor = this.createAnchor(cleanHref,
-                    this.decodeHtmlEntities(labelHtml));
+                const anchor = this.createAnchor(cleanHref, this.decodeHtmlEntities(labelHtml));
                 fragment.appendChild(anchor);
             } else {
                 this.appendPlainSegment(fragment, match[0]);
@@ -1447,28 +1427,24 @@ export default class extends Controller {
             return;
         }
 
-        const row = this.messageListTarget.querySelector(
-            `[data-message-id="${messageId}"]`);
+        const row = this.messageListTarget.querySelector(`[data-message-id="${messageId}"]`);
         if (!row) {
             return;
         }
 
         if (this.highlightedRow && this.highlightedRow !== row) {
-            this.highlightedRow.classList.remove("ring-2", "ring-blue-400",
-                "ring-offset-2", "ring-offset-gray-100");
+            this.highlightedRow.classList.remove("ring-2", "ring-blue-400", "ring-offset-2", "ring-offset-gray-100");
         }
 
         row.scrollIntoView({behavior: "smooth", block: "center"});
-        row.classList.add("ring-2", "ring-blue-400", "ring-offset-2",
-            "ring-offset-gray-100");
+        row.classList.add("ring-2", "ring-blue-400", "ring-offset-2", "ring-offset-gray-100");
         this.highlightedRow = row;
 
         if (this.highlightTimer) {
             clearTimeout(this.highlightTimer);
         }
         this.highlightTimer = setTimeout(() => {
-            row.classList.remove("ring-2", "ring-blue-400", "ring-offset-2",
-                "ring-offset-gray-100");
+            row.classList.remove("ring-2", "ring-blue-400", "ring-offset-2", "ring-offset-gray-100");
             if (this.highlightedRow === row) {
                 this.highlightedRow = null;
             }
@@ -1504,17 +1480,13 @@ export default class extends Controller {
                 key: msg.sender_key,
                 name: msg.sender_name,
                 avatar: msg.sender_avatar || "",
-                initial: (msg.sender_initial || msg.sender_name.slice(0, 1)
-                    || "?").toUpperCase()
+                initial: (msg.sender_initial || msg.sender_name.slice(0, 1) || "?").toUpperCase()
             };
         }
 
         if (msg.self_send) {
             return {
-                key: `self:${msg.to_user_name || 'me'}`,
-                name: "我",
-                avatar: null,
-                initial: "我"
+                key: `self:${msg.to_user_name || 'me'}`, name: "我", avatar: null, initial: "我"
             };
         }
 
@@ -1533,20 +1505,14 @@ export default class extends Controller {
             const avatar = member?.small_head_img_url || "";
             const initial = (name || wxid || "?").slice(0, 1).toUpperCase();
             return {
-                key: `room:${wxid}`,
-                name,
-                avatar,
-                initial
+                key: `room:${wxid}`, name, avatar, initial
             };
         }
 
         const wxid = msg.from_user_name || msg.to_user_name || "contact";
         const name = wxid;
         return {
-            key: `direct:${wxid}`,
-            name,
-            avatar: null,
-            initial: (name || "?").slice(0, 1).toUpperCase()
+            key: `direct:${wxid}`, name, avatar: null, initial: (name || "?").slice(0, 1).toUpperCase()
         };
     }
 
