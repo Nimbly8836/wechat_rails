@@ -37,7 +37,7 @@ class MessagesController < ApplicationController
         include: {
           wx_message: {
             only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                   :new_msg_id, :refer_new_msg_id, :refer_title, :self_send ]
+                   :new_msg_id, :refer_new_msg_id, :refer_title, :self_send, :real_msg_type ]
           }
         }
       )
@@ -48,7 +48,7 @@ class MessagesController < ApplicationController
           include: {
             wx_message: {
               only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                     :new_msg_id, :self_send ]
+                     :new_msg_id, :self_send, :real_msg_type ]
             }
           }
         )

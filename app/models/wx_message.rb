@@ -43,6 +43,38 @@ class WxMessage < ApplicationRecord
     recalled: 10002 # 撤回消息 (MM_DATA_RECALLED)
   }
 
+  enum :real_msg_type, {
+    unknown: 0,
+    text: 1,
+    image: 3,
+    voice: 34,
+    add_friend: 37,
+    contact: 42,
+    video: 43,
+    emoji: 47,
+    location: 48,
+
+    card: 5,
+    file_message: 6,
+    real_time_location: 17,
+    chat_history: 19,
+    mini_app: 33,
+    mini_game: 36,
+    video_account: 51,
+    quote: 57,
+    file_transfer_start: 74,
+    transfer: 2000,
+    red_packet: 2001,
+
+    voip: 50,
+    status_notify: 51,
+
+    revoke: 1,
+    pat: 2,
+    function_message: 3,
+    voip_invite: 4
+  }, prefix: :real
+
   def parse_voice_content
     return unless (msg_type.to_sym == :voice) and content.present?
     doc = Nokogiri::XML(extract_xml_body(self.content))
@@ -91,6 +123,36 @@ class WxMessage < ApplicationRecord
     _, _, body = raw.to_s.partition("\n")
     candidate = body.lstrip
     candidate.start_with?("<") ? candidate : raw
+  end
+
+  def get_real_msg_type
+    base_type = msg_type&.to_sym
+    return :unknown if base_type.nil?
+
+    unless [ :refer, :recalled ].include?(base_type)
+      current = real_msg_type
+      return current.to_sym if current.present?
+      return base_type if self.class.real_msg_types.key?(base_type.to_s)
+      return :unknown
+    end
+
+    return :unknown unless content.present?
+
+    doc = Nokogiri::XML(extract_xml_body(content))
+    type_node = doc.at_xpath("//appmsg/type")
+    if type_node&.text.present?
+      numeric_value = type_node.text.to_i
+      enum_key = self.class.real_msg_types.key(numeric_value)
+      return enum_key ? enum_key.to_sym : :unknown
+    end
+
+    app_msg_node = doc.at_xpath("//appmsg")
+    raw_type_attr = app_msg_node&.[]("type")
+    return :unknown if raw_type_attr.blank?
+
+    numeric_value = raw_type_attr.to_i
+    enum_key = self.class.real_msg_types.key(numeric_value)
+    enum_key ? enum_key.to_sym : :unknown
   end
 
 end
