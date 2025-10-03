@@ -8,11 +8,11 @@ module WechatModels
       content = api_hash.dig("Content", "string")
       msg_type = api_hash["MsgType"]
       refer_app_msg = parse_refer_app_msg(content) if msg_type == 49
-      refer_new_msg_id = refer_app_msg[:srv_id]
-      title = refer_app_msg[:title]
+      refer_new_msg_id = refer_app_msg&[:srv_id]
+      title = refer_app_msg&[:title]
       from_user_name = api_hash.dig("FromUserName", "string")
       parsed_emoji = parse_emoji(content) if msg_type == 47
-      WxMessage.new(
+      wx_message = WxMessage.new(
         msg_id: api_hash["MsgId"],
         from_user_name: from_user_name,
         to_user_name: api_hash.dig("ToUserName", "string"),
@@ -25,11 +25,13 @@ module WechatModels
         push_content: api_hash["PushContent"],
         new_msg_id: api_hash["NewMsgId"],
         msg_seq: api_hash["MsgSeq"],
-        refer_new_msg_id: refer_new_msg_id,
-        refer_title: title,
+        refer_new_msg_id: refer_new_msg_id || nil,
+        refer_title: title || nil,
         self_send: from_user_name === current_wxid,
-        emoji_md5: parsed_emoji[:md5],
+        emoji_md5: parsed_emoji&[ :md5 ] || nil,
       )
+      wx_message.real_msg_type = wx_message.get_real_msg_type
+      wx_message
     end
 
     def self.parse_saves(res, current_wxid)

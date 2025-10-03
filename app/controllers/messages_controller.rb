@@ -1,3 +1,6 @@
+require "base64"
+require "stringio"
+
 class MessagesController < ApplicationController
   skip_before_action :verify_authenticity_token, only: :callback
 
@@ -138,7 +141,7 @@ class MessagesController < ApplicationController
     cdn_url = nil
     existing_path = if emoji_md5.present?
                       Dir.glob(storage_dir.join("#{emoji_md5}.*")).first || (storage_dir.join(emoji_md5) if File.exist?(storage_dir.join(emoji_md5)))
-                    end
+    end
 
     return send_emoji_file(existing_path) if existing_path
 
@@ -181,6 +184,194 @@ class MessagesController < ApplicationController
     render json: { error: true, message: "emoji download error" }, status: :bad_gateway
   end
 
+  def download_image
+    message = Message.includes(:wx_message, chat_room: :contact).find(params[:id])
+    wx_message = message.wx_message
+
+    unless wx_message&.content && wx_message.msg_type.to_sym == :image
+      render json: { error: true, message: "image message not found" }, status: :not_found and return
+    end
+
+    image_meta = wx_message.parse_image
+    unless image_meta
+      render json: { error: true, message: "image metadata missing" }, status: :unprocessable_entity and return
+    end
+
+    storage_dir = Rails.root.join("storage", "images")
+    FileUtils.mkdir_p(storage_dir)
+    basename = message.id.to_s
+
+    if (cached = locate_cached_media(storage_dir, basename))
+      return send_file(cached, type: Marcel::MimeType.for(Pathname.new(cached)), disposition: "inline")
+    end
+
+    contact = message.chat_room&.contact
+    unless contact&.own_wxid.present?
+      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
+    end
+
+    tools_api = ToolsApiService.new(contact.own_wxid)
+
+    if (cdn_payload = try_cdn_image_download(tools_api, image_meta))
+      file_path = persist_image(storage_dir, basename, cdn_payload[:data], image_meta[:cdn_img_url], cdn_payload[:mime])
+      return send_file(file_path, type: cdn_payload[:mime], disposition: "inline")
+    end
+
+    chunk_payload = download_image_chunks(tools_api, wx_message, image_meta)
+    unless chunk_payload
+      render json: { error: true, message: "image download failed" }, status: :bad_gateway and return
+    end
+
+    file_path = persist_image(storage_dir, basename, chunk_payload[:data], image_meta[:cdn_img_url], chunk_payload[:mime])
+    send_file(file_path, type: chunk_payload[:mime], disposition: "inline")
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: true, message: "image message not found" }, status: :not_found
+  rescue => e
+    Rails.logger.error { "image download error: #{e.message}" }
+    render json: { error: true, message: "image download error" }, status: :bad_gateway
+  end
+
+  def download_video_thumbnail
+    message = Message.includes(:wx_message, chat_room: :contact).find(params[:id])
+    wx_message = message.wx_message
+
+    video_meta = wx_message&.parse_video
+    unless video_meta
+      render json: { error: true, message: "video metadata missing" }, status: :unprocessable_entity and return
+    end
+
+    storage_dir = Rails.root.join("storage", "videos", "thumbnails")
+    FileUtils.mkdir_p(storage_dir)
+    basename = "#{message.id}_thumb"
+
+    if (cached = locate_cached_media(storage_dir, basename))
+      return send_file(cached, type: Marcel::MimeType.for(Pathname.new(cached)), disposition: "inline")
+    end
+
+    contact = message.chat_room&.contact
+    unless contact&.own_wxid.present?
+      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
+    end
+
+    tools_api = ToolsApiService.new(contact.own_wxid)
+    thumb_meta = {
+      aes_key: video_meta[:cdn_thumb_aes_key],
+      cdn_img_url: video_meta[:cdn_thumb_url]
+    }
+
+    unless thumb_meta[:aes_key].present? && thumb_meta[:cdn_img_url].present?
+      render json: { error: true, message: "video thumbnail metadata missing" }, status: :unprocessable_entity and return
+    end
+
+    if (cdn_payload = try_cdn_image_download(tools_api, thumb_meta))
+      file_path = persist_image(storage_dir, basename, cdn_payload[:data], video_meta[:cdn_thumb_url], cdn_payload[:mime])
+      return send_file(file_path, type: cdn_payload[:mime], disposition: "inline")
+    end
+
+    render json: { error: true, message: "video thumbnail download failed" }, status: :bad_gateway
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: true, message: "video message not found" }, status: :not_found
+  rescue => e
+    Rails.logger.error { "video thumbnail error: #{e.message}" }
+    render json: { error: true, message: "video thumbnail error" }, status: :bad_gateway
+  end
+
+  def download_video
+    message = Message.includes(:wx_message, chat_room: :contact).find(params[:id])
+    wx_message = message.wx_message
+
+    unless wx_message&.content && wx_message.msg_type.to_sym == :video
+      render json: { error: true, message: "video message not found" }, status: :not_found and return
+    end
+
+    video_meta = wx_message.parse_video
+    unless video_meta
+      render json: { error: true, message: "video metadata missing" }, status: :unprocessable_entity and return
+    end
+
+    storage_dir = Rails.root.join("storage", "videos")
+    FileUtils.mkdir_p(storage_dir)
+    basename = message.id.to_s
+
+    if (cached = locate_cached_media(storage_dir, basename))
+      mime = Marcel::MimeType.for(Pathname.new(cached)) rescue "video/mp4"
+      ext = extension_for_mime(mime) || File.extname(cached) || ".mp4"
+      filename = ensure_extension("video-#{message.id}", ext)
+      return send_file(cached, type: mime, disposition: "attachment", filename: filename)
+    end
+
+    contact = message.chat_room&.contact
+    unless contact&.own_wxid.present?
+      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
+    end
+
+    tools_api = ToolsApiService.new(contact.own_wxid)
+    chunk_payload = download_video_chunks(tools_api, wx_message, video_meta)
+    unless chunk_payload
+      render json: { error: true, message: "video download failed" }, status: :bad_gateway and return
+    end
+
+    data = chunk_payload[:data]
+    mime = chunk_payload[:mime] || "video/mp4"
+    extension_hint = extension_for_mime(mime) || ".mp4"
+    file_path = persist_binary(storage_dir, basename, data, extension_hint: extension_hint, fallback_extension: ".mp4")
+
+    filename = ensure_extension("video-#{message.id}", extension_hint)
+    send_file(file_path, type: mime, disposition: "attachment", filename: filename)
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: true, message: "video message not found" }, status: :not_found
+  rescue => e
+    Rails.logger.error { "video download error: #{e.message}" }
+    render json: { error: true, message: "video download error" }, status: :bad_gateway
+  end
+
+  def download_file
+    message = Message.includes(:wx_message, chat_room: :contact).find(params[:id])
+    wx_message = message.wx_message
+
+    file_meta = wx_message.parse_file_attachment
+    unless file_meta
+      render json: { error: true, message: "file metadata missing" }, status: :unprocessable_entity and return
+    end
+
+    storage_dir = Rails.root.join("storage", "files")
+    FileUtils.mkdir_p(storage_dir)
+    basename = message.id.to_s
+
+    if (cached = locate_cached_media(storage_dir, basename))
+      filename = sanitize_filename(file_meta[:title], default: "file")
+      mime = Marcel::MimeType.for(Pathname.new(cached)) rescue "application/octet-stream"
+      return send_file(cached, type: mime, disposition: "attachment", filename: ensure_extension(filename, cached))
+    end
+
+    contact = message.chat_room&.contact
+    unless contact&.own_wxid.present?
+      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
+    end
+
+    tools_api = ToolsApiService.new(contact.own_wxid)
+    data = download_file_chunks(tools_api, wx_message, file_meta)
+    unless data
+      render json: { error: true, message: "file download failed" }, status: :bad_gateway and return
+    end
+
+    data.force_encoding(Encoding::BINARY)
+
+    base_name = sanitize_filename(file_meta[:title], default: "file")
+    extension_hint = file_meta[:fileext].present? ? ".#{file_meta[:fileext].downcase}" : nil
+    filename = ensure_extension(base_name, extension_hint)
+    mime = detect_mime(data, name: filename, fallback: "application/octet-stream")
+
+    file_path = persist_binary(storage_dir, basename, data, extension_hint: File.extname(filename), fallback_extension: ".bin")
+
+    send_file(file_path, type: mime, disposition: "attachment", filename: filename)
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: true, message: "file message not found" }, status: :not_found
+  rescue => e
+    Rails.logger.error { "file download error: #{e.message}" }
+    render json: { error: true, message: "file download error" }, status: :bad_gateway
+  end
+
   def send_emoji_file(path, content_type = nil)
     mime_type = content_type || Marcel::MimeType.for(Pathname.new(path))
     send_file(path, type: mime_type, disposition: "inline")
@@ -205,6 +396,205 @@ class MessagesController < ApplicationController
   end
 
   private
+
+  def try_cdn_image_download(api_service, image_meta)
+    aes_key = image_meta[:aes_key].presence
+    file_no = image_meta[:cdn_img_url].presence
+    return nil unless aes_key && file_no
+
+    response = api_service.cdn_download_image(file_aes_key: aes_key, file_no: file_no)
+    payload = response.is_a?(Hash) ? response : {}
+    message = payload["Message"] || payload[:Message]
+    success = message == "成功" || payload["Success"] == true || payload[:Success] == true
+    data_node = payload["Data"] || payload[:Data]
+    image_base64 = data_node&.[]("Image") || data_node&.[](:Image)
+    return nil unless success && image_base64.present?
+
+    data = Base64.decode64(image_base64)
+    data.force_encoding(Encoding::BINARY)
+    mime = detect_mime(data, fallback: "image/jpeg")
+    { data: data, mime: mime }
+  rescue => e
+    Rails.logger.error { "cdn image download error: #{e.message}" }
+    nil
+  end
+
+  def download_image_chunks(api_service, wx_message, image_meta)
+    total_size = image_meta[:length].to_i
+    return nil if total_size <= 0
+
+    msg_identifier = wx_message.msg_id.presence || wx_message.new_msg_id
+    return nil unless msg_identifier.present?
+
+    data = download_chunks(total_size) do |section|
+      api_service.download_image_chunk(
+        to_wxid: wx_message.to_user_name,
+        msg_id: msg_identifier,
+        data_len: total_size,
+        section: section
+      )
+    end
+
+    return nil unless data
+
+    mime = detect_mime(data, fallback: "image/jpeg")
+    { data: data, mime: mime }
+  end
+
+  def download_video_chunks(api_service, wx_message, video_meta)
+    total_size = video_meta[:length].to_i
+    return nil if total_size <= 0
+
+    msg_identifier = wx_message.msg_id.presence || wx_message.new_msg_id
+    return nil unless msg_identifier.present?
+
+    data = download_chunks(total_size) do |section|
+      api_service.download_video_chunk(
+        to_wxid: wx_message.to_user_name,
+        msg_id: msg_identifier,
+        data_len: total_size,
+        section: section
+      )
+    end
+
+    return nil unless data
+
+    mime = detect_mime(data, name: "video.mp4", fallback: "video/mp4")
+    { data: data, mime: mime }
+  end
+
+  def download_file_chunks(api_service, wx_message, file_meta)
+    total_size = file_meta[:totallen].to_i
+    return nil if total_size <= 0
+
+    xml_payload = file_meta[:raw_xml].presence || wx_message.content
+    return nil unless xml_payload.present?
+
+    data = download_chunks(total_size) do |section|
+      api_service.download_file_chunk(
+        xml: xml_payload,
+        data_len: total_size,
+        section: section
+      )
+    end
+
+    return nil unless data
+
+    data
+  end
+
+  def extract_chunk_payload(response)
+    payload = response.is_a?(Hash) ? response : {}
+    data_node = payload["Data"] || payload[:Data]
+    buffer_node = data_node&.[]("data") || data_node&.[](:data) || data_node
+    buffer_base64 = buffer_node&.[]("buffer") || buffer_node&.[](:buffer)
+    length_value = buffer_node&.[]("iLen") || buffer_node&.[](:iLen) || data_node&.[]("iLen") || data_node&.[](:iLen)
+    return nil unless buffer_base64.present?
+
+    decoded = Base64.decode64(buffer_base64)
+    decoded.force_encoding(Encoding::BINARY)
+    { data: decoded, length: length_value.to_i }
+  rescue => e
+    Rails.logger.error { "chunk payload parse error: #{e.message}" }
+    nil
+  end
+
+  def download_chunks(total_size)
+    total = total_size.to_i
+    return nil if total <= 0
+
+    collected = +"".b
+    downloaded = 0
+    requested_size = FileChunkHelper::INITIAL_CHUNK_SIZE
+
+    while downloaded < total
+      current_size = [requested_size, total - downloaded].min
+      section = { start_pos: downloaded, data_len: current_size }
+      response = yield(section)
+      payload = extract_chunk_payload(response)
+      return nil unless payload
+
+      chunk_data = payload[:data]
+      actual = payload[:length].to_i
+      actual = chunk_data.bytesize if actual <= 0
+      return nil if actual <= 0
+
+      collected << chunk_data
+      downloaded += actual
+      requested_size = actual
+    end
+
+    collected.force_encoding(Encoding::BINARY)
+    collected
+  rescue => e
+    Rails.logger.error { "chunk download error: #{e.message}" }
+    nil
+  end
+
+  def persist_image(storage_dir, basename, data, url_hint, mime)
+    extension_hint = extension_from_url(url_hint)
+    extension_hint ||= extension_for_mime(mime)
+    persist_binary(storage_dir, basename, data, extension_hint: extension_hint, fallback_extension: ".bin")
+  end
+
+  def persist_binary(storage_dir, basename, data, extension_hint:, fallback_extension: ".bin")
+    extension = extension_hint.to_s.strip
+    extension = fallback_extension if extension.blank?
+    extension = ".#{extension}" unless extension.start_with?(".")
+
+    path = storage_dir.join("#{basename}#{extension}")
+    File.binwrite(path, data)
+    path
+  end
+
+  def detect_mime(data, name: nil, fallback: "application/octet-stream")
+    Marcel::MimeType.for(StringIO.new(data), name: name, declared_type: fallback)
+  end
+
+  def extension_for_mime(mime)
+    case mime
+    when "image/png" then ".png"
+    when "image/jpeg" then ".jpg"
+    when "image/gif" then ".gif"
+    when "image/webp" then ".webp"
+    when "video/mp4" then ".mp4"
+    when "video/quicktime" then ".mov"
+    when "video/x-msvideo" then ".avi"
+    when "application/pdf" then ".pdf"
+    else
+      nil
+    end
+  end
+
+  def extension_from_url(url)
+    return nil if url.blank?
+    uri = URI.parse(url)
+    ext = File.extname(uri.path)
+    ext.presence
+  rescue URI::InvalidURIError
+    nil
+  end
+
+  def locate_cached_media(storage_dir, basename)
+    Dir.glob(storage_dir.join("#{basename}.*")).first
+  end
+
+  def sanitize_filename(name, default: "file")
+    sanitized = name.to_s.strip
+    sanitized = default if sanitized.blank?
+    sanitized.gsub(/[\r\n]+/, " ").gsub(/[\\\/:*?"<>|]+/, "_")
+  end
+
+  def ensure_extension(base_name, extension_or_path)
+    extension = if extension_or_path.to_s.start_with?(".")
+                  extension_or_path
+                else
+                  File.extname(extension_or_path.to_s)
+                end
+    extension = extension.presence
+    return base_name if extension.blank?
+    base_name.end_with?(extension) ? base_name : "#{base_name}#{extension}"
+  end
 
   def send_message_params
     params.require(:chat_room_id)

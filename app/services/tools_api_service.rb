@@ -21,4 +21,71 @@ class ToolsApiService
                ).to_h
     @api_service.post(path, params)
   end
+
+  def cdn_download_image(file_aes_key:, file_no:)
+    path = WechatApis::Tools.cdn_download_image
+    params = WechatRequest::Tools::CdnDownloadImage
+               .new(
+                 wxid: @wx_id,
+                 fileAesKey: file_aes_key,
+                 fileNo: file_no
+               ).to_h
+    @api_service.post(path, params)
+  end
+
+  def download_image_chunk(to_wxid:, msg_id:, data_len:, section:, compress_type: 0)
+    section_payload = {
+      StartPos: section[:start_pos].to_i,
+      DataLen: section[:data_len].to_i
+    }
+
+    path = WechatApis::Tools.download_img
+    params = WechatRequest::Tools::DownloadImg
+               .new(
+                 wxid: @wx_id,
+                 toWxid: to_wxid,
+                 msgId: msg_id,
+                 dataLen: data_len,
+                 section: section_payload,
+                 compressType: compress_type
+               ).to_h
+    @api_service.post(path, params)
+  end
+
+  def download_video_chunk(to_wxid:, msg_id:, data_len:, section:, compress_type: 0)
+    section_payload = {
+      StartPos: section[:start_pos].to_i,
+      DataLen: section[:data_len].to_i
+    }
+
+    path = WechatApis::Tools.download_video
+    params = WechatRequest::Tools::DownloadVideo
+               .new(
+                 wxid: @wx_id,
+                 toWxid: to_wxid,
+                 msgId: msg_id,
+                 dataLen: data_len,
+                 section: section_payload,
+                 compressType: compress_type
+               ).to_h
+    @api_service.post(path, params)
+  end
+
+  def download_file_chunk(xml:, data_len:, section:, compress_type: 0)
+    section_payload = {
+      StartPos: section[:start_pos].to_i,
+      DataLen: section[:data_len].to_i
+    }
+
+    path = WechatApis::Tools.download_file
+    params = WechatRequest::Tools::DownloadFile
+               .new(
+                 wxid: @wx_id,
+                 xml: xml,
+                 dataLen: data_len,
+                 section: section_payload,
+                 compressType: compress_type
+               ).to_h
+    @api_service.post(path, params)
+  end
 end
