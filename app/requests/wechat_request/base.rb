@@ -20,9 +20,9 @@ module WechatRequest
 
       # Tools 接口
       cdn_download_image: { defaults: {}, required: [:url, :wxid] },
-      download_file: { defaults: {}, required: [:dataLen, :xml, :wxid] },
-      download_img: { defaults: {}, required: [:dataLen, :xml, :wxid] },
-      download_video: { defaults: {}, required: [:dataLen, :xml, :wxid] },
+      download_file: { defaults: {}, required: [:dataLen, :xml, :section, :wxid] },
+      download_img: { defaults: {}, required: [:toWxid, :section, :msgId, :dataLen, :compressType, :wxid] },
+      download_video: { defaults: {}, required: [:toWxid, :section, :msgId, :dataLen, :compressType, :wxid] },
       download_voice: { defaults: {}, required: [:bufid, :fromUserName, :length, :msgId] },
       generate_pay_qcode: { defaults: {}, required: [:wxid] },
       get_a8_key: { defaults: { opCode: 2, scene: 4, codeType: 19, codeVersion: 5 }, required: [:wxid] },

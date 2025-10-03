@@ -7,12 +7,16 @@ module WechatRequest
 
     # 文件下载
     class DownloadFile < Base
-      params { [:dataLen, :xml ] }
+      params compressType: 0 do
+        [:dataLen, :xml, :section]
+      end
     end
 
     # 高清图片下载
     class DownloadImg < Base
-      params { [:toWxid, :section, :ssgId, :dataLen, :compressType] }
+      params compressType: 0 do
+        [:toWxid, :section, :msgId, :dataLen]
+      end
     end
 
     # 视频下载

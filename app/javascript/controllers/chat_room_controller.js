@@ -132,20 +132,53 @@ export default class extends Controller {
     }
 
     getMessageType(msg) {
-        // const msgType = msg.msg_type;
+        return msg.real_msg_type
+        // const realType = msg.real_msg_type;
+        // if (realType) {
+        //     const normalized = String(realType).toLowerCase();
+        //     if (normalized && normalized !== "unknown") {
+        //         switch (normalized) {
+        //         case "card":
+        //         case "link":
+        //             return "card";
+        //         case "quote":
+        //         case "refer":
+        //             return "quote";
+        //         case "voice":
+        //         case "emoji":
+        //         case "image":
+        //         case "video":
+        //         case "text":
+        //             return normalized;
+        //         case "file_message":
+        //             return "file";
+        //         default:
+        //             if (["mini_app", "mini_game", "transfer", "red_packet"].includes(normalized)) {
+        //                 return "card";
+        //             }
+        //         }
+        //     }
+        // }
         //
+        // const msgType = msg.msg_type;
         // if (msgType === "voice" || Number(msgType) === 34) {
         //     return "voice";
+        // }
+        // if (msgType === "emoji" || Number(msgType) === 47) {
+        //     return "emoji";
+        // }
+        // if (msgType === "image" || Number(msgType) === 3) {
+        //     return "image";
+        // }
+        // if (msgType === "video" || Number(msgType) === 43) {
+        //     return "video";
         // }
         // const isReferType = msgType === "refer" || Number(msgType) === 49;
         // if (isReferType && msg.content?.trim().startsWith("<msg")) {
         //     return "card";
         // }
         // if (isReferType) {
-        //     return "refer";
-        // }
-        // if (msgType === "emoji" || msgType === "47" || Number(msgType) === 47) {
-        //     return "emoji";
+        //     return "quote";
         // }
         // if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(/(\w+:|.*)\n</)?.length > 0) && msg.content?.length > 250) {
         //     if (!this.isRoom()) {
@@ -154,13 +187,12 @@ export default class extends Controller {
         //             return "card";
         //         }
         //         if (parse.msgType === "57") {
-        //             return "refer";
+        //             return "quote";
         //         }
         //     }
         //     return "xml_unparsed";
         // }
         // return "text";
-        return msg.real_msg_type;
     }
 
     renderMessages(options = {}) {
@@ -323,6 +355,12 @@ export default class extends Controller {
                 return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "emoji":
                 return this.renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
+            case "image":
+                return this.renderImageMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
+            case "video":
+                return this.renderVideoMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
+            case "file_message":
+                return this.renderFileMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "quote":
                 return this.renderReferMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "text":
@@ -380,6 +418,215 @@ export default class extends Controller {
             });
         }
         return this.applyBubbleStyle(xmlBubble, msg, isNewGroup, senderInfo, isFirstMessage);
+    }
+
+    renderImageMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+        const template = this.cloneTemplate("message-template-image");
+        const imageBubble = template || bubble;
+        const wrapper = imageBubble.querySelector("[data-role='image-wrapper']");
+        const placeholder = imageBubble.querySelector("[data-role='image-placeholder']");
+        const image = imageBubble.querySelector("[data-role='image']");
+
+        if (wrapper && placeholder && image) {
+            const resetPlaceholder = (message = "图片加载中…") => {
+                placeholder.textContent = message;
+                placeholder.classList.remove("hidden");
+                image.classList.add("hidden");
+                image.dataset.loaded = "false";
+                wrapper.classList.remove("cursor-zoom-in");
+            };
+
+            resetPlaceholder();
+            image.removeAttribute("src");
+
+            const showImage = () => {
+                placeholder.classList.add("hidden");
+                image.classList.remove("hidden");
+                image.dataset.loaded = "true";
+                wrapper.classList.add("cursor-zoom-in");
+            };
+
+            const showFallback = (message) => {
+                resetPlaceholder(message);
+                image.removeAttribute("src");
+            };
+
+            image.addEventListener("load", showImage, {once: true});
+            image.addEventListener("error", () => {
+                showFallback("[图片加载失败]");
+            }, {once: true});
+
+            const imageUrl = this.attachmentUrl("image", msg);
+            if (imageUrl) {
+                requestAnimationFrame(() => {
+                    image.dataset.sourceUrl = imageUrl;
+                    image.src = imageUrl;
+                });
+            } else {
+                showFallback("[暂不支持的图片]");
+            }
+
+            wrapper.addEventListener("click", (event) => {
+                if (image.dataset.loaded === "true" && image.src) {
+                    event.stopPropagation();
+                    window.open(image.dataset.sourceUrl || image.src, "_blank", "noopener");
+                }
+            });
+        }
+
+        const applied = this.applyBubbleStyle(imageBubble, msg, isNewGroup, senderInfo, isFirstMessage);
+        applied.dataset.bubbleType = "image";
+        applied.style.background = "transparent";
+        applied.style.border = "none";
+        applied.style.boxShadow = "none";
+        applied.style.padding = "6px";
+        applied.style.paddingBottom = "32px";
+        applied.classList.remove("text-white");
+        applied.classList.add("inline-block");
+
+        const senderName = applied.querySelector('[data-role="sender-name"]');
+        if (senderName && wrapper) {
+            wrapper.classList.add("mt-2");
+        }
+
+        return applied;
+    }
+
+    renderVideoMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+        const template = this.cloneTemplate("message-template-video");
+        const videoBubble = template || bubble;
+        const thumbWrapper = videoBubble.querySelector("[data-role='video-thumbnail']");
+        const placeholder = videoBubble.querySelector("[data-role='video-thumb-placeholder']");
+        const thumbImage = videoBubble.querySelector("[data-role='video-thumb-image']");
+        const durationBadge = videoBubble.querySelector("[data-role='video-duration']");
+        const downloadLink = videoBubble.querySelector("[data-role='video-download']");
+        const messageId = msg._messageId || msg.id;
+
+        const resetPlaceholder = (message = "封面加载中…") => {
+            if (placeholder) {
+                placeholder.textContent = message;
+                placeholder.classList.remove("hidden");
+            }
+            if (thumbImage) {
+                thumbImage.classList.add("hidden");
+                thumbImage.removeAttribute("src");
+                thumbImage.dataset.loaded = "false";
+            }
+            if (thumbWrapper) {
+                thumbWrapper.classList.remove("cursor-zoom-in");
+            }
+        };
+
+        resetPlaceholder();
+
+        const videoInfo = this.parseWxVideoMessage(msg.content || "");
+        if (durationBadge) {
+            if (videoInfo?.playLength) {
+                durationBadge.textContent = this.formatVideoDuration(videoInfo.playLength);
+                durationBadge.classList.remove("hidden");
+            } else {
+                durationBadge.classList.add("hidden");
+            }
+        }
+
+        if (thumbImage) {
+            thumbImage.addEventListener("load", () => {
+                if (placeholder) {
+                    placeholder.classList.add("hidden");
+                }
+                thumbImage.classList.remove("hidden");
+                thumbImage.dataset.loaded = "true";
+                if (thumbWrapper) {
+                    thumbWrapper.classList.add("cursor-zoom-in");
+                }
+            }, {once: true});
+            thumbImage.addEventListener("error", () => {
+                resetPlaceholder("[封面加载失败]");
+            }, {once: true});
+        }
+
+        const thumbUrl = this.attachmentUrl("video_thumbnail", msg);
+        if (thumbImage && thumbUrl) {
+            requestAnimationFrame(() => {
+                thumbImage.dataset.sourceUrl = thumbUrl;
+                thumbImage.src = thumbUrl;
+            });
+        } else {
+            resetPlaceholder("[暂无封面]");
+        }
+
+        const downloadUrl = this.attachmentUrl("video", msg);
+        if (downloadLink && downloadUrl) {
+            downloadLink.href = downloadUrl;
+            downloadLink.target = "_blank";
+            downloadLink.rel = "noopener noreferrer";
+            downloadLink.download = `video-${messageId || "media"}.mp4`;
+        } else if (downloadLink) {
+            downloadLink.classList.add("opacity-60", "pointer-events-none");
+        }
+
+        if (thumbWrapper) {
+            thumbWrapper.addEventListener("click", (event) => {
+                if (downloadUrl && thumbImage?.dataset.loaded === "true") {
+                    event.stopPropagation();
+                    window.open(downloadUrl, "_blank", "noopener");
+                }
+            });
+        }
+
+        const applied = this.applyBubbleStyle(videoBubble, msg, isNewGroup, senderInfo, isFirstMessage);
+        applied.dataset.bubbleType = "video";
+        applied.style.background = "transparent";
+        applied.style.border = "none";
+        applied.style.boxShadow = "none";
+        applied.style.padding = "6px";
+        applied.style.paddingBottom = "32px";
+        applied.classList.remove("text-white");
+        applied.classList.add("inline-block");
+
+        const senderName = applied.querySelector('[data-role="sender-name"]');
+        if (senderName && thumbWrapper) {
+            thumbWrapper.classList.add("mt-2");
+        }
+
+        return applied;
+    }
+
+    renderFileMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+        const template = this.cloneTemplate("message-template-file");
+        const fileBubble = template || bubble;
+        const titleEl = fileBubble.querySelector("[data-role='file-title']");
+        const metaEl = fileBubble.querySelector("[data-role='file-meta']");
+        const extEl = fileBubble.querySelector("[data-role='file-ext']");
+        const downloadLink = fileBubble.querySelector("[data-role='file-download']");
+
+        const fileInfo = this.parseWxFileAttachment(msg.content || "") || {};
+        const title = fileInfo.title || msg.refer_title || "文件";
+        const sizeLabel = fileInfo.totallen ? this.formatFileSize(fileInfo.totallen) : "";
+        const extLabel = fileInfo.fileext ? fileInfo.fileext.toUpperCase() : "FILE";
+
+        if (titleEl) {
+            titleEl.textContent = title;
+        }
+        if (metaEl) {
+            metaEl.textContent = sizeLabel;
+            metaEl.classList.toggle("hidden", !sizeLabel);
+        }
+        if (extEl) {
+            extEl.textContent = extLabel;
+        }
+
+        const downloadUrl = this.attachmentUrl("file", msg);
+        if (downloadLink && downloadUrl) {
+            downloadLink.href = downloadUrl;
+            downloadLink.target = "_blank";
+            downloadLink.rel = "noopener noreferrer";
+            downloadLink.download = title;
+        } else if (downloadLink) {
+            downloadLink.classList.add("opacity-60", "pointer-events-none");
+        }
+
+        return this.applyBubbleStyle(fileBubble, msg, isNewGroup, senderInfo, isFirstMessage);
     }
 
     renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
@@ -822,6 +1069,62 @@ export default class extends Controller {
         }
     }
 
+    parseWxVideoMessage(xmlString) {
+        try {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(xmlString, "application/xml");
+            const videoNode = xml.querySelector("videomsg");
+            if (!videoNode) {
+                return null;
+            }
+            return {
+                playLength: Number(videoNode.getAttribute("playlength") || 0),
+                thumbWidth: Number(videoNode.getAttribute("cdnthumbwidth") || 0),
+                thumbHeight: Number(videoNode.getAttribute("cdnthumbheight") || 0)
+            };
+        } catch (error) {
+            console.error("Video XML parse error:", error);
+            return null;
+        }
+    }
+
+    parseWxFileAttachment(xmlString) {
+        try {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(xmlString, "application/xml");
+            const appmsg = xml.querySelector("appmsg");
+            if (!appmsg) {
+                return null;
+            }
+            const type = Number(appmsg.querySelector("type")?.textContent || 0);
+            if (type !== 6) {
+                return null;
+            }
+            const attach = appmsg.querySelector("appattach");
+            return {
+                title: appmsg.querySelector("title")?.textContent?.trim() || "",
+                totallen: Number(attach?.querySelector("totallen")?.textContent || 0),
+                fileext: attach?.querySelector("fileext")?.textContent?.trim() || ""
+            };
+        } catch (error) {
+            console.error("File XML parse error:", error);
+            return null;
+        }
+    }
+
+    attachmentUrl(type, msg, {cacheKey} = {}) {
+        if (!msg) {
+            return null;
+        }
+        const messageId = msg._messageId || msg.id;
+        if (!messageId) {
+            return null;
+        }
+        const resolvedKey = cacheKey === undefined ? msg._cacheKey : cacheKey;
+        const base = `/message/${type}/${messageId}`;
+        return resolvedKey ? `${base}?t=${encodeURIComponent(resolvedKey)}` : base;
+    }
+
     toggleMenu(event) {
         event.stopPropagation();
 
@@ -1019,7 +1322,7 @@ export default class extends Controller {
         }
         const bubbles = this.messageListTarget.querySelectorAll(".message-bubble");
         bubbles.forEach((bubble) => {
-            if (bubble.dataset.bubbleType === "emoji") {
+            if (["emoji", "image", "video"].includes(bubble.dataset.bubbleType)) {
                 bubble.style.background = "transparent";
                 bubble.style.border = "none";
                 bubble.style.boxShadow = "none";
@@ -1390,6 +1693,29 @@ export default class extends Controller {
         return `${safe}″`;
     }
 
+    formatVideoDuration(seconds) {
+        const total = Math.max(0, Math.floor(Number(seconds) || 0));
+        const minutes = Math.floor(total / 60);
+        const remaining = total % 60;
+        return minutes > 0 ? `${minutes}:${String(remaining).padStart(2, "0")}` : `${remaining}s`;
+    }
+
+    formatFileSize(bytes) {
+        const size = Number(bytes);
+        if (!Number.isFinite(size) || size <= 0) {
+            return "";
+        }
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        let value = size;
+        let unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.length - 1) {
+            value /= 1024;
+            unitIndex += 1;
+        }
+        const precision = value >= 10 || unitIndex === 0 ? 0 : 1;
+        return `${value.toFixed(precision)}${units[unitIndex]}`;
+    }
+
     stopCurrentVoicePlayback() {
         if (!this.currentVoicePlayback) {
             return;
@@ -1529,6 +1855,7 @@ export default class extends Controller {
             image: "图片",
             voice: "语音",
             video: "视频",
+            file: "文件",
             emoji: "表情",
             refer: "引用",
             card: "卡片",

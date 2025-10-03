@@ -54,6 +54,44 @@
   </div>
 </template>
 
+<template id="message-template-image">
+  <div class="relative inline-block max-w-[75%] rounded-2xl shadow-sm message-bubble">
+    <div class="relative overflow-hidden rounded-xl bg-slate-100 flex items-center justify-center" data-role="image-wrapper">
+      <div class="py-6 px-4 text-xs text-slate-400" data-role="image-placeholder">图片加载中…</div>
+      <img data-role="image" alt="图片消息" class="hidden max-w-full max-h-[360px] object-contain select-none" referrerpolicy="no-referrer">
+    </div>
+  </div>
+</template>
+
+<template id="message-template-video">
+  <div class="relative inline-block max-w-[75%] rounded-2xl shadow-sm message-bubble">
+    <div class="relative overflow-hidden rounded-xl bg-slate-900/80" data-role="video-thumbnail">
+      <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-slate-800 text-lg font-semibold">▶</span>
+      </div>
+      <div class="absolute bottom-2 right-2 text-xs text-white bg-black/50 px-2 py-1 rounded-full hidden" data-role="video-duration"></div>
+      <div class="py-6 px-4 text-xs text-slate-200" data-role="video-thumb-placeholder">封面加载中…</div>
+      <img data-role="video-thumb-image" alt="视频封面" class="hidden w-full h-full object-cover select-none" referrerpolicy="no-referrer">
+    </div>
+    <div class="flex justify-end mt-3">
+      <a data-role="video-download" class="text-sm text-blue-500 hover:text-blue-600" target="_blank" rel="noopener noreferrer">下载视频</a>
+    </div>
+  </div>
+</template>
+
+<template id="message-template-file">
+  <div class="relative inline-block max-w-[75%] rounded-2xl shadow-sm message-bubble bg-white border border-gray-200">
+    <div class="flex items-center gap-3 p-3" data-role="file-body">
+      <div class="h-12 w-12 flex items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500 text-sm font-semibold" data-role="file-ext">FILE</div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold text-slate-800 truncate" data-role="file-title">文件</div>
+        <div class="text-xs text-slate-400 mt-1" data-role="file-meta"></div>
+      </div>
+      <a data-role="file-download" class="text-sm text-blue-500 hover:text-blue-600 whitespace-nowrap" target="_blank" rel="noopener noreferrer">下载</a>
+    </div>
+  </div>
+</template>
+
 <template id="message-template-emoji">
   <div class="message-bubble inline-flex items-center justify-center rounded-2xl">
     <div class="inline-flex items-center justify-center" data-role="emoji-content">Emoji 替代符，TODO</div>

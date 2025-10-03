@@ -18,11 +18,11 @@ default: &default
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  #  username: wechat_rails
-  #  password: wechat_rails_password
-  #  host: 10.0.0.230
-  #  port: 35432
-  url: <%= Rails.application.credentials.dig(:development, :database, :url) %>
+  username: wechat_rails
+  password: wechat_rails_password
+  host: 10.0.0.230
+  port: 35432
+#  url: <%#= Rails.application.credentials.dig(:development, :database, :url) %>
 
 
 
@@ -30,13 +30,14 @@ default: &default
 development:
   primary:
     <<: *default
-    #  database: wechat_rails_development
-    url: <%= Rails.application.credentials.dig(:development, :database, :url) %>
+    database: wechat_rails_development
+#    url: <%#= Rails.application.credentials.dig(:development, :database, :url) %>
 
   notify:
     <<: *default
-    url: <%= Rails.application.credentials.dig(:development, :database, :url) %>
-    poll: 2
+    database: wechat_rails_development
+#    url: <%#= Rails.application.credentials.dig(:development, :database, :url) %>
+    poll: 5
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.

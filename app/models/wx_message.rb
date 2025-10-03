@@ -118,6 +118,62 @@ class WxMessage < ApplicationRecord
     }
   end
 
+  def parse_image
+    return unless (msg_type.to_sym == :image) and self.content.present?
+    doc = Nokogiri::XML(extract_xml_body(self.content))
+    image_node = doc.at_xpath("//img")
+    return unless image_node
+    aes_key = image_node.attr("aeskey")
+    cdn_img_url = image_node.attr("cdnbigimgurl") || image_node.attr("cdnmidimgurl") || image_node.attr("cdnthumburl")
+    length = image_node.attr("hdlength").to_i || image_node.attr("length").to_i
+    {
+      aes_key: aes_key,
+      cdn_img_url: cdn_img_url,
+      length: length,
+    }
+  end
+
+  def parse_video
+    return unless (msg_type.to_sym == :video) && content.present?
+    doc = Nokogiri::XML(extract_xml_body(content))
+    video_node = doc.at_xpath("//videomsg")
+    return unless video_node
+
+    {
+      aes_key: video_node.attr("aeskey"),
+      cdn_video_url: video_node.attr("cdnvideourl"),
+      length: video_node.attr("length").to_i,
+      play_length: video_node.attr("playlength").to_i,
+      cdn_thumb_aes_key: video_node.attr("cdnthumbaeskey"),
+      cdn_thumb_url: video_node.attr("cdnthumburl"),
+      thumb_length: video_node.attr("cdnthumblength").to_i,
+      thumb_width: video_node.attr("cdnthumbwidth").to_i,
+      thumb_height: video_node.attr("cdnthumbheight").to_i
+    }
+  end
+
+  def parse_file_attachment
+    return unless (msg_type.to_sym == :refer) && content.present?
+    doc = Nokogiri::XML(extract_xml_body(content))
+    appmsg_node = doc.at_xpath("//appmsg")
+    return unless appmsg_node
+    type_value = appmsg_node.at_xpath("type")&.text.to_i
+    return unless type_value == 6
+
+    attach_node = appmsg_node.at_xpath("appattach")
+
+    {
+      title: appmsg_node.at_xpath("title")&.text,
+      totallen: (attach_node&.at_xpath("totallen")&.text).to_s.to_i,
+      fileext: attach_node&.at_xpath("fileext")&.text,
+      cdn_attach_url: attach_node&.at_xpath("cdnattachurl")&.text,
+      aes_key: attach_node&.at_xpath("aeskey")&.text,
+      file_key: attach_node&.at_xpath("filekey")&.text,
+      attach_id: attach_node&.at_xpath("attachid")&.text,
+      raw_xml: content
+    }
+  end
+
   def extract_xml_body(raw)
     return raw if raw.strip.start_with?("<")
     _, _, body = raw.to_s.partition("\n")
