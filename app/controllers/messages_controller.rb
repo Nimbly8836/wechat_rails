@@ -350,7 +350,7 @@ class MessagesController < ApplicationController
     end
 
     tools_api = ToolsApiService.new(contact.own_wxid)
-    data = download_file_chunks(tools_api, wx_message, file_meta)
+    data = download_file_chunks(tools_api, file_meta)
     unless data
       render json: { error: true, message: "file download failed" }, status: :bad_gateway and return
     end
@@ -368,7 +368,7 @@ class MessagesController < ApplicationController
   rescue ActiveRecord::RecordNotFound
     render json: { error: true, message: "file message not found" }, status: :not_found
   rescue => e
-    Rails.logger.error { "file download error: #{e.message}" }
+    Rails.logger.error { "file download error: #{e}" }
     render json: { error: true, message: "file download error" }, status: :bad_gateway
   end
 
@@ -463,18 +463,17 @@ class MessagesController < ApplicationController
     { data: data, mime: mime }
   end
 
-  def download_file_chunks(api_service, wx_message, file_meta)
+  def download_file_chunks(api_service, file_meta)
     total_size = file_meta[:totallen].to_i
     return nil if total_size <= 0
 
-    xml_payload = file_meta[:raw_xml].presence || wx_message.content
-    return nil unless xml_payload.present?
-
     data = download_chunks(total_size) do |section|
       api_service.download_file_chunk(
-        xml: xml_payload,
-        data_len: total_size,
-        section: section
+        app_id: file_meta[:app_id],
+        data_len: file_meta[:totallen],
+        section: section,
+        user_name: file_meta[:from_user_name],
+        attach_id: file_meta[:attach_id],
       )
     end
 

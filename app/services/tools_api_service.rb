@@ -71,7 +71,7 @@ class ToolsApiService
     @api_service.post(path, params)
   end
 
-  def download_file_chunk(xml:, data_len:, section:, compress_type: 0)
+  def download_file_chunk(data_len:, section:, user_name:, app_id:, attach_id:)
     section_payload = {
       StartPos: section[:start_pos].to_i,
       DataLen: section[:data_len].to_i
@@ -81,10 +81,11 @@ class ToolsApiService
     params = WechatRequest::Tools::DownloadFile
                .new(
                  wxid: @wx_id,
-                 xml: xml,
+                 appId: app_id,
                  dataLen: data_len,
                  section: section_payload,
-                 compressType: compress_type
+                 userName: user_name,
+                 attachId: attach_id
                ).to_h
     @api_service.post(path, params)
   end
