@@ -132,34 +132,35 @@ export default class extends Controller {
     }
 
     getMessageType(msg) {
-        const msgType = msg.msg_type;
-
-        if (msgType === "voice" || Number(msgType) === 34) {
-            return "voice";
-        }
-        const isReferType = msgType === "refer" || Number(msgType) === 49;
-        if (isReferType && msg.content?.trim().startsWith("<msg")) {
-            return "card";
-        }
-        if (isReferType) {
-            return "refer";
-        }
-        if (msgType === "emoji" || msgType === "47" || Number(msgType) === 47) {
-            return "emoji";
-        }
-        if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(/(\w+:|.*)\n</)?.length > 0) && msg.content?.length > 250) {
-            if (!this.isRoom()) {
-                const parse = this.parseWxXmlMessage(msg.content);
-                if (parse.msgType === "5") {
-                    return "card";
-                }
-                if (parse.msgType === "57") {
-                    return "refer";
-                }
-            }
-            return "xml_unparsed";
-        }
-        return "text";
+        // const msgType = msg.msg_type;
+        //
+        // if (msgType === "voice" || Number(msgType) === 34) {
+        //     return "voice";
+        // }
+        // const isReferType = msgType === "refer" || Number(msgType) === 49;
+        // if (isReferType && msg.content?.trim().startsWith("<msg")) {
+        //     return "card";
+        // }
+        // if (isReferType) {
+        //     return "refer";
+        // }
+        // if (msgType === "emoji" || msgType === "47" || Number(msgType) === 47) {
+        //     return "emoji";
+        // }
+        // if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(/(\w+:|.*)\n</)?.length > 0) && msg.content?.length > 250) {
+        //     if (!this.isRoom()) {
+        //         const parse = this.parseWxXmlMessage(msg.content);
+        //         if (parse.msgType === "5") {
+        //             return "card";
+        //         }
+        //         if (parse.msgType === "57") {
+        //             return "refer";
+        //         }
+        //     }
+        //     return "xml_unparsed";
+        // }
+        // return "text";
+        return msg.real_msg_type;
     }
 
     renderMessages(options = {}) {
@@ -322,7 +323,7 @@ export default class extends Controller {
                 return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "emoji":
                 return this.renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
-            case "refer":
+            case "quote":
                 return this.renderReferMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage);
             case "text":
             default:
