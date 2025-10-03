@@ -492,6 +492,39 @@ export default class extends Controller {
         return applied;
     }
 
+    renderFileMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+        const template = this.cloneTemplate("message-template-file");
+        const fileBubble = template || bubble;
+        const titleEl = fileBubble.querySelector("[data-role='file-title']");
+        const metaEl = fileBubble.querySelector("[data-role='file-meta']");
+        const extEl = fileBubble.querySelector("[data-role='file-ext']");
+        const downloadLink = fileBubble.querySelector("[data-role='file-download']");
+
+        const fileInfo = this.parseWxFileAttachment(msg.content || "") || {};
+        const title = fileInfo.title || msg.refer_title || "文件";
+        const sizeLabel = fileInfo.totallen ? this.formatFileSize(fileInfo.totallen) : "";
+        const extLabel = fileInfo.fileext ? fileInfo.fileext.toUpperCase() : "FILE";
+
+        if (titleEl) titleEl.textContent = title;
+        if (metaEl) {
+            metaEl.textContent = sizeLabel;
+            metaEl.classList.toggle("hidden", !sizeLabel);
+        }
+        if (extEl) extEl.textContent = extLabel;
+
+        const downloadUrl = this.attachmentUrl("file", msg);
+        if (downloadLink && downloadUrl) {
+            downloadLink.addEventListener("click", (event) => {
+                event.preventDefault();
+                this.downloadFile(downloadUrl, title);
+            });
+        } else if (downloadLink) {
+            downloadLink.classList.add("opacity-60", "pointer-events-none");
+        }
+
+        return this.applyBubbleStyle(fileBubble, msg, isNewGroup, senderInfo, isFirstMessage);
+    }
+
     renderVideoMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
         const template = this.cloneTemplate("message-template-video");
         const videoBubble = template || bubble;
@@ -503,18 +536,13 @@ export default class extends Controller {
         const messageId = msg._messageId || msg.id;
 
         const resetPlaceholder = (message = "封面加载中…") => {
-            if (placeholder) {
-                placeholder.textContent = message;
-                placeholder.classList.remove("hidden");
-            }
+            if (placeholder) placeholder.textContent = message;
             if (thumbImage) {
                 thumbImage.classList.add("hidden");
                 thumbImage.removeAttribute("src");
                 thumbImage.dataset.loaded = "false";
             }
-            if (thumbWrapper) {
-                thumbWrapper.classList.remove("cursor-zoom-in");
-            }
+            if (thumbWrapper) thumbWrapper.classList.remove("cursor-zoom-in");
         };
 
         resetPlaceholder();
@@ -531,14 +559,10 @@ export default class extends Controller {
 
         if (thumbImage) {
             thumbImage.addEventListener("load", () => {
-                if (placeholder) {
-                    placeholder.classList.add("hidden");
-                }
+                if (placeholder) placeholder.classList.add("hidden");
                 thumbImage.classList.remove("hidden");
                 thumbImage.dataset.loaded = "true";
-                if (thumbWrapper) {
-                    thumbWrapper.classList.add("cursor-zoom-in");
-                }
+                if (thumbWrapper) thumbWrapper.classList.add("cursor-zoom-in");
             }, {once: true});
             thumbImage.addEventListener("error", () => {
                 resetPlaceholder("[封面加载失败]");
@@ -557,10 +581,10 @@ export default class extends Controller {
 
         const downloadUrl = this.attachmentUrl("video", msg);
         if (downloadLink && downloadUrl) {
-            downloadLink.href = downloadUrl;
-            downloadLink.target = "_blank";
-            downloadLink.rel = "noopener noreferrer";
-            downloadLink.download = `video-${messageId || "media"}.mp4`;
+            downloadLink.addEventListener("click", (event) => {
+                event.preventDefault();
+                this.downloadFile(downloadUrl, `video-${messageId || "media"}.mp4`);
+            });
         } else if (downloadLink) {
             downloadLink.classList.add("opacity-60", "pointer-events-none");
         }
@@ -569,7 +593,7 @@ export default class extends Controller {
             thumbWrapper.addEventListener("click", (event) => {
                 if (downloadUrl && thumbImage?.dataset.loaded === "true") {
                     event.stopPropagation();
-                    window.open(downloadUrl, "_blank", "noopener");
+                    this.downloadFile(downloadUrl, `video-${messageId || "media"}.mp4`);
                 }
             });
         }
@@ -592,41 +616,32 @@ export default class extends Controller {
         return applied;
     }
 
-    renderFileMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
-        const template = this.cloneTemplate("message-template-file");
-        const fileBubble = template || bubble;
-        const titleEl = fileBubble.querySelector("[data-role='file-title']");
-        const metaEl = fileBubble.querySelector("[data-role='file-meta']");
-        const extEl = fileBubble.querySelector("[data-role='file-ext']");
-        const downloadLink = fileBubble.querySelector("[data-role='file-download']");
-
-        const fileInfo = this.parseWxFileAttachment(msg.content || "") || {};
-        const title = fileInfo.title || msg.refer_title || "文件";
-        const sizeLabel = fileInfo.totallen ? this.formatFileSize(fileInfo.totallen) : "";
-        const extLabel = fileInfo.fileext ? fileInfo.fileext.toUpperCase() : "FILE";
-
-        if (titleEl) {
-            titleEl.textContent = title;
-        }
-        if (metaEl) {
-            metaEl.textContent = sizeLabel;
-            metaEl.classList.toggle("hidden", !sizeLabel);
-        }
-        if (extEl) {
-            extEl.textContent = extLabel;
-        }
-
-        const downloadUrl = this.attachmentUrl("file", msg);
-        if (downloadLink && downloadUrl) {
-            downloadLink.href = downloadUrl;
-            downloadLink.target = "_blank";
-            downloadLink.rel = "noopener noreferrer";
-            downloadLink.download = title;
-        } else if (downloadLink) {
-            downloadLink.classList.add("opacity-60", "pointer-events-none");
-        }
-
-        return this.applyBubbleStyle(fileBubble, msg, isNewGroup, senderInfo, isFirstMessage);
+// 新增 downloadFile 方法
+    downloadFile(url, filename) {
+        fetch(url, {
+            headers: {
+                "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+            }
+        })
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error(`下载失败: ${res.statusText}`);
+                }
+                return res.blob();
+            })
+            .then((blob) => {
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            })
+            .catch((err) => {
+                console.error("下载文件失败:", err);
+                alert("下载失败，请稍后重试");
+            });
     }
 
     renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {

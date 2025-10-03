@@ -153,7 +153,7 @@ class WxMessage < ApplicationRecord
   end
 
   def parse_file_attachment
-    return unless (msg_type.to_sym == :refer) && content.present?
+    return unless (real_msg_type.to_sym == :real_file_message) && content.present?
     doc = Nokogiri::XML(extract_xml_body(content))
     appmsg_node = doc.at_xpath("//appmsg")
     return unless appmsg_node
@@ -163,14 +163,14 @@ class WxMessage < ApplicationRecord
     attach_node = appmsg_node.at_xpath("appattach")
 
     {
-      title: appmsg_node.at_xpath("title")&.text,
-      totallen: (attach_node&.at_xpath("totallen")&.text).to_s.to_i,
-      fileext: attach_node&.at_xpath("fileext")&.text,
-      cdn_attach_url: attach_node&.at_xpath("cdnattachurl")&.text,
-      aes_key: attach_node&.at_xpath("aeskey")&.text,
-      file_key: attach_node&.at_xpath("filekey")&.text,
-      attach_id: attach_node&.at_xpath("attachid")&.text,
-      raw_xml: content
+      title: appmsg_node.at_xpath("title").text,
+      app_id: appmsg_node.attr("appid").to_s,
+      totallen: (attach_node.at_xpath("totallen").text).to_s.to_i,
+      fileext: attach_node.at_xpath("fileext").text,
+      cdn_attach_url: attach_node.at_xpath("cdnattachurl").text,
+      aes_key: attach_node.at_xpath("aeskey").text,
+      attach_id: attach_node.at_xpath("attachid").text,
+      from_user_name: doc.at_xpath("//fromusername").text,
     }
   end
 
