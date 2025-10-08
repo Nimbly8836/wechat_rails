@@ -41,7 +41,6 @@ Rails.application.routes.draw do
   get "message/emoji/:id" => "messages#download_emoji"
   get "message/image/:id" => "messages#download_image"
   get "message/video/:id" => "messages#download_video"
-  get "message/video_thumbnail/:id" => "messages#download_video_thumbnail"
   get "message/file/:id" => "messages#download_file"
 
   get "/notion/message", to: "message_events#events"

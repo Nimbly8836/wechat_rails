@@ -153,7 +153,7 @@ class WxMessage < ApplicationRecord
   end
 
   def parse_file_attachment
-    return unless (real_msg_type.to_sym == :real_file_message) && content.present?
+    return unless (real_msg_type.to_sym == :file_message) && content.present?
     doc = Nokogiri::XML(extract_xml_body(content))
     appmsg_node = doc.at_xpath("//appmsg")
     return unless appmsg_node
@@ -209,6 +209,45 @@ class WxMessage < ApplicationRecord
     numeric_value = raw_type_attr.to_i
     enum_key = self.class.real_msg_types.key(numeric_value)
     enum_key ? enum_key.to_sym : :unknown
+  end
+
+  def preview_content
+    # 1. 推送类消息，直接返回推送内容
+    if push_content?
+      unless from_user_name&.end_with?("@chatroom")
+        return push_content.sub(/\S+ : /, "")
+      end
+      return push_content
+    end
+
+    # 2. 文本消息：截断显示
+    if real_msg_type.to_sym == :text && content.present?
+      return content&.length > 100 ? "#{content[0..100]}..." : content
+    end
+
+    if real_msg_type.to_sym == :emoji
+      return "表情消息"
+    end
+
+    if real_msg_type.to_sym == :image
+      return "图片消息"
+    end
+
+    if real_msg_type.to_sym == :voice
+      return "语音消息"
+    end
+
+    if real_msg_type.to_sym == :video
+      return "视频消息"
+    end
+
+    # 3. 其它消息类型，默认返回 content
+    xml = extract_xml_body(content)
+    if xml&.to_s&.start_with?("<")
+      return ""
+    end
+
+    content
   end
 
 end

@@ -17,7 +17,7 @@ class ChatRoomController < ApplicationController
                                            contact.user_name,
                                            contact.own_wxid,
                                            contact.member_list.as_json)
-      chat_room
+      render json: chat_room.as_json(only: [:id, :name, :contact_id])
     end
   end
 
@@ -36,8 +36,12 @@ class ChatRoomController < ApplicationController
   end
 
   def list
-    chat_rooms = ChatRoom.all.order_by_latest_message
-    render json: chat_rooms.as_json(only: [:id, :name, :contact_id], methods: [:avatar_base64])
+    chat_rooms = ChatRoom.includes(messages: :wx_message).order_by_latest_message
+    render json: chat_rooms.as_json(only: [ :id, :name, :contact_id ],
+                                    methods: [ :avatar_base64 ],
+                                    include: { latest_wx_message: { only: [ :id, :real_msg_type, :message_time ],
+                                               methods: [ :preview_content ]
+                                    } })
   end
 
   def sync_chat_members
@@ -73,7 +77,7 @@ class ChatRoomController < ApplicationController
 
   def chat_members
     members = ChatRoomMember.where(chat_room_id: params[:id])
-    render json: members.as_json()
+    render json: members.as_json
   end
 
   private

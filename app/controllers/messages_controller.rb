@@ -185,7 +185,7 @@ class MessagesController < ApplicationController
   end
 
   def download_image
-    message = Message.includes(:wx_message, chat_room: :contact).find(params[:id])
+    message = Message.includes(:wx_message, :chat_room).find(params[:id])
     wx_message = message.wx_message
 
     unless wx_message&.content && wx_message.msg_type.to_sym == :image
@@ -205,7 +205,7 @@ class MessagesController < ApplicationController
       return send_file(cached, type: Marcel::MimeType.for(Pathname.new(cached)), disposition: "inline")
     end
 
-    contact = message.chat_room&.contact
+    contact = Contact.find(message.chat_room&.contact_id)
     unless contact&.own_wxid.present?
       render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
     end
@@ -230,54 +230,8 @@ class MessagesController < ApplicationController
     Rails.logger.error { "image download error: #{e.message}" }
     render json: { error: true, message: "image download error" }, status: :bad_gateway
   end
-
-  def download_video_thumbnail
-    message = Message.includes(:wx_message, chat_room: :contact).find(params[:id])
-    wx_message = message.wx_message
-
-    video_meta = wx_message&.parse_video
-    unless video_meta
-      render json: { error: true, message: "video metadata missing" }, status: :unprocessable_entity and return
-    end
-
-    storage_dir = Rails.root.join("storage", "videos", "thumbnails")
-    FileUtils.mkdir_p(storage_dir)
-    basename = "#{message.id}_thumb"
-
-    if (cached = locate_cached_media(storage_dir, basename))
-      return send_file(cached, type: Marcel::MimeType.for(Pathname.new(cached)), disposition: "inline")
-    end
-
-    contact = message.chat_room&.contact
-    unless contact&.own_wxid.present?
-      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
-    end
-
-    tools_api = ToolsApiService.new(contact.own_wxid)
-    thumb_meta = {
-      aes_key: video_meta[:cdn_thumb_aes_key],
-      cdn_img_url: video_meta[:cdn_thumb_url]
-    }
-
-    unless thumb_meta[:aes_key].present? && thumb_meta[:cdn_img_url].present?
-      render json: { error: true, message: "video thumbnail metadata missing" }, status: :unprocessable_entity and return
-    end
-
-    if (cdn_payload = try_cdn_image_download(tools_api, thumb_meta))
-      file_path = persist_image(storage_dir, basename, cdn_payload[:data], video_meta[:cdn_thumb_url], cdn_payload[:mime])
-      return send_file(file_path, type: cdn_payload[:mime], disposition: "inline")
-    end
-
-    render json: { error: true, message: "video thumbnail download failed" }, status: :bad_gateway
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: true, message: "video message not found" }, status: :not_found
-  rescue => e
-    Rails.logger.error { "video thumbnail error: #{e.message}" }
-    render json: { error: true, message: "video thumbnail error" }, status: :bad_gateway
-  end
-
   def download_video
-    message = Message.includes(:wx_message, chat_room: :contact).find(params[:id])
+    message = Message.includes(:wx_message, :chat_room).find(params[:id])
     wx_message = message.wx_message
 
     unless wx_message&.content && wx_message.msg_type.to_sym == :video
@@ -300,7 +254,7 @@ class MessagesController < ApplicationController
       return send_file(cached, type: mime, disposition: "attachment", filename: filename)
     end
 
-    contact = message.chat_room&.contact
+    contact = Contact.find(message.chat_room&.contact_id)
     unless contact&.own_wxid.present?
       render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
     end
@@ -326,7 +280,7 @@ class MessagesController < ApplicationController
   end
 
   def download_file
-    message = Message.includes(:wx_message, chat_room: :contact).find(params[:id])
+    message = Message.includes(:wx_message, :chat_room).find(params[:id])
     wx_message = message.wx_message
 
     file_meta = wx_message.parse_file_attachment
@@ -344,8 +298,8 @@ class MessagesController < ApplicationController
       return send_file(cached, type: mime, disposition: "attachment", filename: ensure_extension(filename, cached))
     end
 
-    contact = message.chat_room&.contact
-    unless contact&.own_wxid.present?
+    contact = Contact.find(message.chat_room&.contact_id)
+    unless contact.own_wxid.present?
       render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
     end
 
@@ -366,6 +320,7 @@ class MessagesController < ApplicationController
 
     send_file(file_path, type: mime, disposition: "attachment", filename: filename)
   rescue ActiveRecord::RecordNotFound
+    Rails.logger.error { "file message find error: #{e}" }
     render json: { error: true, message: "file message not found" }, status: :not_found
   rescue => e
     Rails.logger.error { "file download error: #{e}" }
