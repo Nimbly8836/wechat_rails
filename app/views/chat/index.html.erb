@@ -1,22 +1,23 @@
 <div class="flex h-[calc(100vh-5px)] bg-white" data-controller="chat">
   <!-- 左侧 sidebar -->
   <div id="sidebar"
-       class="flex flex-col min-w-[250px] max-w-[500px] w-[330px] border-r border-gray-200 bg-white relative">
+       class="flex flex-col min-w-[65px] max-w-[500px] w-[330px] border-r border-gray-200 bg-white relative"
+       data-chat-target="sidebar">
     <!-- header -->
     <div class="flex items-center h-[60px] px-4 border-b border-gray-200 bg-white">
-      <div class="flex items-center space-x-2 font-medium">
+      <div class="flex items-center w-64 font-medium">
         <img width="30" height="30" src="https://img.icons8.com/hands/50/sms.png" alt="sms"/>
         <span>Wechat</span>
       </div>
     </div>
 
     <!-- 搜索栏 -->
-    <input type="text"
-           class="m-2 rounded-full border-none bg-gray-100 px-4 py-2 outline-none"
-           placeholder="搜索联系人或搜索消息...">
+    <label class="m-2 rounded-full border-none bg-gray-100 px-4 py-2 outline-none">
+      <input type="text" id="sidebar-search" placeholder="搜索消息或者通讯录..." data-action="keyup->chat#search">
+    </label>
 
     <!-- tab 栏 -->
-    <div class="flex border-b border-gray-200">
+    <div class="flex border-b border-gray-200 rounded-full">
       <div data-active="false"
            class="flex-1 py-4 text-center font-medium cursor-pointer
                   data-[active=true]:border-b-2 data-[active=true]:border-blue-500 data-[active=true]:text-blue-500"
@@ -32,15 +33,11 @@
         通讯录
       </div>
     </div>
-    <!-- 消息列表容器，初始隐藏 -->
-    <div id="message-list" class="hidden px-4 py-2 overflow-y-auto">
-      <div id="chat-room-list">
-        <%# 这里后续由 JS 填充数据，结构与联系人列表一致 %>
+    <!-- 消息列表容器 -->
+    <div class="relative flex-1 min-h-0">
+      <div id="message-list" class="hidden h-full overflow-y-auto">
+        <div id="chat-room-list"></div>
       </div>
-    </div>
-
-    <!-- list-area -->
-    <div class="relative flex-1 min-h-0 contacts-list">
       <!-- 联系人滚动区 -->
       <div id="contacts-list"
            class="h-full overflow-y-auto"
@@ -73,15 +70,10 @@
       </div>
 
       <!-- 字母导航 -->
-      <div class="absolute
-            right-2 top-1/2 -translate-y-1/2 flex flex-col items-center justify-center
-            gap-1 px-1 py-1 bg-white/85 rounded-md shadow-md z-50 antialiased sm:flex
-            overflow-hidden"
-           aria-hidden="false"
+      <div class="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-1 px-1 py-1 bg-white/85 rounded-md shadow-md z-50 antialiased sm:flex overflow-hidden"
            id="letter-nav">
         <% @letters.each do |letter| %>
-          <div class="letter px-1.5 py-0.5 text-xs cursor-pointer select-none rounded
-          hover:bg-black/5"
+          <div class="letter px-1.5 py-0.5 text-xs cursor-pointer select-none rounded hover:bg-black/15"
                data-letter="<%= letter %>"
                data-chat-target="letter"
                data-action="click->chat#scrollToGroup">
@@ -94,8 +86,9 @@
 
   <!-- 拖拽分隔线 -->
   <div id="resizer"
-       class="w-1 cursor-col-resize bg-gray-200 hover:bg-gray-400"
-       data-action="mousedown->chat#startResize"></div>
+       class="w-2 sm:w-1 cursor-col-resize bg-gray-200 hover:bg-gray-400 touch-none"
+       data-action="mousedown->chat#startResize touchstart->chat#startResize">
+  </div>
 
   <!-- 右侧内容区 -->
   <div class="flex flex-col flex-1 bg-gray-100 overflow-x-hidden">
@@ -106,7 +99,6 @@
       </div>
     </div>
   </div>
-
 </div>
 
 <%= render "chat/message_templates" %>

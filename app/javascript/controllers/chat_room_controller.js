@@ -1,7 +1,9 @@
 import {Controller} from "@hotwired/stimulus";
 
 export default class extends Controller {
-    static targets = ["messageList", "input", "emptyMessage", "menu", "showMore", "themePanel", "backgroundInput", "bubbleInput", "backgroundImageInput", "fontSelect", "fontCustomInput"];
+    static targets = ["messageList", "input", "emptyMessage", "menu",
+        "showMore", "themePanel", "backgroundInput", "bubbleInput", "backgroundImageInput",
+        "fontSelect", "fontCustomInput", "attachmentSelect"];
     static values = {currentWxid: String, id: Number, members: Array};
 
     connect() {
@@ -54,7 +56,8 @@ export default class extends Controller {
                 })
                 .catch(error => console.error("加载room members 失败", error));
         }
-        this.messages = [];
+        // Initialize messages as a Set
+        this.messages = new Set();
         this.loadMessages();
 
         this.applyTheme({refreshBubbles: false});
@@ -71,6 +74,11 @@ export default class extends Controller {
 
         this.inputTarget.addEventListener("input", this.autoResize.bind(this));
         this.autoResize();
+    }
+
+    resize() {
+        this.element.style.height = "auto";
+        this.element.style.height = this.element.scrollHeight + "px";
     }
 
     debounce(fn, delay) {
@@ -125,74 +133,16 @@ export default class extends Controller {
         fetch(`/chat_room/${this.idValue}/messages`)
             .then(res => res.json())
             .then(data => {
-                this.messages = data;
+                // Clear existing messages and add new ones to the Set
+                this.messages.clear();
+                data.forEach(msg => this.messages.add(msg));
                 this.renderMessages();
             })
             .catch(error => console.error("加载消息失败:", error));
     }
 
     getMessageType(msg) {
-        return msg.real_msg_type
-        // const realType = msg.real_msg_type;
-        // if (realType) {
-        //     const normalized = String(realType).toLowerCase();
-        //     if (normalized && normalized !== "unknown") {
-        //         switch (normalized) {
-        //         case "card":
-        //         case "link":
-        //             return "card";
-        //         case "quote":
-        //         case "refer":
-        //             return "quote";
-        //         case "voice":
-        //         case "emoji":
-        //         case "image":
-        //         case "video":
-        //         case "text":
-        //             return normalized;
-        //         case "file_message":
-        //             return "file";
-        //         default:
-        //             if (["mini_app", "mini_game", "transfer", "red_packet"].includes(normalized)) {
-        //                 return "card";
-        //             }
-        //         }
-        //     }
-        // }
-        //
-        // const msgType = msg.msg_type;
-        // if (msgType === "voice" || Number(msgType) === 34) {
-        //     return "voice";
-        // }
-        // if (msgType === "emoji" || Number(msgType) === 47) {
-        //     return "emoji";
-        // }
-        // if (msgType === "image" || Number(msgType) === 3) {
-        //     return "image";
-        // }
-        // if (msgType === "video" || Number(msgType) === 43) {
-        //     return "video";
-        // }
-        // const isReferType = msgType === "refer" || Number(msgType) === 49;
-        // if (isReferType && msg.content?.trim().startsWith("<msg")) {
-        //     return "card";
-        // }
-        // if (isReferType) {
-        //     return "quote";
-        // }
-        // if ((msg.content?.trim().startsWith("<") || msg.content?.trim().match(/(\w+:|.*)\n</)?.length > 0) && msg.content?.length > 250) {
-        //     if (!this.isRoom()) {
-        //         const parse = this.parseWxXmlMessage(msg.content);
-        //         if (parse.msgType === "5") {
-        //             return "card";
-        //         }
-        //         if (parse.msgType === "57") {
-        //             return "quote";
-        //         }
-        //     }
-        //     return "xml_unparsed";
-        // }
-        // return "text";
+        return msg.real_msg_type;
     }
 
     renderMessages(options = {}) {
@@ -213,7 +163,7 @@ export default class extends Controller {
         }
         this.highlightedRow = null;
 
-        if (this.messages.length === 0) {
+        if (this.messages.size === 0) {
             if (this.hasEmptyMessageTarget) {
                 this.emptyMessageTarget.style.display = "block";
             }
@@ -225,7 +175,14 @@ export default class extends Controller {
 
         let lastSenderKey = null;
 
-        this.messages.forEach((wrapper, index) => {
+        // Convert Set to array and sort by message_time to maintain order
+        const sortedMessages = [...this.messages].sort((a, b) => {
+            const timeA = a.message_time || a.created_at || a.wx_message?.message_time || 0;
+            const timeB = b.message_time || b.created_at || b.wx_message?.message_time || 0;
+            return new Date(timeA) - new Date(timeB);
+        });
+
+        sortedMessages.forEach((wrapper) => {
             const msg = wrapper.wx_message;
             msg.id = wrapper.id;
             msg._messageId = wrapper.id;
@@ -242,8 +199,11 @@ export default class extends Controller {
             const isNewGroup = lastSenderKey === null || lastSenderKey !== senderKey;
             lastSenderKey = senderKey;
 
+            if (msg.real_msg_type == "file_transfer_start") {
+                return
+            }
             const row = this.buildRow(isNewGroup, msg, senderInfo);
-            const bubble = this.renderMessageBubble(msg, isNewGroup, senderInfo, index === 0);
+            const bubble = this.renderMessageBubble(msg, isNewGroup, senderInfo, sortedMessages[0] === wrapper);
             row.appendChild(bubble);
             container.appendChild(row);
 
@@ -278,7 +238,6 @@ export default class extends Controller {
             row.dataset.messageId = msg.id;
         }
 
-        // 只在群聊中显示其他人的头像
         if (!msg.self_send && this.isRoom()) {
             const wrapper = document.createElement("div");
             wrapper.className = "mr-2 flex justify-center items-start";
@@ -295,7 +254,6 @@ export default class extends Controller {
                 delete row.dataset.senderAvatar;
             }
 
-            // 只在新组时显示头像
             if (isNewGroup) {
                 const avatar = document.createElement("div");
                 avatar.className = "w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
@@ -312,14 +270,12 @@ export default class extends Controller {
                 }
                 wrapper.appendChild(avatar);
             } else {
-                // 连续消息不显示头像，但保留空间
                 wrapper.style.visibility = "hidden";
                 wrapper.style.opacity = "0";
             }
 
             row.appendChild(wrapper);
         } else if (!msg.self_send) {
-            // 私聊中不显示头像，但仍记录发送者信息
             const senderName = senderInfo?.name || msg.sender_name || "";
             const senderAvatar = senderInfo?.avatar || msg.sender_avatar || "";
             if (senderName) {
@@ -342,9 +298,7 @@ export default class extends Controller {
         const bubble = document.createElement("div");
         const type = this.getMessageType(msg);
 
-        // if (type !== "refer") {
         this.replaceRoomSenderWxid(msg);
-        // }
 
         switch (type) {
             case "voice":
@@ -528,24 +482,8 @@ export default class extends Controller {
     renderVideoMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
         const template = this.cloneTemplate("message-template-video");
         const videoBubble = template || bubble;
-        const thumbWrapper = videoBubble.querySelector("[data-role='video-thumbnail']");
-        const placeholder = videoBubble.querySelector("[data-role='video-thumb-placeholder']");
-        const thumbImage = videoBubble.querySelector("[data-role='video-thumb-image']");
         const durationBadge = videoBubble.querySelector("[data-role='video-duration']");
-        const downloadLink = videoBubble.querySelector("[data-role='video-download']");
         const messageId = msg._messageId || msg.id;
-
-        const resetPlaceholder = (message = "封面加载中…") => {
-            if (placeholder) placeholder.textContent = message;
-            if (thumbImage) {
-                thumbImage.classList.add("hidden");
-                thumbImage.removeAttribute("src");
-                thumbImage.dataset.loaded = "false";
-            }
-            if (thumbWrapper) thumbWrapper.classList.remove("cursor-zoom-in");
-        };
-
-        resetPlaceholder();
 
         const videoInfo = this.parseWxVideoMessage(msg.content || "");
         if (durationBadge) {
@@ -557,44 +495,29 @@ export default class extends Controller {
             }
         }
 
-        if (thumbImage) {
-            thumbImage.addEventListener("load", () => {
-                if (placeholder) placeholder.classList.add("hidden");
-                thumbImage.classList.remove("hidden");
-                thumbImage.dataset.loaded = "true";
-                if (thumbWrapper) thumbWrapper.classList.add("cursor-zoom-in");
-            }, {once: true});
-            thumbImage.addEventListener("error", () => {
-                resetPlaceholder("[封面加载失败]");
-            }, {once: true});
-        }
+        const videoUrl = this.attachmentUrl("video", msg);
+        if (videoUrl) {
+            const videoElement = document.createElement("video");
 
-        const thumbUrl = this.attachmentUrl("video_thumbnail", msg);
-        if (thumbImage && thumbUrl) {
-            requestAnimationFrame(() => {
-                thumbImage.dataset.sourceUrl = thumbUrl;
-                thumbImage.src = thumbUrl;
-            });
-        } else {
-            resetPlaceholder("[暂无封面]");
-        }
+            const video_a = document.createElement("a");
+            video_a.href = videoUrl;
+            video_a.textContent = "下载视频";
 
-        const downloadUrl = this.attachmentUrl("video", msg);
-        if (downloadLink && downloadUrl) {
-            downloadLink.addEventListener("click", (event) => {
-                event.preventDefault();
-                this.downloadFile(downloadUrl, `video-${messageId || "media"}.mp4`);
-            });
-        } else if (downloadLink) {
-            downloadLink.classList.add("opacity-60", "pointer-events-none");
-        }
+            videoElement.src = videoUrl;
+            videoElement.controls = true;
+            videoElement.style.maxWidth = "250px";
+            videoElement.style.display = "block";
+            videoElement.dataset.messageId = messageId;
 
-        if (thumbWrapper) {
-            thumbWrapper.addEventListener("click", (event) => {
-                if (downloadUrl && thumbImage?.dataset.loaded === "true") {
-                    event.stopPropagation();
-                    this.downloadFile(downloadUrl, `video-${messageId || "media"}.mp4`);
-                }
+            const thumbWrapper = videoBubble.querySelector("[data-role='video-thumbnail']");
+            if (thumbWrapper) {
+                thumbWrapper.innerHTML = "";
+                thumbWrapper.appendChild(videoElement);
+            }
+
+            videoElement.addEventListener("click", (event) => {
+                event.stopPropagation();
+                videoElement.play();
             });
         }
 
@@ -608,15 +531,9 @@ export default class extends Controller {
         applied.classList.remove("text-white");
         applied.classList.add("inline-block");
 
-        const senderName = applied.querySelector('[data-role="sender-name"]');
-        if (senderName && thumbWrapper) {
-            thumbWrapper.classList.add("mt-2");
-        }
-
         return applied;
     }
 
-// 新增 downloadFile 方法
     downloadFile(url, filename) {
         fetch(url, {
             headers: {
@@ -879,7 +796,7 @@ export default class extends Controller {
             return bubble;
         }
 
-        bubble.classList.add("relative", "inline-block", "max-w-[75%]", "rounded-2xl", "shadow-sm", "message-bubble");
+        bubble.classList.add("relative", "inline-block", "rounded-2xl", "shadow-sm", "message-bubble");
 
         bubble.style.marginTop = isNewGroup ? "6px" : "";
         bubble.style.paddingBottom = "";
@@ -937,10 +854,10 @@ export default class extends Controller {
             const loader = document.createElement("div");
             loader.className = "absolute bottom-1 left-2 flex space-x-1";
             loader.innerHTML = `
-        <span class="w-1 h-1 bg-blue-300 rounded-full animate-tg-dot"></span>
-        <span class="w-1 h-1 bg-blue-300 rounded-full animate-tg-dot" style="animation-delay:0.2s"></span>
-        <span class="w-1 h-1 bg-blue-300 rounded-full animate-tg-dot" style="animation-delay:0.4s"></span>
-      `;
+                <span class="w-1 h-1 bg-blue-300 rounded-full animate-tg-dot"></span>
+                <span class="w-1 h-1 bg-blue-300 rounded-full animate-tg-dot" style="animation-delay:0.2s"></span>
+                <span class="w-1 h-1 bg-blue-300 rounded-full animate-tg-dot" style="animation-delay:0.4s"></span>
+            `;
             bubble.appendChild(loader);
         } else if (m.send_failed) {
             const retry = document.createElement("button");
@@ -1031,7 +948,8 @@ export default class extends Controller {
             }
         };
 
-        this.messages.push(tempMsg);
+        // Add temporary message to Set
+        this.messages.add(tempMsg);
         this.renderMessages();
         this.inputTarget.value = "";
         this.autoResize();
@@ -1046,22 +964,17 @@ export default class extends Controller {
         })
             .then(res => res.json())
             .then(newMsg => {
-                const index = this.messages.findIndex(m => m.id === tempId);
-                if (index !== -1) {
-                    this.messages[index] = {
-                        ...newMsg.result, sending: false, send_failed: false
-                    };
-                    this.renderMessages();
-                }
+                // Remove temporary message and add new message
+                this.messages.delete(tempMsg);
+                this.messages.add({...newMsg.result, sending: false, send_failed: false});
+                this.renderMessages();
             })
             .catch(error => {
                 console.error("发送消息失败:", error);
-                const index = this.messages.findIndex(m => m.id === tempId);
-                if (index !== -1) {
-                    this.messages[index].sending = false;
-                    this.messages[index].send_failed = true;
-                    this.renderMessages();
-                }
+                // Update temporary message to show failure
+                this.messages.delete(tempMsg);
+                this.messages.add({...tempMsg, sending: false, send_failed: true});
+                this.renderMessages();
             });
     }
 
@@ -1154,6 +1067,20 @@ export default class extends Controller {
         } else {
             this.closeMenu();
         }
+    }
+
+    mouseenterAttachment(event) {
+        event.stopPropagation();
+
+        const shouldShow = this.attachmentSelectTarget.classList.contains("hidden")
+        if (shouldShow) {
+            this.attachmentSelectTarget.classList.remove("hidden");
+            // document.addEventListener("click", this.boundCloseMenu);
+        }
+    }
+
+    mouseleaveAttachment(event) {
+        event.stopPropagation();
     }
 
     closeMenu(event = null) {
@@ -1397,8 +1324,7 @@ export default class extends Controller {
         fetch(`/chat_room/${this.idValue}/sync_chat_members`, {
             method: "PUT", headers: {
                 "Content-Type": "application/json",
-                "X-CSRF-Token": document.querySelector(
-                    'meta[name="csrf-token"]').content
+                "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
             },
             body: JSON.stringify({
                 chat_room_id: this.idValue,
@@ -1408,7 +1334,7 @@ export default class extends Controller {
 
     syncContact(event = null) {
         event?.stopPropagation();
-        msg_type: 0, fetch(`/chat_room/${this.idValue}/sync_chat_contact`, {
+        fetch(`/chat_room/${this.idValue}/sync_chat_contact`, {
             method: "PUT", headers: {
                 "Content-Type": "application/json",
                 "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
@@ -1419,11 +1345,18 @@ export default class extends Controller {
     }
 
     loadMore() {
-        if (this.messages.length === 0) {
+        if (this.messages.size === 0) {
             return;
         }
 
-        const firstMsgId = this.messages[0].id;
+        // Get the earliest message by sorting and taking the first
+        const sortedMessages = [...this.messages].sort((a, b) => {
+            const timeA = a.message_time || a.created_at || a.wx_message?.message_time || 0;
+            const timeB = b.message_time || b.created_at || b.wx_message?.message_time || 0;
+            return new Date(timeA) - new Date(timeB);
+        });
+        const firstMsg = sortedMessages[0];
+        const firstMsgId = firstMsg.id;
         const container = this.messageListTarget;
         const preserveBottomOffset = container.scrollHeight - container.scrollTop;
 
@@ -1434,28 +1367,39 @@ export default class extends Controller {
                     return;
                 }
 
-                this.messages = [...data, ...this.messages];
+                // Add new messages to the Set
+                data.forEach(msg => this.messages.add(msg));
                 this.renderMessages({preserveBottomOffset});
             })
             .catch(console.error);
     }
 
     loadNewMessages(msg) {
-        if (this.messages.length === 0) {
+        if (this.messages.size === 0) {
             return this.loadMessages();
         }
 
         const container = this.messageListTarget;
         const oldHeight = container.scrollHeight;
 
-        fetch(`/chat_room/${this.idValue}/messages?after_id=${this.messages[this.messages.length - 1].id}`)
+        // Get the latest message by sorting and taking the last
+        const sortedMessages = [...this.messages].sort((a, b) => {
+            const timeA = a.message_time || a.created_at || a.wx_message?.message_time || 0;
+            const timeB = b.message_time || b.created_at || b.wx_message?.message_time || 0;
+            return new Date(timeA) - new Date(timeB);
+        });
+        const lastMsg = sortedMessages[sortedMessages.length - 1];
+        const lastMsgId = lastMsg.id;
+
+        fetch(`/chat_room/${this.idValue}/messages?after_id=${lastMsgId}`)
             .then(res => res.json())
             .then(data => {
                 if (!data.length) {
                     return;
                 }
 
-                this.messages = [...this.messages, ...data];
+                // Add new messages to the Set
+                data.forEach(msg => this.messages.add(msg));
                 this.renderMessages({
                     preserveBottomOffset: container.scrollHeight - container.scrollTop
                 });
@@ -1929,6 +1873,4 @@ export default class extends Controller {
             key: `direct:${wxid}`, name, avatar: null, initial: (name || "?").slice(0, 1).toUpperCase()
         };
     }
-
-
 }

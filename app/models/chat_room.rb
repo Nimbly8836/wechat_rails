@@ -17,4 +17,8 @@ class ChatRoom < ApplicationRecord
     end
   end
 
+  def latest_wx_message
+    messages.first&.wx_message
+  end
+
 end

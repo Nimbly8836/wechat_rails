@@ -18,11 +18,11 @@
       </div>
     </div>
     <div class="flex items-center gap-3 text-gray-500">
-      <button class="hover:text-gray-700" title="搜索">🔍</button>
+      <button class="hover:text-gray-700 w-5" title="搜索"><img src="search-svgrepo-com.svg" alt="搜索聊天信息"></button>
       <!-- 菜单触发 -->
-      <button class="hover:text-gray-700 relative"
+      <button class="hover:text-gray-700 relative w-5"
               data-action="click->chat-room#toggleMenu">
-        ⋯
+        <img src="setting.svg" alt="设置">
       </button>
     </div>
   </div>
@@ -138,6 +138,40 @@
     </div>
   </div>
 
+  <div data-chat-room-target="attachmentSelect"
+       class="hidden absolute right-1 bottom-1 w-64 bg-white/95 text-slate-900 shadow-xl rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-40">
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#openAppearanceSettings">
+      <span aria-hidden="true">🎨</span>
+      <span>图片</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#handleMenuClose">
+      <span aria-hidden="true">⚙️</span>
+      <span>语音</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#handleMenuClose">
+      <span aria-hidden="true">🔄</span>
+      <span>附件</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#syncMembers">
+      <span aria-hidden="true">👥</span>
+      <span>视频</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#syncContact">
+      <span aria-hidden="true">🧭</span>
+      <span>更新聊天室信息</span>
+    </button>
+  </div>
+
   <div id="show-more-message"
        data-chat-room-target="showMore"
        class="hidden text-xs text-gray-500 text-center relative my-2">
@@ -162,21 +196,29 @@
 
   <!-- 底部：输入区 -->
   <div class="flex items-center gap-2 px-3 py-2 border-t bg-white">
-    <button class="px-2 text-xl leading-none">😊</button>
-    <button class="px-2 text-xl leading-none">📎</button>
 
-    <textarea
-      rows="1"
-      class="flex-1 border border-gray-200 bg-gray-50 rounded-full px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none leading-6"
-      placeholder="输入消息…"
-      data-chat-room-target="input"
-    ></textarea>
 
-    <button
-      class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full"
-      data-action="click->chat-room#sendMessage"
-    >
-      发送
-    </button>
+    <!-- 附件按钮 -->
+    <div class="px-2 text-xl flex-shrink-0 w-10"
+            data-action="mouseenter->chat-room#mouseenterAttachment">
+      <img src="attachment.svg" alt="附件">
+    </div>
+
+    <!-- 输入框 -->
+    <div class="flex-1">
+      <label>
+        <textarea
+          rows="1"
+          class="w-full border border-gray-200 bg-gray-50 rounded-full px-4 py-2 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="输入消息…"
+          data-chat-room-target="input"
+          data-action="input->chat-room#resize"
+        ></textarea>
+      </label>
+    </div>
+
+    <!-- 表情按钮 -->
+    <button class="px-2 text-xl flex-shrink-0 w-10"><img src="emoji-pleased-svgrepo-com.svg" alt="表情"></button>
+
   </div>
 </div>
