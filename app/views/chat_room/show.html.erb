@@ -4,6 +4,11 @@
      data-chat-room-id-value="<%= @chat_room.id %>"
      data-chat-room-members-value="<%= @chat_room.members %>"
 >
+  <input type="file" data-chat-room-target="fileInput"
+         data-action="change->chat-room#handleFileSelect"
+         style="display: none;">
+  <div data-chat-room-target="uploadStatus"></div>
+
   <!-- 顶部：会话信息 -->
   <div class="flex items-center justify-between px-4 h-14 border-b bg-white">
     <div class="flex items-center gap-3">
@@ -18,11 +23,11 @@
       </div>
     </div>
     <div class="flex items-center gap-3 text-gray-500">
-      <button class="hover:text-gray-700 w-5" title="搜索"><img src="search-svgrepo-com.svg" alt="搜索聊天信息"></button>
+      <button class="hover:text-gray-700 w-5" title="搜索"><img src="icon/search-svgrepo-com.svg" alt="搜索聊天信息"></button>
       <!-- 菜单触发 -->
       <button class="hover:text-gray-700 relative w-5"
               data-action="click->chat-room#toggleMenu">
-        <img src="setting.svg" alt="设置">
+        <img src="icon/setting.svg" alt="设置">
       </button>
     </div>
   </div>
@@ -139,36 +144,37 @@
   </div>
 
   <div data-chat-room-target="attachmentSelect"
-       class="hidden absolute right-1 bottom-1 w-64 bg-white/95 text-slate-900 shadow-xl rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-40">
+       class="hidden absolute left-3 bottom-12 w-auto bg-white/95 shadow-xl
+       rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-40">
     <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
-            data-action="click->chat-room#openAppearanceSettings">
-      <span aria-hidden="true">🎨</span>
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium transition-colors duration-150 focus:outline-none"
+            data-action="click->chat-room#openFilePicker"
+            data-upload-type-param="image">
+
+      <span aria-hidden="true"><img class="w-5" src="icon/picture-frame-svgrepo.svg"></span>
       <span>图片</span>
     </button>
     <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
-            data-action="click->chat-room#handleMenuClose">
-      <span aria-hidden="true">⚙️</span>
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150  focus:outline-none"
+            data-action="click->chat-room#openFilePicker"
+            data-upload-type-param="voice">
+
+      <span aria-hidden="true"><img class="w-5" src="icon/voice-square-svgrepo.svg"></span>
       <span>语音</span>
     </button>
     <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
-            data-action="click->chat-room#handleMenuClose">
-      <span aria-hidden="true">🔄</span>
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150  focus:outline-none"
+            data-action="click->chat-room#openFilePicker"
+            data-upload-type-param="file">
+      <span aria-hidden="true"><img class="w-5" src="icon/document-svgrepo.svg"></span>
       <span>附件</span>
     </button>
     <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
-            data-action="click->chat-room#syncMembers">
-      <span aria-hidden="true">👥</span>
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150  focus:outline-none"
+            data-action="click->chat-room#openFilePicker"
+            data-upload-type-param="video">
+      <span aria-hidden="true"><img class="w-5" src="icon/video-svgrepo.svg"></span>
       <span>视频</span>
-    </button>
-    <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
-            data-action="click->chat-room#syncContact">
-      <span aria-hidden="true">🧭</span>
-      <span>更新聊天室信息</span>
     </button>
   </div>
 
@@ -201,7 +207,7 @@
     <!-- 附件按钮 -->
     <div class="px-2 text-xl flex-shrink-0 w-10"
             data-action="mouseenter->chat-room#mouseenterAttachment">
-      <img src="attachment.svg" alt="附件">
+      <img src="icon/attachment.svg" alt="附件">
     </div>
 
     <!-- 输入框 -->
@@ -218,7 +224,7 @@
     </div>
 
     <!-- 表情按钮 -->
-    <button class="px-2 text-xl flex-shrink-0 w-10"><img src="emoji-pleased-svgrepo-com.svg" alt="表情"></button>
+    <button class="px-2 text-xl flex-shrink-0 w-10"><img src="icon/emoji-pleased-svgrepo-com.svg" alt="表情"></button>
 
   </div>
 </div>
