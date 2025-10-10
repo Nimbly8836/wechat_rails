@@ -72,7 +72,7 @@ module WechatRequest
 
     # 上传图片
     class UploadImg < Base
-      params { [:toWxid, :base64] }
+      params { [ :toWxid, :base64 ] }
     end
   end
 end

@@ -92,6 +92,10 @@ class MessagesController < ApplicationController
     end
   end
 
+  def send_image_message
+    to_wx_id = params[:to_wx_id]
+    image_base64 = params[:image_base64]
+  end
   def download_voice
     # 下载语音消息
     message = Message.includes(:wx_message, :chat_room).find(params[:id])

@@ -25,4 +25,12 @@ class MessageApiService
     @api_service.post(path, params)
   end
 
+  def send_image(to_wxid, image_base64)
+    path = WechatApis::Message.send_image
+    params = WechatRequest::Message::UploadImg.new(wxid: @wx_id,
+                                                   toWxid: to_wxid,
+                                                   base64: image_base64).to_h
+    @api_service.post(path, params)
+  end
+
 end
