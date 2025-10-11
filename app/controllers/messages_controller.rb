@@ -557,7 +557,7 @@ class MessagesController < ApplicationController
   def send_message_params
     params.require(:chat_room_id)
     params.require(:msg_type)
-    params.require(:content)
-    params.permit(:chat_room_id, :msg_type, :content, :extra)
+    # params.require(:content)
+    params.permit(:chat_room_id, :msg_type, :content, extra: {})
   end
 end

@@ -25,7 +25,7 @@ Rails.application.routes.draw do
 
   # chat room management
   resources :chat_room do
-    resources :messages, only: [:index, :create]
+    resources :messages, only: [ :index, :create ]
     collection do
       get :list
     end

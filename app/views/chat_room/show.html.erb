@@ -4,13 +4,10 @@
      data-chat-room-id-value="<%= @chat_room.id %>"
      data-chat-room-members-value="<%= @chat_room.members %>"
 >
-  <input type="file" data-chat-room-target="fileInput"
-         data-action="change->chat-room#handleFileSelect"
-         style="display: none;">
-  <div data-chat-room-target="uploadStatus"></div>
+
 
   <!-- 顶部：会话信息 -->
-  <div class="flex items-center justify-between px-4 h-14 border-b bg-white">
+  <div class="flex sticky items-center justify-between px-4 h-13 bg-white">
     <div class="flex items-center gap-3">
       <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
         <img src='data:image/png;base64,<%= @chat_room.avatar_base64 %>' class='w-full h-full
@@ -23,7 +20,8 @@
       </div>
     </div>
     <div class="flex items-center gap-3 text-gray-500">
-      <button class="hover:text-gray-700 w-5" title="搜索"><img src="icon/search-svgrepo-com.svg" alt="搜索聊天信息"></button>
+      <button class="hover:text-gray-700 w-5" title="搜索">
+        <img src="icon/search-svgrepo-com.svg" alt="搜索聊天信息"></button>
       <!-- 菜单触发 -->
       <button class="hover:text-gray-700 relative w-5"
               data-action="click->chat-room#toggleMenu">
@@ -31,6 +29,11 @@
       </button>
     </div>
   </div>
+
+  <input type="file" data-chat-room-target="fileInput"
+         data-action="change->chat-room#handleFileSelect"
+         style="display: none;">
+  <div data-chat-room-target="uploadStatus"></div>
 
   <!-- 二级菜单 -->
   <div data-chat-room-target="menu"
@@ -144,7 +147,7 @@
   </div>
 
   <div data-chat-room-target="attachmentSelect"
-       class="hidden absolute left-3 bottom-12 w-auto bg-white/95 shadow-xl
+       class="hidden absolute left-3.5 bottom-14 w-auto bg-white/95 shadow-xl
        rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-40">
     <button type="button"
             class="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium transition-colors duration-150 focus:outline-none"
@@ -194,20 +197,21 @@
 
 
   <!-- 中间：消息列表 -->
-  <div class="flex-1 w-full overflow-y-auto overflow-x-clip px-4 py-3 flex flex-col justify-start gap-2
-  min-h-0"
+  <div class="flex-1 shadow-lg w-full overflow-y-auto overflow-x-clip px-5 py-5 flex flex-col
+  justify-start gap-2
+  min-h-0 bg-gray-200"
        data-chat-room-target="messageList">
     <div class="text-gray-400 text-center py-8" data-chat-room-target="emptyMessage">暂无消息</div>
   </div>
 
   <!-- 底部：输入区 -->
-  <div class="flex items-center gap-2 px-3 py-2 border-t bg-white">
+  <div class="flex items-end gap-2 px-2 py-2 bg-white h-13">
 
 
     <!-- 附件按钮 -->
-    <div class="px-2 text-xl flex-shrink-0 w-10"
-            data-action="mouseenter->chat-room#mouseenterAttachment">
-      <img src="icon/attachment.svg" alt="附件">
+    <div class="flex-shrink-0 w-10"
+         data-action="mouseenter->chat-room#mouseenterAttachment">
+      <button class="px-2 text-xl w-10"><img src="icon/attachment.svg" alt="附件"></button>
     </div>
 
     <!-- 输入框 -->
@@ -215,16 +219,20 @@
       <label>
         <textarea
           rows="1"
-          class="w-full border border-gray-200 bg-gray-50 rounded-full px-4 py-2 resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-400"
+          class="w-full resize-none px-2 py-2 focus-border-none focus:outline-none
+          overflow-hidden "
           placeholder="输入消息…"
           data-chat-room-target="input"
-          data-action="input->chat-room#resize"
+          data-action="input->chat-room#autoResize"
         ></textarea>
       </label>
     </div>
 
     <!-- 表情按钮 -->
-    <button class="px-2 text-xl flex-shrink-0 w-10"><img src="icon/emoji-pleased-svgrepo-com.svg" alt="表情"></button>
+    <div class="flex-shrink-0 w-10">
+      <button class="px-2 text-xl w-10"><img src="icon/emoji-pleased-svgrepo-com.svg" alt="表情">
+      </button>
+    </div>
 
   </div>
 </div>
