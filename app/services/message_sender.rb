@@ -24,10 +24,11 @@ class MessageSender
     when MESSAGE_TYPES[:text]
       res = message_api_service.send_text(@chat_room.wx_id, @message_content, @extra&.dig(:at) || "")
     when MESSAGE_TYPES[:image]
-      res = message_api_service.send_image(@chat_room.wx_id, @extra&.dig(:image_base64))
+      res = message_api_service.send_image(@chat_room.wx_id, @extra&.dig(:base64))
     else
       raise ArgumentError, "Unsupported message_type: #{@message_type}"
     end
+    Rails.logger.info { "send message res: #{res.inspect}" }
     save_send_message(res)
   end
 

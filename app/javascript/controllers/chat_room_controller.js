@@ -10,9 +10,9 @@ export default class extends Controller {
 
   connect() {
     const defaultTheme = {
-      backgroundColor: "#ffffff",
+      backgroundColor: "var(--color-gray-100)",
       backgroundImage: "",
-      selfBubbleColor: "#6366f1",
+      selfBubbleColor: "#6387f2",
       selfBubbleTextColor: "#ffffff",
       otherBubbleColor: "rgba(255,255,255,0.92)",
       otherBubbleBorderColor: "rgba(148,163,184,0.45)",
@@ -86,11 +86,6 @@ export default class extends Controller {
 
     this.inputTarget.addEventListener("input", this.autoResize.bind(this));
     this.autoResize();
-  }
-
-  resize() {
-    this.element.style.height = "auto";
-    this.element.style.height = this.element.scrollHeight + "px";
   }
 
   debounce(fn, delay) {
@@ -1036,7 +1031,7 @@ export default class extends Controller {
       send_failed: false,
       wx_message: {
         msg_type: type,
-        // content: content,
+        content: "",
         to_user_name: this.currentWxidValue,
         self_send: true,
       }
@@ -1071,17 +1066,19 @@ export default class extends Controller {
             'meta[name="csrf-token"]').content
       }, body: JSON.stringify({
         chat_room_id: this.idValue,
-        content: msg.content,
+        content: msg.wx_message.content,
         msg_type: msg.msg_type,
-        extra: msg.extra || {},
+        extra: msg.wx_message.extra || {},
       })
     })
         .then(res => res.json())
         .then(newMsg => {
-          this.messages.delete(msg);
-          this.messages.add(
-              {...newMsg.result, sending: false, send_failed: false});
-          this.renderMessages();
+          if (newMsg?.result) {
+            this.messages.delete(msg);
+            this.messages.add(
+                {...newMsg.result, sending: false, send_failed: false});
+            this.renderMessages();
+          }
         })
         .catch(error => {
           this.messages.delete(msg);
@@ -2041,6 +2038,7 @@ export default class extends Controller {
   openFilePicker(event) {
     const uploadType = event.currentTarget.dataset.uploadTypeParam; // 获取按钮上的参数
     console.debug("openFilePicker:", event.currentTarget, uploadType);
+    this.currentUploadType = uploadType;
     let acceptTypes;
 
     // 根据 uploadType 设置文件类型
@@ -2054,8 +2052,8 @@ export default class extends Controller {
     this.fileInputTarget.click();
   }
 
-  handleFileSelect(event) {
-    const uploadType = this.attachmentSelectTarget.dataset.uploadTypeParam;
+  async handleFileSelect(event) {
+    const uploadType = this.currentUploadType
     console.debug("handleFileSelect", uploadType, event.target.files[0]);
     const file = event.target.files[0];
     if (!file) {
@@ -2064,7 +2062,7 @@ export default class extends Controller {
     } else {
       let sendMsg = {extra: {}}
       if (uploadType === "image") {
-        sendMsg.extra.base64 = get_file_base64(file);
+        sendMsg.extra.base64 = await get_file_base64(file);
       }
       this.sendMessage(uploadType, sendMsg)
     }

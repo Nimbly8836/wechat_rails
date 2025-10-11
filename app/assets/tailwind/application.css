@@ -9,3 +9,7 @@
     animation: tgDots 1.4s infinite;
   }
 }
+
+@theme {
+  --text-tiny: 0.625rem;
+}
