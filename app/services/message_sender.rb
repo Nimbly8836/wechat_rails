@@ -28,44 +28,78 @@ class MessageSender
     else
       raise ArgumentError, "Unsupported message_type: #{@message_type}"
     end
-    Rails.logger.info { "send message res: #{res.inspect}" }
+    Rails.logger.debug { "send message res: #{res.inspect}" }
     save_send_message(res)
   end
 
   def save_send_message(res)
-    msg_res = res&.dig("Data", "List")&.first
-    return unless msg_res
-    # 先保存到 wx_message 表
-    wx_message = WxMessage.create({
-                                    msg_id: msg_res.dig("Msgid") ||
-                                      msg_res.dig("ClientMsgid") ||
-                                      msg_res.dig("clientMsgId"),
-                                    new_msg_id: msg_res.dig("Newmsgid") ||
-                                      msg_res.dig("NewMsgId") ||
-                                      msg_res.dig("newMsgId"),
-                                    msg_seq: 0,
-                                    msg_create_time: Time.at(msg_res.dig("servertime") ||
-                                                             msg_res.dig("CreateTime")),
-                                    msg_type: @message_type,
-                                    from_user_name: @chat_room.contact.own_wxid,
-                                    to_user_name: msg_res.dig("ToUsetName", "string") ||
-                                      msg_res.dig("ToUserName", "string") ||
-                                      msg_res.dig("toUserName") ||
-                                      @chat_room.wx_id,
-                                    content: @message_content,
-                                    # 这里发送的当然都是自己发的？（后续可能会加机器人）
-                                    self_send: true,
-                                  })
-    # 保存到当前聊天的消息
-    message =  Message.create({
-                     wx_messages_id: wx_message.id,
-                     chat_room_id: @chat_room.id,
-                     message_time: wx_message.msg_create_time
-                   })
-    # 返回和分页一样的结构
-    message.as_json.merge(
-      wx_message: wx_message.as_json
+    return unless @chat_room && @message_type
+
+    # 根据消息类型提取主数据节点
+    msg_res = case @message_type
+              when MESSAGE_TYPES[:text]
+                res&.dig("Data", "List")&.first
+              when MESSAGE_TYPES[:image]
+                res&.dig("Data")
+              else
+                nil
+              end
+
+    return unless msg_res.is_a?(Hash)
+
+    # 统一提取字段，集中处理兼容性问题
+    msg_id = msg_res["Msgid"] || msg_res["ClientMsgid"] || msg_res["clientMsgId"]
+    new_msg_id = msg_res["Newmsgid"] || msg_res["NewMsgId"] || msg_res["newMsgId"]
+
+    timestamp = msg_res["servertime"] || msg_res["CreateTime"]
+    msg_time = timestamp.to_i > 0 ? Time.at(timestamp.to_i) : Time.current
+
+    to_user_name = msg_res.dig("ToUserName", "string") ||
+                   msg_res.dig("toUserName") ||
+                   msg_res.dig("ToUsetName", "string") || # 兼容错误拼写
+                   @chat_room.wx_id
+
+    wx_message_attrs = {
+      msg_id: msg_id,
+      new_msg_id: new_msg_id,
+      msg_seq: 0,
+      msg_create_time: msg_time,
+      msg_type: @message_type,
+      from_user_name: @chat_room.contact&.own_wxid,
+      to_user_name: to_user_name,
+      content: @message_content,
+      self_send: true,
+    }
+
+    # 特殊类型字段
+    wx_message_attrs[:msg_source] = msg_res["MsgSource"] if @message_type == MESSAGE_TYPES[:image]
+    wx_message = WxMessage.new(wx_message_attrs)
+    wx_message.real_msg_type = wx_message.get_real_msg_type
+
+    unless wx_message.save
+      Rails.logger.error("WxMessage 保存失败: #{wx_message.errors.full_messages.join(', ')}")
+      return { success: false, message: "保存微信消息失败" }
+    end
+
+    message = Message.new(
+      wx_messages_id: wx_message.id,
+      chat_room_id: @chat_room.id,
+      message_time: wx_message.msg_create_time
     )
+
+    unless message.save
+      Rails.logger.error("Message 保存失败: #{message.errors.full_messages.join(', ')}")
+      return { error: true, message: "保存消息失败" }
+    end
+
+    {
+      success: true,
+      message: "ok",
+      data: message.as_json.merge(wx_message: wx_message.as_json)
+    }
+  rescue => e
+    Rails.logger.error("save_send_message 出错: #{e.class} - #{e.message}")
+    { success: false, message: "内部错误: #{e.message}" }
   end
 
   private
@@ -81,4 +115,30 @@ class MessageSender
     @message_api_service ||= MessageApiService.new(@chat_room.contact.own_wxid)
   end
 
+  def save_send_image(message_id, image_base64)
+    # 保存目录
+    storage_dir = Rails.root.join("storage", "images")
+    FileUtils.mkdir_p(storage_dir)
+
+    # 去掉可能带的 data URI 头
+    if image_base64 =~ /^data:(image\/\w+);base64,(.+)$/
+      mime_type = Regexp.last_match(1)
+      data = Regexp.last_match(2)
+    else
+      mime_type = "image/jpeg"
+      data = image_base64
+    end
+
+    # 计算扩展名
+    ext = Marcel::MimeType.for(StringIO.new(Base64.decode64(data)), name: "image").split("/").last || "jpg"
+    filename = "#{message_id}.#{ext}"
+    file_path = storage_dir.join(filename)
+
+    # 写入文件
+    File.open(file_path, "wb") do |f|
+      f.write(Base64.decode64(data))
+    end
+
+    file_path.to_s
+  end
 end

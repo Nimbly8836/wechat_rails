@@ -1073,10 +1073,10 @@ export default class extends Controller {
     })
         .then(res => res.json())
         .then(newMsg => {
-          if (newMsg?.result) {
+          if (newMsg?.data) {
             this.messages.delete(msg);
             this.messages.add(
-                {...newMsg.result, sending: false, send_failed: false});
+                {...newMsg.data, sending: false, send_failed: false});
             this.renderMessages();
           }
         })
@@ -2054,20 +2054,14 @@ export default class extends Controller {
 
   async handleFileSelect(event) {
     const uploadType = this.currentUploadType
-    console.debug("handleFileSelect", uploadType, event.target.files[0]);
     const file = event.target.files[0];
-    if (!file) {
-      this.uploadStatusTarget.textContent = "未选择文件";
-      return;
-    } else {
-      let sendMsg = {extra: {}}
-      if (uploadType === "image") {
-        sendMsg.extra.base64 = await get_file_base64(file);
+      if (file) {
+          let sendMsg = {extra: {}}
+          if (uploadType === "image") {
+              sendMsg.extra.base64 = await get_file_base64(file);
+          }
+          this.sendMessage(uploadType, sendMsg)
       }
-      this.sendMessage(uploadType, sendMsg)
-    }
-
-    this.uploadStatusTarget.textContent = "正在上传...";
 
   }
 
