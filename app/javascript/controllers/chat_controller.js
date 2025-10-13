@@ -12,7 +12,7 @@ export default class extends Controller {
         this.eventSource = null;
         this.reconnectTimer = null;
         this.eventSourceUrl = "/notion/message";
-        this.eventSourceRetryDelay = 2000;
+        this.eventSourceRetryDelay = 1500;
 
         this.sidebar = document.getElementById("sidebar");
         this.resizer = document.getElementById("resizer");
@@ -97,6 +97,7 @@ export default class extends Controller {
                     body: `${roomName}：${payload.content_preview}`
                 });
             }
+            this.switchTab()
         } catch (error) {
             console.error("解析消息失败", error);
         }

@@ -1,5 +1,4 @@
 import {Controller} from "@hotwired/stimulus"
-// import {openChatRoom} from "chat_controller"
 
 export default class extends Controller {
     static targets = ["details"]

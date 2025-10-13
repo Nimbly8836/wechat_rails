@@ -26,9 +26,9 @@ class MessagesController < ApplicationController
                                    .joins(:wx_message)
                                    .where(wx_messages: { new_msg_id: refer_ids })
                                    .to_a
-                          else
-                            []
-                          end
+    else
+                           []
+    end
 
     referenced_by_new_msg_id = referenced_messages.index_by { |msg| msg.wx_message&.new_msg_id }
 
@@ -39,19 +39,19 @@ class MessagesController < ApplicationController
       base = message.as_json(
         include: {
           wx_message: {
-            only: [:msg_type, :content, :from_user_name, :to_user_name,
-                   :new_msg_id, :refer_new_msg_id, :refer_title, :self_send, :real_msg_type]
+            only: [ :msg_type, :content, :from_user_name, :to_user_name,
+                   :new_msg_id, :refer_new_msg_id, :refer_title, :self_send, :real_msg_type ]
           }
         }
       )
 
       base.merge(
         "referenced_message" => referenced&.as_json(
-          only: [:id, :chat_room_id, :created_at, :message_time],
+          only: [ :id, :chat_room_id, :created_at, :message_time ],
           include: {
             wx_message: {
-              only: [:msg_type, :content, :from_user_name, :to_user_name,
-                     :new_msg_id, :self_send, :real_msg_type]
+              only: [ :msg_type, :content, :from_user_name, :to_user_name,
+                     :new_msg_id, :self_send, :real_msg_type ]
             }
           }
         )
@@ -147,7 +147,7 @@ class MessagesController < ApplicationController
     cdn_url = nil
     existing_path = if emoji_md5.present?
                       Dir.glob(storage_dir.join("#{emoji_md5}.*")).first || (storage_dir.join(emoji_md5) if File.exist?(storage_dir.join(emoji_md5)))
-                    end
+    end
 
     return send_emoji_file(existing_path) if existing_path
 
@@ -289,20 +289,22 @@ class MessagesController < ApplicationController
     message = Message.includes(:wx_message, :chat_room).find(params[:id])
     wx_message = message.wx_message
 
-    file_meta = wx_message.parse_file_attachment
-    unless file_meta
-      render json: { error: true, message: "file metadata missing" }, status: :unprocessable_content and return
-    end
-
     storage_dir = Rails.root.join("storage", "files")
     FileUtils.mkdir_p(storage_dir)
     basename = message.id.to_s
 
     if (cached = locate_cached_media(storage_dir, basename))
-      filename = sanitize_filename(file_meta[:title], default: "file")
+      # filename = sanitize_filename(file_meta[:title], default: "file")
+      filename = wx_message.content || "unknow"
       mime = Marcel::MimeType.for(Pathname.new(cached)) rescue "application/octet-stream"
-      return send_file(cached, type: mime, disposition: "attachment", filename: ensure_extension(filename, cached))
+      return send_file(cached, type: mime, disposition: "attachment", filename: filename)
     end
+
+    file_meta = wx_message.parse_file_attachment
+    unless file_meta
+      render json: { error: true, message: "file metadata missing" }, status: :unprocessable_content and return
+    end
+
 
     contact = Contact.find(message.chat_room&.contact_id)
     unless contact.own_wxid.present?
@@ -468,7 +470,7 @@ class MessagesController < ApplicationController
     requested_size = FileChunkHelper::INITIAL_CHUNK_SIZE
 
     while downloaded < total
-      current_size = [requested_size, total - downloaded].min
+      current_size = [ requested_size, total - downloaded ].min
       section = { start_pos: downloaded, data_len: current_size }
       response = yield(section)
       payload = extract_chunk_payload(response)
@@ -548,9 +550,9 @@ class MessagesController < ApplicationController
   def ensure_extension(base_name, extension_or_path)
     extension = if extension_or_path.to_s.start_with?(".")
                   extension_or_path
-                else
+    else
                   File.extname(extension_or_path.to_s)
-                end
+    end
     extension = extension.presence
     return base_name if extension.blank?
     base_name.end_with?(extension) ? base_name : "#{base_name}#{extension}"
@@ -563,3 +565,4 @@ class MessagesController < ApplicationController
     params.permit(:chat_room_id, :msg_type, :content, :file, extra: {})
   end
 end
+
