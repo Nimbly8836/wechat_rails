@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+require "builder"
 
 class MessageApiService
   def initialize(wx_id = nil)
@@ -31,6 +32,38 @@ class MessageApiService
                                                    toWxid: to_wxid,
                                                    base64: image_base64).to_h
     @api_service.post(path, params)
+  end
+
+  def send_app(to_wxid, type, xml)
+    path = WechatApis::Message.send_app
+    params = WechatRequest::Message::SendApp.new(wxid: @wx_id,
+                                                 toWxid: to_wxid,
+                                                 xml: xml,
+                                                 type: type)
+                                            .to_h
+    @api_service.post(path, params)
+  end
+
+  def send_app_file(to_wxid, name, size, id, ext_name)
+    xml = <<~XML
+      <appmsg appid='' sdkver=''>
+        <title>#{CGI.escapeHTML(name.to_s)}</title>
+        <des></des>
+        <action></action>
+        <type>6</type>
+        <content></content>
+        <url></url>
+        <lowurl></lowurl>
+        <appattach>
+          <totallen>#{size}</totallen>
+          <attachid>#{id}</attachid>
+          <fileext>#{ext_name}</fileext>
+        </appattach>
+        <extinfo></extinfo>
+      </appmsg>
+    XML
+
+    send_app(to_wxid, 6, xml.strip)
   end
 
 end

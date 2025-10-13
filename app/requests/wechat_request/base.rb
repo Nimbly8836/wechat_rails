@@ -33,7 +33,7 @@ module WechatRequest
       third_app_grant: { defaults: {}, required: [ :appId, :authCode, :wxid ] },
       update_step_number_api: { defaults: {}, required: [ :step, :wxid ] },
       upload_file: { defaults: {}, required: [ :file, :wxid ] },
-      upload_file_binary: { defaults: {}, required: [ :file, :wxid ] },
+      upload_file_binary: { defaults: {}, required: [] },
       set_proxy: { defaults: {}, required: [ :proxy, :wxid ] },
 
     }.freeze

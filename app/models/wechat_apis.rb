@@ -68,6 +68,10 @@ module WechatApis
     def self.send_image
       "/Msg/UploadImg"
     end
+
+    def self.send_app
+      "/Msg/SendApp"
+    end
   end
 
   # 联系人相关API路径

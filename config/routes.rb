@@ -25,7 +25,7 @@ Rails.application.routes.draw do
 
   # chat room management
   resources :chat_room do
-    resources :messages, only: [ :index, :create ]
+    resources :messages, only: [:index, :create]
     collection do
       get :list
     end
@@ -42,6 +42,7 @@ Rails.application.routes.draw do
   get "message/image/:id" => "messages#download_image"
   get "message/video/:id" => "messages#download_video"
   get "message/file/:id" => "messages#download_file"
+  post "message/file" => "messages#upload_file"
 
   get "/notion/message", to: "message_events#events"
 

@@ -22,6 +22,12 @@ class ToolsApiService
     @api_service.post(path, params)
   end
 
+  def upload_file(file)
+    path = WechatApis::Tools.upload_file_binary
+    params = WechatRequest::Tools::UploadFileBinary.new(wxid: @wx_id).to_h
+    @api_service.upload_file(path, file, params)
+  end
+
   def cdn_download_image(file_aes_key:, file_no:)
     path = WechatApis::Tools.cdn_download_image
     params = WechatRequest::Tools::CdnDownloadImage

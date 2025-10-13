@@ -26,9 +26,9 @@ class MessagesController < ApplicationController
                                    .joins(:wx_message)
                                    .where(wx_messages: { new_msg_id: refer_ids })
                                    .to_a
-    else
+                          else
                             []
-    end
+                          end
 
     referenced_by_new_msg_id = referenced_messages.index_by { |msg| msg.wx_message&.new_msg_id }
 
@@ -39,19 +39,19 @@ class MessagesController < ApplicationController
       base = message.as_json(
         include: {
           wx_message: {
-            only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                   :new_msg_id, :refer_new_msg_id, :refer_title, :self_send, :real_msg_type ]
+            only: [:msg_type, :content, :from_user_name, :to_user_name,
+                   :new_msg_id, :refer_new_msg_id, :refer_title, :self_send, :real_msg_type]
           }
         }
       )
 
       base.merge(
         "referenced_message" => referenced&.as_json(
-          only: [ :id, :chat_room_id, :created_at, :message_time ],
+          only: [:id, :chat_room_id, :created_at, :message_time],
           include: {
             wx_message: {
-              only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                     :new_msg_id, :self_send, :real_msg_type ]
+              only: [:msg_type, :content, :from_user_name, :to_user_name,
+                     :new_msg_id, :self_send, :real_msg_type]
             }
           }
         )
@@ -66,9 +66,10 @@ class MessagesController < ApplicationController
     chat_room = ChatRoom.includes(:contact).find(args[:chat_room_id])
     sender = MessageSender.new(
       chat_room,
-      args[:msg_type],
+      args[:msg_type]&.to_i,
       args[:content],
       args[:extra],
+      args[:file]
     )
     res = sender.send
     render json: res
@@ -96,6 +97,7 @@ class MessagesController < ApplicationController
     to_wx_id = params[:to_wx_id]
     image_base64 = params[:image_base64]
   end
+
   def download_voice
     # 下载语音消息
     message = Message.includes(:wx_message, :chat_room).find(params[:id])
@@ -126,7 +128,7 @@ class MessagesController < ApplicationController
       send_file(file_path, type: converter.mime_type, disposition: "inline")
     rescue VoiceConversionService::ConversionError => e
       Rails.logger.error { "Voice conversion failed: #{e.message}" }
-      render json: { error: true, message: "voice conversion failed" }, status: :unprocessable_entity
+      render json: { error: true, message: "voice conversion failed" }, status: :unprocessable_content
     end
   end
 
@@ -145,7 +147,7 @@ class MessagesController < ApplicationController
     cdn_url = nil
     existing_path = if emoji_md5.present?
                       Dir.glob(storage_dir.join("#{emoji_md5}.*")).first || (storage_dir.join(emoji_md5) if File.exist?(storage_dir.join(emoji_md5)))
-    end
+                    end
 
     return send_emoji_file(existing_path) if existing_path
 
@@ -162,7 +164,7 @@ class MessagesController < ApplicationController
     end
 
     if emoji_md5.blank? || cdn_url.blank?
-      render json: { error: true, message: "emoji metadata missing" }, status: :unprocessable_entity and return
+      render json: { error: true, message: "emoji metadata missing" }, status: :unprocessable_content and return
     end
 
     existing_path = Dir.glob(storage_dir.join("#{emoji_md5}.*")).first
@@ -196,22 +198,21 @@ class MessagesController < ApplicationController
       render json: { error: true, message: "image message not found" }, status: :not_found and return
     end
 
-    image_meta = wx_message.parse_image
-    unless image_meta
-      render json: { error: true, message: "image metadata missing" }, status: :unprocessable_entity and return
-    end
-
     storage_dir = Rails.root.join("storage", "images")
     FileUtils.mkdir_p(storage_dir)
     basename = message.id.to_s
-
     if (cached = locate_cached_media(storage_dir, basename))
       return send_file(cached, type: Marcel::MimeType.for(Pathname.new(cached)), disposition: "inline")
     end
 
+    image_meta = wx_message.parse_image
+    unless image_meta
+      render json: { error: true, message: "image metadata missing" }, status: :unprocessable_content and return
+    end
+
     contact = Contact.find(message.chat_room&.contact_id)
     unless contact.own_wxid.present?
-      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
+      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_content and return
     end
 
     tools_api = ToolsApiService.new(contact.own_wxid)
@@ -234,6 +235,7 @@ class MessagesController < ApplicationController
     Rails.logger.error { "image download error: #{e.message}" }
     render json: { error: true, message: "image download error" }, status: :bad_gateway
   end
+
   def download_video
     message = Message.includes(:wx_message, :chat_room).find(params[:id])
     wx_message = message.wx_message
@@ -244,7 +246,7 @@ class MessagesController < ApplicationController
 
     video_meta = wx_message.parse_video
     unless video_meta
-      render json: { error: true, message: "video metadata missing" }, status: :unprocessable_entity and return
+      render json: { error: true, message: "video metadata missing" }, status: :unprocessable_content and return
     end
 
     storage_dir = Rails.root.join("storage", "videos")
@@ -260,7 +262,7 @@ class MessagesController < ApplicationController
 
     contact = Contact.find(message.chat_room&.contact_id)
     unless contact&.own_wxid.present?
-      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
+      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_content and return
     end
 
     tools_api = ToolsApiService.new(contact.own_wxid)
@@ -289,7 +291,7 @@ class MessagesController < ApplicationController
 
     file_meta = wx_message.parse_file_attachment
     unless file_meta
-      render json: { error: true, message: "file metadata missing" }, status: :unprocessable_entity and return
+      render json: { error: true, message: "file metadata missing" }, status: :unprocessable_content and return
     end
 
     storage_dir = Rails.root.join("storage", "files")
@@ -304,7 +306,7 @@ class MessagesController < ApplicationController
 
     contact = Contact.find(message.chat_room&.contact_id)
     unless contact.own_wxid.present?
-      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
+      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_content and return
     end
 
     tools_api = ToolsApiService.new(contact.own_wxid)
@@ -558,6 +560,6 @@ class MessagesController < ApplicationController
     params.require(:chat_room_id)
     params.require(:msg_type)
     # params.require(:content)
-    params.permit(:chat_room_id, :msg_type, :content, extra: {})
+    params.permit(:chat_room_id, :msg_type, :content, :file, extra: {})
   end
 end

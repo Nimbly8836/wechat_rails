@@ -2,6 +2,7 @@ class Message < ApplicationRecord
   belongs_to :chat_room
   belongs_to :wx_message, foreign_key: :wx_messages_id
   after_create_commit :notify_chat_room
+  has_one_attached :file
 
   def notify_chat_room
     msg = self.wx_message
