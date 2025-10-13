@@ -43,7 +43,7 @@ module WechatModels
         parse(msg_hash, current_wxid).attributes.except("id", "created_at", "updated_at")
       end
       return [] if wx_messages.empty?
-      result = WxMessage.insert_all(wx_messages, returning: %w[id])
+      result = WxMessage.upsert_all(wx_messages, returning: %w[id])
       ids = result.map { |r| r["id"] }
       WxMessage.where(id: ids)
     end

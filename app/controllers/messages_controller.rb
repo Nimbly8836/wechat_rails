@@ -71,7 +71,7 @@ class MessagesController < ApplicationController
       args[:extra],
     )
     res = sender.send
-    render json: { success: true, result: res }
+    render json: res
   end
 
   def callback
@@ -210,7 +210,7 @@ class MessagesController < ApplicationController
     end
 
     contact = Contact.find(message.chat_room&.contact_id)
-    unless contact&.own_wxid.present?
+    unless contact.own_wxid.present?
       render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_entity and return
     end
 

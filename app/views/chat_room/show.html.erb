@@ -5,6 +5,9 @@
      data-chat-room-members-value="<%= @chat_room.members %>"
 >
 
+  <input type="file" data-chat-room-target="fileInput"
+         data-action="change->chat-room#handleFileSelect"
+         style="display: none;">
 
   <!-- 顶部：会话信息 -->
   <div class="flex sticky items-center justify-between px-4 h-13 bg-white">
@@ -30,10 +33,7 @@
     </div>
   </div>
 
-  <input type="file" data-chat-room-target="fileInput"
-         data-action="change->chat-room#handleFileSelect"
-         style="display: none;">
-  <div data-chat-room-target="uploadStatus"></div>
+
 
   <!-- 二级菜单 -->
   <div data-chat-room-target="menu"
