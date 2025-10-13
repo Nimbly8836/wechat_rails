@@ -3,6 +3,7 @@ require "net/http"
 require "uri"
 require "json"
 require "singleton"
+require "net/http/post/multipart"
 
 class BaseApiService
   include Singleton
@@ -65,6 +66,36 @@ class BaseApiService
   def handle_error(message, status: nil, body: nil)
     Rails.logger.error("API调用错误: #{message}, 状态: #{status}, 响应体: #{body}")
     raise ApiError.new(message, status: status, body: body)
+  end
+
+  # 上传文件（multipart/form-data）
+  def upload_file(path, file, extra_params = {})
+    url = build_url(path)
+    uri = URI.parse(url)
+
+    # 上传的文件包装
+    upload_io = if file.is_a?(ActionDispatch::Http::UploadedFile)
+                  UploadIO.new(file.tempfile, file.content_type, file.original_filename)
+                else
+                  UploadIO.new(file, "application/octet-stream", File.basename(file.path))
+                end
+
+    # 组合 FormData 参数
+    form_data = { wxid: self.class.wx_id, file: upload_io }.merge(extra_params.compact)
+
+    request = Net::HTTP::Post::Multipart.new(uri.path, form_data)
+    request["User-Agent"] = get_user_agent
+    request["Accept"] = "application/json"
+
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = (uri.scheme == "https")
+    http.read_timeout = @config[:timeout] || 30
+
+    response = http.request(request)
+    handle_response(response)
+  rescue => e
+    Rails.logger.error("文件上传失败: #{e.message}")
+    { error: true, message: "文件上传失败: #{e.message}" }
   end
 
   protected
@@ -152,4 +183,5 @@ class BaseApiService
       end
     end
   end
+
 end

@@ -447,6 +447,7 @@ export default class extends Controller {
       }, {once: true});
       let imageUrl
       if (msg.self_send && msg._sending) {
+        console.log("onSendImage Message: ", msg)
         imageUrl = msg.extra?.base64;
       } else {
         imageUrl = this.attachmentUrl("image", msg);
@@ -1049,6 +1050,9 @@ export default class extends Controller {
         base64: message.extra?.base64,
       }
     }
+    if (type === "file") {
+      tempMsg.msg_type = 6;
+    }
     this.renderMessages();
     this.messages.add(tempMsg);
     this.autoResize();
@@ -1059,17 +1063,37 @@ export default class extends Controller {
   sendMessage(type, message) {
     const msg = this.createSendMessage(type, message);
 
-    fetch(`/chat_room/${this.idValue}/messages`, {
-      method: "POST", headers: {
-        "Content-Type": "application/json",
+    let body;
+    let headers;
+    if (type === "file") {
+      const formData = new FormData();
+      formData.append("chat_room_id", this.idValue);
+      formData.append("msg_type", msg.msg_type);
+      formData.append("content", msg.wx_message.content || "");
+      formData.append("extra", JSON.stringify(msg.wx_message.extra || {}));
+      formData.append("file", message.file);
+      body = formData
+
+      headers = {
         "X-CSRF-Token": document.querySelector(
             'meta[name="csrf-token"]').content
-      }, body: JSON.stringify({
+      }
+    } else {
+      body = JSON.stringify({
         chat_room_id: this.idValue,
         content: msg.wx_message.content,
         msg_type: msg.msg_type,
         extra: msg.wx_message.extra || {},
       })
+      headers = {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": document.querySelector(
+            'meta[name="csrf-token"]').content
+      }
+    }
+
+    fetch(`/chat_room/${this.idValue}/messages`, {
+      method: "POST", headers: headers, body: body
     })
         .then(res => res.json())
         .then(newMsg => {
@@ -2055,13 +2079,17 @@ export default class extends Controller {
   async handleFileSelect(event) {
     const uploadType = this.currentUploadType
     const file = event.target.files[0];
-      if (file) {
-          let sendMsg = {extra: {}}
-          if (uploadType === "image") {
-              sendMsg.extra.base64 = await get_file_base64(file);
-          }
-          this.sendMessage(uploadType, sendMsg)
+    if (file) {
+      let sendMsg = {extra: {}}
+      if (uploadType === "image") {
+        sendMsg.extra.base64 = await get_file_base64(file);
       }
+      if (uploadType === "file") {
+        sendMsg.file = file
+      }
+      console.debug("handleFileSelect", uploadType, sendMsg)
+      this.sendMessage(uploadType, sendMsg)
+    }
 
   }
 

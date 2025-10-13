@@ -7,42 +7,52 @@ class MessageSender
     video: 43,
     voice: 34,
     file: 6,
-    emoji: 47,
+    emoji: 47
   }.freeze
 
   attr_reader :chat_room, :message_type, :message_content
 
-  def initialize(chat_room, message_type, message_content, extra)
+  def initialize(chat_room, message_type, message_content, extra, file)
     @chat_room = chat_room
-    @message_type = message_type
+    @message_type = message_type.to_i
     @message_content = message_content
     @extra = extra
+    @file = file
   end
 
   def send
-    case @message_type
+    case @message_type.to_i
     when MESSAGE_TYPES[:text]
       res = message_api_service.send_text(@chat_room.wx_id, @message_content, @extra&.dig(:at) || "")
     when MESSAGE_TYPES[:image]
       res = message_api_service.send_image(@chat_room.wx_id, @extra&.dig(:base64))
+    when MESSAGE_TYPES[:file]
+      res = send_file
     else
       raise ArgumentError, "Unsupported message_type: #{@message_type}"
     end
     Rails.logger.debug { "send message res: #{res.inspect}" }
-    save_send_message(res)
+    unless res&.dig("success") || res&.dig("Success")
+      return res
+    end
+    result = save_send_message(res)
+    save_send_image(result[:data]&.dig("id"), @extra&.dig(:base64)) if @message_type.to_i ==
+    MESSAGE_TYPES[:image]
+    save_send_file(result[:data]&.dig("id"), @file) if @message_type == MESSAGE_TYPES[:file]
+    result
   end
 
   def save_send_message(res)
     return unless @chat_room && @message_type
 
     # 根据消息类型提取主数据节点
-    msg_res = case @message_type
+    msg_res = case @message_type.to_i
               when MESSAGE_TYPES[:text]
                 res&.dig("Data", "List")&.first
               when MESSAGE_TYPES[:image]
                 res&.dig("Data")
               else
-                nil
+                res&.dig("Data")
               end
 
     return unless msg_res.is_a?(Hash)
@@ -64,7 +74,7 @@ class MessageSender
       new_msg_id: new_msg_id,
       msg_seq: 0,
       msg_create_time: msg_time,
-      msg_type: @message_type,
+      msg_type: @message_type.to_i,
       from_user_name: @chat_room.contact&.own_wxid,
       to_user_name: to_user_name,
       content: @message_content,
@@ -91,7 +101,6 @@ class MessageSender
       Rails.logger.error("Message 保存失败: #{message.errors.full_messages.join(', ')}")
       return { error: true, message: "保存消息失败" }
     end
-
     {
       success: true,
       message: "ok",
@@ -140,5 +149,39 @@ class MessageSender
     end
 
     file_path.to_s
+  end
+
+  def save_send_file(message_id, file)
+    return unless file.respond_to?(:tempfile)
+
+    storage_dir = Rails.root.join("storage", "files")
+    FileUtils.mkdir_p(storage_dir)
+
+    ext = File.extname(file.original_filename).delete_prefix(".")
+    filename = "#{message_id}.#{ext}"
+    file_path = storage_dir.join(filename)
+
+    # 从临时文件复制到目标路径
+    File.open(file_path, "wb") do |f|
+      IO.copy_stream(file.tempfile, f)
+    end
+
+    file_path.to_s
+  end
+
+  def send_file
+    @tool_api_service ||= ToolsApiService.new(@chat_room.contact.own_wxid)
+    file_res = @tool_api_service.upload_file(@file)
+    unless file_res&.dig("Code").to_i == 0
+      return { success: false, message: "Error on upload file" }
+    end
+    size = file_res&.dig("Data", "totalLen").to_i
+    id = file_res&.dig("Data", "mediaId")
+    name = @file.original_filename&.to_s
+    message_api_service.send_app_file(@chat_room.contact.user_name,
+                                      name,
+                                      size,
+                                      id,
+                                      name&.split(".")&.last)
   end
 end

@@ -155,6 +155,7 @@ GEM
     mini_mime (1.1.5)
     minitest (5.25.5)
     msgpack (1.8.0)
+    multipart-post (2.4.1)
     net-imap (0.5.9)
       date
       net-protocol
@@ -378,6 +379,7 @@ DEPENDENCIES
   importmap-rails
   jbuilder
   kamal
+  multipart-post
   pg (~> 1.1)
   propshaft
   puma (>= 5.0)
