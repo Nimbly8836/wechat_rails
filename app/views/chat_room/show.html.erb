@@ -34,7 +34,6 @@
   </div>
 
 
-
   <!-- 二级菜单 -->
   <div data-chat-room-target="menu"
        class="hidden absolute right-3 top-14 w-60 bg-slate-900/95 text-slate-100 shadow-2xl rounded-2xl ring-1 ring-white/10 overflow-hidden z-50 backdrop-blur">
@@ -205,7 +204,7 @@
   </div>
 
   <!-- 底部：输入区 -->
-  <div class="flex items-end gap-2 px-2 py-2 bg-white h-13">
+  <div class="flex items-end gap-2 px-2 py-2 bg-white min-h-13">
 
 
     <!-- 附件按钮 -->
@@ -223,16 +222,18 @@
           overflow-hidden "
           placeholder="输入消息…"
           data-chat-room-target="input"
-          data-action="input->chat-room#autoResize"
         ></textarea>
       </label>
     </div>
 
-    <!-- 表情按钮 -->
-    <div class="flex-shrink-0 w-10">
-      <button class="px-2 text-xl w-10"><img src="icon/emoji-pleased-svgrepo-com.svg" alt="表情">
+    <div class="flex-shrink-0" data-controller="emoji">
+      <button class="px-2 text-xl w-10"
+              data-action="mouseenter->emoji#mouseenter mouseleave->emoji#mouseleave">
+        <img src="icon/emoji-pleased-svgrepo-com.svg" alt="表情">
       </button>
     </div>
 
+
   </div>
+  <%= render partial: "chat/emoji_templates" %>
 </div>

@@ -18,3 +18,14 @@
         min-width: 4px; /* 桌面模式下恢复窄宽度 */
     }
 }
+
+/*.emoji-panel {*/
+/*  z-index: 9999 !important;*/
+/*  position: absolute;*/
+/*  bottom: 4rem;*/
+/*  right: 2rem;*/
+/*  max-width: 30rem;*/
+/*  max-height: 30rem;*/
+/*  overflow-y: auto; */
+/*}*/
+

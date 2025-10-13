@@ -47,13 +47,13 @@ class MessageSender
 
     # 根据消息类型提取主数据节点
     msg_res = case @message_type.to_i
-              when MESSAGE_TYPES[:text]
+    when MESSAGE_TYPES[:text]
                 res&.dig("Data", "List")&.first
-              when MESSAGE_TYPES[:image]
+    when MESSAGE_TYPES[:image]
                 res&.dig("Data")
-              else
+    else
                 res&.dig("Data")
-              end
+    end
 
     return unless msg_res.is_a?(Hash)
 
@@ -78,13 +78,13 @@ class MessageSender
       from_user_name: @chat_room.contact&.own_wxid,
       to_user_name: to_user_name,
       content: @message_content,
-      self_send: true,
+      self_send: true
     }
 
     # 特殊类型字段
     wx_message_attrs[:msg_source] = msg_res["MsgSource"] if @message_type == MESSAGE_TYPES[:image]
     wx_message = WxMessage.new(wx_message_attrs)
-    wx_message.real_msg_type = wx_message.get_real_msg_type
+    wx_message.real_msg_type = @message_type
 
     unless wx_message.save
       Rails.logger.error("WxMessage 保存失败: #{wx_message.errors.full_messages.join(', ')}")
@@ -178,6 +178,8 @@ class MessageSender
     size = file_res&.dig("Data", "totalLen").to_i
     id = file_res&.dig("Data", "mediaId")
     name = @file.original_filename&.to_s
+    # set message content file original_filename
+    @message_content = name
     message_api_service.send_app_file(@chat_room.contact.user_name,
                                       name,
                                       size,
