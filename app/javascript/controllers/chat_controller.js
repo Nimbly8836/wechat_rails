@@ -97,7 +97,6 @@ export default class extends Controller {
                     body: `${roomName}：${payload.content_preview}`
                 });
             }
-            this.switchTab()
         } catch (error) {
             console.error("解析消息失败", error);
         }
