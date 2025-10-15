@@ -1,0 +1,9 @@
+# config/wechat_api.yml
+default: &default
+  base_url: 'https://192.168.110.184:8059/api'
+  callback_url: 'http://192.168.110.184:33000/message/callback/{0}'
+  timeout: 10
+  retry_count: 3
+
+production:
+  <<: *default

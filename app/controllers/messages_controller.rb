@@ -3,6 +3,7 @@ require "stringio"
 
 class MessagesController < ApplicationController
   skip_before_action :verify_authenticity_token, only: :callback
+  skip_before_action :require_authentication, only: :callback
 
   def index
     chat_room_id = params[:chat_room_id]

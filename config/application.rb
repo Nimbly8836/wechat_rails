@@ -23,6 +23,8 @@ module WechatRails
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
+    # config.force_ssl = false
     config.autoload_paths << Rails.root.join("app/errors")
+    config.active_job.queue_adapter = :sidekiq
   end
 end

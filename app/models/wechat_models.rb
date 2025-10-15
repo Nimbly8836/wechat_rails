@@ -38,7 +38,7 @@ module WechatModels
       return [] unless res["Success"]
       add_messages = res.dig("Data", "AddMsgs") || []
       wx_messages = add_messages
-                      .reject { |msg_hash| [51, 10002].include?(msg_hash["MsgType"]) }
+                      .reject { |msg_hash| [ 51, 10002 ].include?(msg_hash["MsgType"]) }
                       .map do |msg_hash|
         parse(msg_hash, current_wxid).attributes.except("id", "created_at", "updated_at")
       end

@@ -1,0 +1,51 @@
+services:
+  app:
+    container_name: wechat_rails_app
+    image: wechat_rails:0.0.5
+    ports:
+      - "41234:80"
+      - "33000:3000"
+    volumes:
+      - ./config/database.yml:/rails/config/database.yml
+      - ./config/wechat_api.yml:/rails/config/wechat_api.yml
+      - ./config/seeds.rb:/rails/db/seeds.rb
+    environment:
+      - RAILS_MAX_THREADS=10
+      - DB_HOST=1.94.116.158
+      - DB_USERNAME=wechat_rails
+      - DB_PASSWORD=wechat_rails_password
+      - DB_PORT=27005
+      - DB_DATABASE=wechat_rails_production
+      - RAILS_MASTER_KEY=70b7878b47e06ae38f845a767698c770
+
+  # 任务消费者容器（例如 SolidQueue 或 Sidekiq）
+  job_worker:
+    container_name: wechat_rails_job_worker
+    image: wechat_rails:0.0.5  # 使用同一个镜像
+    command: ./bin/jobs start  # 启动后台任务
+    depends_on:
+      - app  # 确保应用服务启动后再启动任务消费者
+    environment:
+      - RAILS_ENV=production
+      - DB_HOST=1.94.116.158
+      - DB_USERNAME=wechat_rails
+      - DB_PASSWORD=wechat_rails_password
+      - DB_PORT=27005
+      - DB_DATABASE=wechat_rails_production
+      - RAILS_MASTER_KEY=70b7878b47e06ae38f845a767698c770
+    restart: always  # 确保任务消费者容器始终在后台运行
+
+  # 数据库，如果你已经有 PG了，可以注释掉，记得配置好数据库密码
+#  db:
+#    container_name: wechat_rails_db
+#    image: postgres:17
+#    volumes:
+#      # 挂载位置 记得修改
+#      - ./db:/var/lib/postgresql/data
+#    environment:
+#      POSTGRES_PASSWORD: password # 记得修改
+#      POSTGRES_USER: wechat_rails # 记得修改
+#      POSTGRES_DB: wechat_rails
+#      PGDAT: /var/lib/postgresql/data/pgdata
+
+
