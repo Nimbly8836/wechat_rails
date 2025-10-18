@@ -41,5 +41,4 @@ class MessageEventsController < ApplicationController
   ensure
     response.stream.close
   end
-
 end
