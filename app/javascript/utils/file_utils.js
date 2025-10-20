@@ -53,7 +53,7 @@ export function setupEmojiInputPreview(inputElement, uniqueId) {
     // 确保预览容器存在
     const existingContainer = document.getElementById(containerId);
     if (existingContainer) {
-      return () => {};
+      return () => { };
     }
   }
 
@@ -157,9 +157,86 @@ export function setupEmojiInputPreview(inputElement, uniqueId) {
   inputElement._previewContainerId = containerId;
   inputElement._emojiPreviewListener = inputListener;
 
-  return () => {};
+  return () => { };
 }
 
 // 监听 Turbo 的页面切换事件，隐藏所有预览
 document.addEventListener('turbo:before-visit', hideAllEmojiPreviews);
 document.addEventListener('turbo:before-render', hideAllEmojiPreviews);
+
+
+
+export class MessageSet {
+  constructor() {
+    this.items = [];
+    this.idSet = new Set();
+  }
+
+  add(message) {
+    if (!message || message.id == null) {
+      console.warn("Message 必须有 id 属性");
+      return;
+    }
+
+    if (this.idSet.has(message.id)) return;
+
+    this.items.push(message);
+    this.idSet.add(message.id);
+  }
+
+  remove(id) {
+    const index = this.items.findIndex(m => m.id === id);
+    if (index !== -1) {
+      this.items.splice(index, 1);
+      this.idSet.delete(id);
+    }
+  }
+
+  clear() {
+    this.items = [];
+    this.idSet.clear();
+  }
+
+  /**
+   * 批量合并消息数组，自动去重
+   * @param {Array} messages - 需要合并的消息数组
+   * @param {Boolean} prepend - 是否插入到前面（默认 false）
+   */
+  merge(messages, { prepend = false } = {}) {
+    if (!Array.isArray(messages)) return;
+
+    const newOnes = messages.filter(m => m && m.id != null && !this.idSet.has(m.id));
+    if (newOnes.length === 0) return;
+
+    if (prepend) {
+      this.items = [...newOnes, ...this.items];
+    } else {
+      this.items.push(...newOnes);
+    }
+
+    for (const m of newOnes) {
+      this.idSet.add(m.id);
+    }
+  }
+
+  get all() {
+    return this.items;
+  }
+
+  get length() {
+    return this.items.length;
+  }
+
+  get size() {
+return this.items.length;
+  }
+
+  at(index) {
+    return this.items[index];
+  }
+
+  [Symbol.iterator]() {
+    return this.items[Symbol.iterator]();
+  }
+}
+
