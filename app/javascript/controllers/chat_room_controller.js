@@ -1,9 +1,10 @@
-import {Controller} from "@hotwired/stimulus";
+import { Controller } from "@hotwired/stimulus";
 import {
   get_file_base64,
   replaceEmojis,
   setupEmojiInputPreview,
-  hideAllEmojiPreviews
+  hideAllEmojiPreviews,
+  MessageSet
 } from "utils/file_utils";
 
 export default class extends Controller {
@@ -11,10 +12,10 @@ export default class extends Controller {
     "showMore", "themePanel", "backgroundInput", "bubbleInput",
     "backgroundImageInput", "fileInput", "uploadStatus",
     "fontSelect", "fontCustomInput", "attachmentSelect"];
-  static values = {currentWxid: String, id: Number, members: Array};
+  static values = { currentWxid: String, id: Number, members: Array };
 
   connect() {
-    hideAllEmojiPreviews();
+    // hideAllEmojiPreviews();
     const defaultTheme = {
       backgroundColor: "var(--color-gray-100)",
       backgroundImage: "",
@@ -24,7 +25,7 @@ export default class extends Controller {
       otherBubbleBorderColor: "rgba(148,163,184,0.45)",
       fontFamily: "inherit"
     };
-    this.theme = {...defaultTheme, ...(this.theme || {})};
+    this.theme = { ...defaultTheme, ...(this.theme || {}) };
 
     this.boundCloseMenu = this.closeMenu.bind(this);
     this.boundCloseThemePanel = this.closeThemePanel.bind(this);
@@ -39,12 +40,12 @@ export default class extends Controller {
 
     if (this.hasThemePanelTarget) {
       this.themePanelTarget.addEventListener("click",
-          this.boundPreventThemeHide);
+        this.boundPreventThemeHide);
     }
 
     if (this.hasAttachmentSelectTarget) {
       this.attachmentSelectTarget.addEventListener("mouseleave",
-          this.boundCloseAttachmentSelect);
+        this.boundCloseAttachmentSelect);
     }
 
     // 防止重复绑定
@@ -53,7 +54,7 @@ export default class extends Controller {
     }
 
     this.debouncedLoadNewMessages = this.debounce(
-        this.loadNewMessages.bind(this), 400);
+      this.loadNewMessages.bind(this), 400);
     this.voiceBlobUrls = new Map();
     this.currentVoicePlayback = null;
     this.voicePlaybackRates = new Map();
@@ -71,18 +72,18 @@ export default class extends Controller {
 
     if (this.isRoom()) {
       fetch(`/chat_room/${this.idValue}/chat_members`)
-          .then(res => res.json())
-          .then(data => {
-            this.chatMembers = data;
-            this.renderMessages();
-          })
-          .catch(error => console.error("加载room members 失败", error));
+        .then(res => res.json())
+        .then(data => {
+          this.chatMembers = data;
+          this.renderMessages();
+        })
+        .catch(error => console.error("加载room members 失败", error));
     }
     // Initialize messages as a Set
-    this.messages = new Set();
+    this.messages = new MessageSet();
     this.loadMessages();
 
-    this.applyTheme({refreshBubbles: false});
+    this.applyTheme({ refreshBubbles: false });
     this.syncThemeInputs();
 
     this.inputTarget.addEventListener("keydown", (e) => {
@@ -93,7 +94,7 @@ export default class extends Controller {
     });
 
     this.messageListTarget.addEventListener("scroll",
-        this.handleScroll.bind(this));
+      this.handleScroll.bind(this));
 
     this.inputTarget.addEventListener("input", this.autoResize.bind(this));
     this.autoResize();
@@ -101,13 +102,13 @@ export default class extends Controller {
     // 设置 emoji 预览功能
     if (this.hasInputTarget) {
       this.cleanupEmojiPreview = setupEmojiInputPreview(this.inputTarget,
-          this.idValue);
+        this.idValue);
     }
   }
 
   debounce(fn, delay) {
     let timer = null;
-    return function (...args) {
+    return function(...args) {
       clearTimeout(timer);
       timer = setTimeout(() => fn.apply(this, args), delay);
     };
@@ -129,12 +130,12 @@ export default class extends Controller {
 
     if (this.hasThemePanelTarget) {
       this.themePanelTarget.removeEventListener("click",
-          this.boundPreventThemeHide);
+        this.boundPreventThemeHide);
     }
 
     if (this.hasAttachmentSelectTarget) {
       this.attachmentSelectTarget.removeEventListener("mouseleave",
-          this.boundCloseAttachmentSelect);
+        this.boundCloseAttachmentSelect);
     }
 
     // 清理 emoji 预览
@@ -157,7 +158,7 @@ export default class extends Controller {
     }
 
     if (this.messageListTarget.scrollTop <= 0
-        && this.messageListTarget.scrollHeight >= 100) {
+      && this.messageListTarget.scrollHeight >= 100) {
       this.showMoreTarget.style.display = "block";
     } else {
       this.showMoreTarget.style.display = "none";
@@ -172,14 +173,15 @@ export default class extends Controller {
 
   loadMessages() {
     fetch(`/chat_room/${this.idValue}/messages`)
-        .then(res => res.json())
-        .then(data => {
-          // Clear existing messages and add new ones to the Set
-          this.messages.clear();
-          data.forEach(msg => this.messages.add(msg));
-          this.renderMessages();
-        })
-        .catch(error => console.error("加载消息失败:", error));
+      .then(res => res.json())
+      .then(data => {
+        // Clear existing messages and add new ones to the Set
+        // this.messages.clear();
+        // data.forEach(msg => this.messages.add(msg));
+        this.messages.merge(data)
+        this.renderMessages();
+      })
+      .catch(error => console.error("加载消息失败:", error));
   }
 
   getMessageType(msg) {
@@ -204,7 +206,7 @@ export default class extends Controller {
     }
     this.highlightedRow = null;
 
-    if (this.messages.size === 0) {
+    if (this.messages.length === 0) {
       if (this.hasEmptyMessageTarget) {
         this.emptyMessageTarget.style.display = "block";
       }
@@ -217,20 +219,22 @@ export default class extends Controller {
     let lastSenderKey = null;
 
     // Convert Set to array and sort by message_time to maintain order
-    const sortedMessages = [...this.messages].sort((a, b) => {
-      const timeA = a.message_time || a.created_at || a.wx_message?.message_time
-          || 0;
-      const timeB = b.message_time || b.created_at || b.wx_message?.message_time
-          || 0;
-      return new Date(timeA) - new Date(timeB);
-    });
+    // 这里在干嘛？
+    // const sortedMessages = [...this.messages].sort((a, b) => {
+    //   const timeA = a.message_time || a.created_at || a.wx_message?.message_time
+    //     || 0;
+    //   const timeB = b.message_time || b.created_at || b.wx_message?.message_time
+    //     || 0;
+    //   return new Date(timeA) - new Date(timeB);
+    // });
 
+    const sortedMessages = this.messages.all
     sortedMessages.forEach((wrapper) => {
       const msg = wrapper.wx_message;
       msg.id = wrapper.id;
       msg._messageId = wrapper.id;
       msg._cacheKey = wrapper.updated_at || wrapper.message_time
-          || wrapper.created_at || msg.message_time;
+        || wrapper.created_at || msg.message_time;
       msg.referenced_message = wrapper.referenced_message;
       msg._sending = wrapper.sending;
       msg.extra = wrapper.extra;
@@ -242,7 +246,7 @@ export default class extends Controller {
       msg.sender_key = senderInfo?.key;
 
       const senderKey = msg.sender_key || (msg.self_send
-          ? `self:${msg.to_user_name || 'me'}` : msg.from_user_name || "");
+        ? `self:${msg.to_user_name || 'me'}` : msg.from_user_name || "");
       const isNewGroup = lastSenderKey === null || lastSenderKey !== senderKey;
       lastSenderKey = senderKey;
 
@@ -251,7 +255,7 @@ export default class extends Controller {
       }
       const row = this.buildRow(isNewGroup, msg, senderInfo);
       const bubble = this.renderMessageBubble(msg, isNewGroup, senderInfo,
-          sortedMessages[0] === wrapper);
+        sortedMessages[0] === wrapper);
       row.appendChild(bubble);
       container.appendChild(row);
 
@@ -282,7 +286,7 @@ export default class extends Controller {
   buildRow(isNewGroup, msg, senderInfo) {
     const row = document.createElement("div");
     row.className = `w-full flex ${msg.self_send ? "justify-end"
-        : "justify-start"} items-end`;
+      : "justify-start"} items-end`;
     if (msg.id) {
       row.dataset.messageId = msg.id;
     }
@@ -352,32 +356,32 @@ export default class extends Controller {
     switch (type) {
       case "voice":
         return this.renderVoiceMessage(bubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+          isFirstMessage);
       case "card":
         return this.renderCardMessage(bubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+          isFirstMessage);
       case "xml_unparsed":
         return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+          isFirstMessage);
       case "emoji":
         return this.renderEmojiMessage(bubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+          isFirstMessage);
       case "image":
         return this.renderImageMessage(bubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+          isFirstMessage);
       case "video":
         return this.renderVideoMessage(bubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+          isFirstMessage);
       case "file_message":
         return this.renderFileMessage(bubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+          isFirstMessage);
       case "quote":
         return this.renderReferMessage(bubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+          isFirstMessage);
       case "text":
       default:
         return this.renderTextMessage(bubble, msg, isNewGroup, senderInfo,
-            isFirstMessage);
+          isFirstMessage);
     }
   }
 
@@ -396,8 +400,8 @@ export default class extends Controller {
     }
     if (cover) {
       cover.innerHTML = parsed.cover
-          ? `<img src="${parsed.cover}" class="max-h-48 w-full object-cover" referrerpolicy="no-referrer"/>`
-          : "";
+        ? `<img src="${parsed.cover}" class="max-h-48 w-full object-cover" referrerpolicy="no-referrer"/>`
+        : "";
     }
     if (title) {
       title.textContent = parsed.title || "";
@@ -410,7 +414,7 @@ export default class extends Controller {
     }
 
     return this.applyBubbleStyle(cardBubble, msg, isNewGroup, senderInfo,
-        isFirstMessage);
+      isFirstMessage);
   }
 
   renderXmlMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
@@ -433,7 +437,7 @@ export default class extends Controller {
       });
     }
     return this.applyBubbleStyle(xmlBubble, msg, isNewGroup, senderInfo,
-        isFirstMessage);
+      isFirstMessage);
   }
 
   renderImageMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
@@ -441,7 +445,7 @@ export default class extends Controller {
     const imageBubble = template || bubble;
     const wrapper = imageBubble.querySelector("[data-role='image-wrapper']");
     const placeholder = imageBubble.querySelector(
-        "[data-role='image-placeholder']");
+      "[data-role='image-placeholder']");
     const image = imageBubble.querySelector("[data-role='image']");
 
     if (wrapper && placeholder && image) {
@@ -468,10 +472,10 @@ export default class extends Controller {
         image.removeAttribute("src");
       };
 
-      image.addEventListener("load", showImage, {once: true});
+      image.addEventListener("load", showImage, { once: true });
       image.addEventListener("error", () => {
         showFallback("[图片加载失败]");
-      }, {once: true});
+      }, { once: true });
       let imageUrl
       if (msg.self_send && msg._sending) {
         console.log("onSendImage Message: ", msg)
@@ -492,13 +496,13 @@ export default class extends Controller {
         if (image.dataset.loaded === "true" && image.src) {
           event.stopPropagation();
           window.open(image.dataset.sourceUrl || image.src, "_blank",
-              "noopener");
+            "noopener");
         }
       });
     }
 
     const applied = this.applyBubbleStyle(imageBubble, msg, isNewGroup,
-        senderInfo, isFirstMessage);
+      senderInfo, isFirstMessage);
     applied.dataset.bubbleType = "image";
     applied.style.background = "transparent";
     applied.style.border = "none";
@@ -523,12 +527,12 @@ export default class extends Controller {
     const metaEl = fileBubble.querySelector("[data-role='file-meta']");
     const extEl = fileBubble.querySelector("[data-role='file-ext']");
     const downloadLink = fileBubble.querySelector(
-        "[data-role='file-download']");
+      "[data-role='file-download']");
 
     const fileInfo = this.parseWxFileAttachment(msg.content || "") || {};
     const title = fileInfo.title || msg.refer_title || msg.content || "文件";
     const sizeLabel = fileInfo.totallen ? this.formatFileSize(fileInfo.totallen)
-        : "";
+      : "";
     const extLabel = fileInfo.fileext ? fileInfo.fileext.toUpperCase() : "FILE";
 
     if (titleEl) {
@@ -553,21 +557,21 @@ export default class extends Controller {
     }
 
     return this.applyBubbleStyle(fileBubble, msg, isNewGroup, senderInfo,
-        isFirstMessage);
+      isFirstMessage);
   }
 
   renderVideoMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
     const template = this.cloneTemplate("message-template-video");
     const videoBubble = template || bubble;
     const durationBadge = videoBubble.querySelector(
-        "[data-role='video-duration']");
+      "[data-role='video-duration']");
     const messageId = msg._messageId || msg.id;
 
     const videoInfo = this.parseWxVideoMessage(msg.content || "");
     if (durationBadge) {
       if (videoInfo?.playLength) {
         durationBadge.textContent = this.formatVideoDuration(
-            videoInfo.playLength);
+          videoInfo.playLength);
         durationBadge.classList.remove("hidden");
       } else {
         durationBadge.classList.add("hidden");
@@ -589,7 +593,7 @@ export default class extends Controller {
       videoElement.dataset.messageId = messageId;
 
       const thumbWrapper = videoBubble.querySelector(
-          "[data-role='video-thumbnail']");
+        "[data-role='video-thumbnail']");
       if (thumbWrapper) {
         thumbWrapper.innerHTML = "";
         thumbWrapper.appendChild(videoElement);
@@ -602,7 +606,7 @@ export default class extends Controller {
     }
 
     const applied = this.applyBubbleStyle(videoBubble, msg, isNewGroup,
-        senderInfo, isFirstMessage);
+      senderInfo, isFirstMessage);
     applied.dataset.bubbleType = "video";
     applied.style.background = "transparent";
     applied.style.border = "none";
@@ -619,28 +623,28 @@ export default class extends Controller {
     fetch(url, {
       headers: {
         "X-CSRF-Token": document.querySelector(
-            'meta[name="csrf-token"]').content
+          'meta[name="csrf-token"]').content
       }
     })
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error(`下载失败: ${res.statusText}`);
-          }
-          return res.blob();
-        })
-        .then((blob) => {
-          const link = document.createElement("a");
-          link.href = URL.createObjectURL(blob);
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(link.href);
-        })
-        .catch((err) => {
-          console.error("下载文件失败:", err);
-          alert("下载失败，请稍后重试");
-        });
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`下载失败: ${res.statusText}`);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+      })
+      .catch((err) => {
+        console.error("下载文件失败:", err);
+        alert("下载失败，请稍后重试");
+      });
   }
 
   renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
@@ -677,7 +681,7 @@ export default class extends Controller {
         placeholder.textContent = message;
       };
 
-      image.addEventListener("load", showImage, {once: true});
+      image.addEventListener("load", showImage, { once: true });
       image.addEventListener("error", () => {
         showFallback("[表情加载失败]");
       });
@@ -687,8 +691,8 @@ export default class extends Controller {
 
       if (messageId) {
         const url = cacheKey
-            ? `/message/emoji/${messageId}?t=${encodeURIComponent(cacheKey)}`
-            : `/message/emoji/${messageId}`;
+          ? `/message/emoji/${messageId}?t=${encodeURIComponent(cacheKey)}`
+          : `/message/emoji/${messageId}`;
         requestAnimationFrame(() => {
           image.src = url;
         });
@@ -698,7 +702,7 @@ export default class extends Controller {
     }
 
     const applied = this.applyBubbleStyle(emojiBubble, msg, isNewGroup,
-        senderInfo, isFirstMessage);
+      senderInfo, isFirstMessage);
     applied.dataset.bubbleType = "emoji";
     applied.style.background = "transparent";
     applied.style.border = "none";
@@ -706,7 +710,7 @@ export default class extends Controller {
     applied.style.padding = "4px";
     applied.style.paddingBottom = "32px";
     applied.classList.remove("text-white", "text-gray-900", "border",
-        "inline-flex", "items-center", "justify-center");
+      "inline-flex", "items-center", "justify-center");
     applied.classList.add("inline-block");
 
     const senderName = applied.querySelector('[data-role="sender-name"]');
@@ -735,28 +739,28 @@ export default class extends Controller {
     }
 
     return this.applyBubbleStyle(textBubble, msg, isNewGroup, senderInfo,
-        isFirstMessage);
+      isFirstMessage);
   }
 
   renderVoiceMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
     const template = this.cloneTemplate("message-template-voice");
     const voiceBubble = template || bubble;
     const container = voiceBubble.querySelector(
-        "[data-role='voice-container']");
+      "[data-role='voice-container']");
     const label = voiceBubble.querySelector("[data-role='voice-label']");
     const wrapper = voiceBubble.querySelector("[data-role='voice-wrapper']");
     const progressBar = voiceBubble.querySelector(
-        "[data-role='voice-progress']");
+      "[data-role='voice-progress']");
     const progressInner = voiceBubble.querySelector(
-        "[data-role='voice-progress-inner']");
+      "[data-role='voice-progress-inner']");
     const speedButton = voiceBubble.querySelector("[data-role='voice-speed']");
     const controls = voiceBubble.querySelector("[data-role='voice-controls']");
 
     const parser = new DOMParser();
     const xml = parser.parseFromString(msg.content, "application/xml");
     const fallbackDuration = Number(
-            xml.querySelector("voicemsg")?.getAttribute("voicelength") || 0) / 1000
-        || 10;
+      xml.querySelector("voicemsg")?.getAttribute("voicelength") || 0) / 1000
+      || 10;
 
     if (progressBar) {
       progressBar.classList.remove("hidden");
@@ -765,7 +769,7 @@ export default class extends Controller {
 
     if (progressInner) {
       progressInner.style.background = msg.self_send
-          ? this.theme.selfBubbleTextColor || "#ffffff" : "#6366f1";
+        ? this.theme.selfBubbleTextColor || "#ffffff" : "#6366f1";
       progressInner.style.transition = "width 120ms ease-out";
     }
 
@@ -794,7 +798,7 @@ export default class extends Controller {
     const pendingRatio = this.pendingVoiceSeeks.get(msg.id);
     if (typeof pendingRatio === "number" && progressInner) {
       progressInner.style.width = `${Math.min(Math.max(pendingRatio, 0), 1)
-      * 100}%`;
+        * 100}%`;
     }
 
     if (controls && progressBar && speedButton) {
@@ -812,7 +816,7 @@ export default class extends Controller {
 
     if (container && label) {
       container.addEventListener("click",
-          () => this.handleVoiceClick(msg.id, container, label, context));
+        () => this.handleVoiceClick(msg.id, container, label, context));
     }
 
     if (progressBar) {
@@ -830,7 +834,7 @@ export default class extends Controller {
     }
 
     return this.applyBubbleStyle(voiceBubble, msg, isNewGroup, senderInfo,
-        isFirstMessage);
+      isFirstMessage);
   }
 
   renderReferMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
@@ -839,9 +843,9 @@ export default class extends Controller {
     const body = referBubble.querySelector("[data-role='refer-body']");
     const quoted = referBubble.querySelector("[data-role='refer-quoted']");
     const quotedMeta = referBubble.querySelector(
-        "[data-role='refer-quoted-meta']");
+      "[data-role='refer-quoted-meta']");
     const quotedContent = referBubble.querySelector(
-        "[data-role='refer-quoted-content']");
+      "[data-role='refer-quoted-content']");
 
     const parsed = this.parseWxXmlMessage(msg.content || "");
     const title = (msg.refer_title || parsed.title || "引用的消息").trim();
@@ -871,7 +875,7 @@ export default class extends Controller {
 
       if (quotedMeta) {
         quotedMeta.textContent = `引用的${this.humanizeMessageType(
-            refWx.msg_type)}消息`;
+          refWx.msg_type)}消息`;
       }
 
       if (quotedContent) {
@@ -880,7 +884,7 @@ export default class extends Controller {
           quotedContent.appendChild(this.buildLinkedText(refWx.content));
         } else {
           quotedContent.textContent = `[${this.humanizeMessageType(
-              refWx.msg_type)}]`;
+            refWx.msg_type)}]`;
         }
       }
     } else {
@@ -902,25 +906,25 @@ export default class extends Controller {
     }
 
     return this.applyBubbleStyle(referBubble, msg, isNewGroup, senderInfo,
-        isFirstMessage);
+      isFirstMessage);
   }
 
   applyBubbleStyle(bubble, msg, isNewGroup = true, senderInfo = null,
-      isFirstMessage = false) {
+    isFirstMessage = false) {
     if (!bubble) {
       return bubble;
     }
 
     bubble.classList.add("relative", "inline-block", "rounded-2xl", "shadow-sm",
-        "message-bubble");
+      "message-bubble");
 
     bubble.style.marginTop = isNewGroup ? "6px" : "";
     bubble.style.paddingBottom = "";
 
     bubble.classList.remove("bg-blue-500", "text-white", "rounded-bl-2xl",
-        "rounded-tr-2xl", "rounded-br-md", "bg-white", "text-gray-900",
-        "border", "border-gray-200", "rounded-br-2xl", "rounded-tl-2xl",
-        "rounded-bl-md");
+      "rounded-tr-2xl", "rounded-br-md", "bg-white", "text-gray-900",
+      "border", "border-gray-200", "rounded-br-2xl", "rounded-tl-2xl",
+      "rounded-bl-md");
 
     bubble.style.background = "";
     bubble.style.color = "";
@@ -931,9 +935,9 @@ export default class extends Controller {
     if (msg.self_send) {
       bubble.dataset.senderType = "self";
       bubble.classList.add("text-white", "rounded-bl-2xl", "rounded-tr-2xl",
-          "rounded-br-md");
+        "rounded-br-md");
       bubble.classList.remove("rounded-br-2xl", "rounded-tl-2xl",
-          "rounded-bl-md");
+        "rounded-bl-md");
       bubble.style.background = this.theme.selfBubbleColor;
       bubble.style.color = this.theme.selfBubbleTextColor;
       bubble.style.border = "none";
@@ -941,9 +945,9 @@ export default class extends Controller {
     } else {
       bubble.dataset.senderType = "other";
       bubble.classList.add("text-gray-900", "border", "rounded-br-2xl",
-          "rounded-tl-2xl", "rounded-bl-md");
+        "rounded-tl-2xl", "rounded-bl-md");
       bubble.classList.remove("rounded-bl-2xl", "rounded-tr-2xl",
-          "rounded-br-md");
+        "rounded-br-md");
       bubble.style.background = this.theme.otherBubbleColor;
       bubble.style.color = "#111827";
       bubble.style.border = `1px solid ${this.theme.otherBubbleBorderColor}`;
@@ -999,7 +1003,7 @@ export default class extends Controller {
     const time = document.createElement("span");
     time.className = "absolute bottom-2 right-3 text-[10px] leading-none tracking-wide";
     const ts = wrapper.message_time || wrapper.created_at
-        || wrapper.wx_message?.message_time;
+      || wrapper.wx_message?.message_time;
     time.textContent = ts ? this.formatTimestamp(ts) : "";
 
     if (!bubble.dataset.timestampPrepared) {
@@ -1013,11 +1017,11 @@ export default class extends Controller {
     time.style.padding = "3px 8px";
     time.style.borderRadius = "9999px";
     time.style.background = isSelf ? "rgba(255,255,255,0.18)"
-        : "rgba(15,23,42,0.08)";
+      : "rgba(15,23,42,0.08)";
     time.style.color = isSelf ? "rgba(255,255,255,0.85)"
-        : "rgba(100,116,139,0.95)";
+      : "rgba(100,116,139,0.95)";
     time.style.boxShadow = isSelf ? "0 4px 12px -8px rgba(15,23,42,0.45)"
-        : "0 4px 10px -8px rgba(15,23,42,0.25)";
+      : "0 4px 10px -8px rgba(15,23,42,0.25)";
 
     bubble.appendChild(time);
   }
@@ -1114,7 +1118,7 @@ export default class extends Controller {
 
       headers = {
         "X-CSRF-Token": document.querySelector(
-            'meta[name="csrf-token"]').content
+          'meta[name="csrf-token"]').content
       }
     } else {
       body = JSON.stringify({
@@ -1126,27 +1130,27 @@ export default class extends Controller {
       headers = {
         "Content-Type": "application/json",
         "X-CSRF-Token": document.querySelector(
-            'meta[name="csrf-token"]').content
+          'meta[name="csrf-token"]').content
       }
     }
 
     fetch(`/chat_room/${this.idValue}/messages`, {
       method: "POST", headers: headers, body: body
     })
-        .then(res => res.json())
-        .then(newMsg => {
-          if (newMsg?.data) {
-            this.messages.delete(msg);
-            this.messages.add(
-                {...newMsg.data, sending: false, send_failed: false});
-            this.renderMessages();
-          }
-        })
-        .catch(error => {
-          this.messages.delete(msg);
-          this.messages.add({...msg, sending: false, send_failed: true});
+      .then(res => res.json())
+      .then(newMsg => {
+        if (newMsg?.data) {
+          this.messages.remove(msg);
+          this.messages.add(
+            { ...newMsg.data, sending: false, send_failed: false });
           this.renderMessages();
-        });
+        }
+      })
+      .catch(error => {
+        this.messages.remove(msg);
+        this.messages.add({ ...msg, sending: false, send_failed: true });
+        this.renderMessages();
+      });
   }
 
   parseWxXmlMessage(xmlString) {
@@ -1158,13 +1162,13 @@ export default class extends Controller {
       const desc = xml.querySelector("des")?.textContent?.trim() || "";
       const url = xml.querySelector("url")?.textContent?.trim() || "";
       const cover = xml.querySelector("thumburl")?.textContent?.trim()
-          || xml.querySelector("cover")?.textContent?.trim();
+        || xml.querySelector("cover")?.textContent?.trim();
       const source = xml.querySelector(
-          "publisher > nickname")?.textContent?.trim() || xml.querySelector(
+        "publisher > nickname")?.textContent?.trim() || xml.querySelector(
           "appname")?.textContent?.trim();
       const msgType = xml.querySelector("type")?.textContent?.trim() || 0;
       const refContent = xml.querySelector("refermsg")?.querySelector(
-          "content")?.textContent.trim();
+        "content")?.textContent.trim();
       return {
         type: "xml",
         title,
@@ -1177,7 +1181,7 @@ export default class extends Controller {
       };
     } catch (e) {
       console.error("XML parse error:", e);
-      return {type: "text", content: xmlString};
+      return { type: "text", content: xmlString };
     }
   }
 
@@ -1224,7 +1228,7 @@ export default class extends Controller {
     }
   }
 
-  attachmentUrl(type, msg, {cacheKey} = {}) {
+  attachmentUrl(type, msg, { cacheKey } = {}) {
     if (!msg) {
       return null;
     }
@@ -1376,7 +1380,7 @@ export default class extends Controller {
     }
 
     this.theme.fontFamily = value || "inherit";
-    this.applyTheme({refreshBubbles: false});
+    this.applyTheme({ refreshBubbles: false });
     if (this.hasFontCustomInputTarget) {
       this.fontCustomInputTarget.value = "";
     }
@@ -1396,10 +1400,10 @@ export default class extends Controller {
         this.fontSelectTarget.value = "custom";
       }
     }
-    this.applyTheme({refreshBubbles: false});
+    this.applyTheme({ refreshBubbles: false });
   }
 
-  applyTheme({refreshBubbles = true} = {}) {
+  applyTheme({ refreshBubbles = true } = {}) {
     const backgroundColor = this.theme.backgroundColor || "#ffffff";
     const backgroundImage = this.theme.backgroundImage || "";
     const fontFamily = this.theme.fontFamily || "inherit";
@@ -1479,10 +1483,10 @@ export default class extends Controller {
         bubble.style.border = "none";
         bubble.classList.add("text-white");
         const progressInner = bubble.querySelector(
-            '[data-role="voice-progress-inner"]');
+          '[data-role="voice-progress-inner"]');
         if (progressInner) {
           progressInner.style.background = this.theme.selfBubbleTextColor
-              || "#ffffff";
+            || "#ffffff";
         }
       } else {
         bubble.style.background = this.theme.otherBubbleColor;
@@ -1490,7 +1494,7 @@ export default class extends Controller {
         bubble.style.border = `1px solid ${this.theme.otherBubbleBorderColor}`;
         bubble.classList.remove("text-white");
         const progressInner = bubble.querySelector(
-            '[data-role="voice-progress-inner"]');
+          '[data-role="voice-progress-inner"]');
         if (progressInner) {
           progressInner.style.background = "#6366f1";
         }
@@ -1500,11 +1504,11 @@ export default class extends Controller {
 
   syncThemeInputs() {
     if (this.hasBackgroundInputTarget && this.backgroundInputTarget.value
-        !== this.theme.backgroundColor) {
+      !== this.theme.backgroundColor) {
       this.backgroundInputTarget.value = this.theme.backgroundColor;
     }
     if (this.hasBubbleInputTarget && this.bubbleInputTarget.value
-        !== this.theme.selfBubbleColor) {
+      !== this.theme.selfBubbleColor) {
       this.bubbleInputTarget.value = this.theme.selfBubbleColor;
     }
     if (this.hasBackgroundImageInputTarget) {
@@ -1524,7 +1528,7 @@ export default class extends Controller {
     }
     if (this.hasFontCustomInputTarget) {
       this.fontCustomInputTarget.value = presetFonts.has(fontValue) || fontValue
-      === "inherit" ? "" : fontValue;
+        === "inherit" ? "" : fontValue;
     }
   }
 
@@ -1535,7 +1539,7 @@ export default class extends Controller {
       method: "PUT", headers: {
         "Content-Type": "application/json",
         "X-CSRF-Token": document.querySelector(
-            'meta[name="csrf-token"]').content
+          'meta[name="csrf-token"]').content
       },
       body: JSON.stringify({
         chat_room_id: this.idValue,
@@ -1549,7 +1553,7 @@ export default class extends Controller {
       method: "PUT", headers: {
         "Content-Type": "application/json",
         "X-CSRF-Token": document.querySelector(
-            'meta[name="csrf-token"]').content
+          'meta[name="csrf-token"]').content
       }, body: JSON.stringify({
         chat_room_id: this.idValue,
       })
@@ -1557,35 +1561,35 @@ export default class extends Controller {
   }
 
   loadMore() {
-    if (this.messages.size === 0) {
+    if (this.messages.length === 0) {
       return;
     }
 
     // Get the earliest message by sorting and taking the first
-    const sortedMessages = [...this.messages].sort((a, b) => {
-      const timeA = a.message_time || a.created_at || a.wx_message?.message_time
-          || 0;
-      const timeB = b.message_time || b.created_at || b.wx_message?.message_time
-          || 0;
-      return new Date(timeA) - new Date(timeB);
-    });
-    const firstMsg = sortedMessages[0];
+    // const sortedMessages = [...this.messages].sort((a, b) => {
+    //   const timeA = a.message_time || a.created_at || a.wx_message?.message_time
+    //     || 0;
+    //   const timeB = b.message_time || b.created_at || b.wx_message?.message_time
+    //     || 0;
+    //   return new Date(timeA) - new Date(timeB);
+    // });
+    const firstMsg = this.messages.at(0);
     const firstMsgId = firstMsg.id;
     const container = this.messageListTarget;
     const preserveBottomOffset = container.scrollHeight - container.scrollTop;
 
     fetch(`/chat_room/${this.idValue}/messages?before_id=${firstMsgId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (!data.length) {
-            return;
-          }
+      .then(res => res.json())
+      .then(data => {
+        if (!data.length) {
+          return;
+        }
 
-          // Add new messages to the Set
-          data.forEach(msg => this.messages.add(msg));
-          this.renderMessages({preserveBottomOffset});
-        })
-        .catch(console.error);
+        // Add new messages to the Set
+        data.forEach(msg => this.messages.add(msg));
+        this.renderMessages({ preserveBottomOffset });
+      })
+      .catch(console.error);
   }
 
   loadNewMessages(msg) {
@@ -1597,30 +1601,31 @@ export default class extends Controller {
     const oldHeight = container.scrollHeight;
 
     // Get the latest message by sorting and taking the last
-    const sortedMessages = [...this.messages].sort((a, b) => {
-      const timeA = a.message_time || a.created_at || a.wx_message?.message_time
-          || 0;
-      const timeB = b.message_time || b.created_at || b.wx_message?.message_time
-          || 0;
-      return new Date(timeA) - new Date(timeB);
-    });
-    const lastMsg = sortedMessages[sortedMessages.length - 1];
+    // const sortedMessages = [...this.messages].sort((a, b) => {
+    //   const timeA = a.message_time || a.created_at || a.wx_message?.message_time
+    //     || 0;
+    //   const timeB = b.message_time || b.created_at || b.wx_message?.message_time
+    //     || 0;
+    //   return new Date(timeA) - new Date(timeB);
+    // });
+    const sortedMessages = this.messages
+    const lastMsg = sortedMessages.at(sortedMessages.length - 1);
     const lastMsgId = lastMsg.id;
 
     fetch(`/chat_room/${this.idValue}/messages?after_id=${lastMsgId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (!data.length) {
-            return;
-          }
+      .then(res => res.json())
+      .then(data => {
+        if (!data.length) {
+          return;
+        }
 
-          // Add new messages to the Set
-          data.forEach(msg => this.messages.add(msg));
-          this.renderMessages({
-            preserveBottomOffset: container.scrollHeight - container.scrollTop
-          });
-        })
-        .catch(console.error);
+        // Add new messages to the Set
+        this.messages.merge(data)
+        this.renderMessages({
+          preserveBottomOffset: container.scrollHeight - container.scrollTop
+        });
+      })
+      .catch(console.error);
   }
 
   handleVoiceClick(messageId, container, label, context) {
@@ -1640,27 +1645,27 @@ export default class extends Controller {
     label.textContent = "加载中…";
 
     fetch(`/message/voice/${messageId}`)
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error(`请求失败: ${res.status}`);
-          }
-          return res.blob();
-        })
-        .then((blob) => {
-          const url = URL.createObjectURL(blob);
-          this.voiceBlobUrls.set(messageId, url);
-          this.playVoice(url, container, label, context);
-        })
-        .catch((err) => {
-          console.error("语音下载失败:", err);
-          label.textContent = "下载失败";
-          setTimeout(() => {
-            label.textContent = original;
-          }, 1500);
-        })
-        .finally(() => {
-          container.dataset.loading = "false";
-        });
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`请求失败: ${res.status}`);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        this.voiceBlobUrls.set(messageId, url);
+        this.playVoice(url, container, label, context);
+      })
+      .catch((err) => {
+        console.error("语音下载失败:", err);
+        label.textContent = "下载失败";
+        setTimeout(() => {
+          label.textContent = original;
+        }, 1500);
+      })
+      .finally(() => {
+        container.dataset.loading = "false";
+      });
   }
 
   playVoice(url, container, label, context) {
@@ -1716,7 +1721,7 @@ export default class extends Controller {
 
     const updateProgress = () => {
       const duration = Number.isFinite(audio.duration) && audio.duration > 0
-          ? audio.duration : fallbackDuration;
+        ? audio.duration : fallbackDuration;
       if (duration > 0 && progressInner) {
         const percent = Math.min(1, audio.currentTime / duration) * 100;
         progressInner.style.width = `${percent}%`;
@@ -1767,9 +1772,9 @@ export default class extends Controller {
     label.textContent = "播放中…";
     container.classList.add("opacity-60");
 
-    audio.addEventListener("loadedmetadata", startTracking, {once: true});
-    audio.addEventListener("play", startTracking, {once: true});
-    audio.addEventListener("ended", cleanup, {once: true});
+    audio.addEventListener("loadedmetadata", startTracking, { once: true });
+    audio.addEventListener("play", startTracking, { once: true });
+    audio.addEventListener("ended", cleanup, { once: true });
 
     let playResult;
     try {
@@ -1799,14 +1804,14 @@ export default class extends Controller {
   }
 
   seekVoice(messageId, context, event) {
-    const {progressBar, progressInner} = context;
+    const { progressBar, progressInner } = context;
     const rect = progressBar.getBoundingClientRect();
     if (!rect.width) {
       return;
     }
 
     const ratio = Math.min(
-        Math.max((event.clientX - rect.left) / rect.width, 0), 1);
+      Math.max((event.clientX - rect.left) / rect.width, 0), 1);
     if (progressInner) {
       progressInner.style.width = `${ratio * 100}%`;
     }
@@ -1817,7 +1822,7 @@ export default class extends Controller {
     }
 
     const activeState = this.currentVoicePlayback;
-    const {audio} = activeState;
+    const { audio } = activeState;
     const previousInner = activeState.progressInner;
     activeState.progressBar = progressBar;
     activeState.progressInner = progressInner;
@@ -1835,7 +1840,7 @@ export default class extends Controller {
     if (Number.isFinite(audio.duration) && audio.duration > 0) {
       apply();
     } else {
-      audio.addEventListener("loadedmetadata", apply, {once: true});
+      audio.addEventListener("loadedmetadata", apply, { once: true });
     }
   }
 
@@ -1875,7 +1880,7 @@ export default class extends Controller {
     const minutes = Math.floor(total / 60);
     const remaining = total % 60;
     return minutes > 0 ? `${minutes}:${String(remaining).padStart(2, "0")}`
-        : `${remaining}s`;
+      : `${remaining}s`;
   }
 
   formatFileSize(bytes) {
@@ -1898,7 +1903,7 @@ export default class extends Controller {
     if (!this.currentVoicePlayback) {
       return;
     }
-    const {audio, cleanup} = this.currentVoicePlayback;
+    const { audio, cleanup } = this.currentVoicePlayback;
     audio.pause();
     audio.currentTime = 0;
     cleanup();
@@ -1927,7 +1932,7 @@ export default class extends Controller {
 
       if (cleanHref) {
         const anchor = this.createAnchor(cleanHref,
-            this.decodeHtmlEntities(labelHtml));
+          this.decodeHtmlEntities(labelHtml));
         fragment.appendChild(anchor);
       } else {
         this.appendPlainSegment(fragment, match[0]);
@@ -2005,19 +2010,19 @@ export default class extends Controller {
     }
 
     const row = this.messageListTarget.querySelector(
-        `[data-message-id="${messageId}"]`);
+      `[data-message-id="${messageId}"]`);
     if (!row) {
       return;
     }
 
     if (this.highlightedRow && this.highlightedRow !== row) {
       this.highlightedRow.classList.remove("ring-2", "ring-blue-400",
-          "ring-offset-2", "ring-offset-gray-100");
+        "ring-offset-2", "ring-offset-gray-100");
     }
 
-    row.scrollIntoView({behavior: "smooth", block: "center"});
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
     row.classList.add("ring-2", "ring-blue-400", "ring-offset-2",
-        "ring-offset-gray-100");
+      "ring-offset-gray-100");
     this.highlightedRow = row;
 
     if (this.highlightTimer) {
@@ -2025,7 +2030,7 @@ export default class extends Controller {
     }
     this.highlightTimer = setTimeout(() => {
       row.classList.remove("ring-2", "ring-blue-400", "ring-offset-2",
-          "ring-offset-gray-100");
+        "ring-offset-gray-100");
       if (this.highlightedRow === row) {
         this.highlightedRow = null;
       }
@@ -2063,7 +2068,7 @@ export default class extends Controller {
         name: msg.sender_name,
         avatar: msg.sender_avatar || "",
         initial: (msg.sender_initial || msg.sender_name.slice(0, 1)
-            || "?").toUpperCase()
+          || "?").toUpperCase()
       };
     }
 
@@ -2126,7 +2131,7 @@ export default class extends Controller {
     const uploadType = this.currentUploadType
     const file = event.target.files[0];
     if (file) {
-      let sendMsg = {extra: {}}
+      let sendMsg = { extra: {} }
       if (uploadType === "image") {
         sendMsg.extra.base64 = await get_file_base64(file);
       }
