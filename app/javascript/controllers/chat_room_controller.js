@@ -2,8 +2,8 @@ import { Controller } from "@hotwired/stimulus";
 import {
   get_file_base64,
   replaceEmojis,
-  setupEmojiInputPreview,
-  hideAllEmojiPreviews,
+  // setupEmojiInputPreview,
+  // hideAllEmojiPreviews,
   MessageSet
 } from "utils/file_utils";
 
@@ -87,9 +87,15 @@ export default class extends Controller {
     this.syncThemeInputs();
 
     this.inputTarget.addEventListener("keydown", (e) => {
+      const errorMessage = document.getElementById('errorMessage');
       if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        this.sendMessage("text");
+        if (this.inputTarget.value.trim() === '') {
+          errorMessage.style.display = 'inline'; // Show the error message
+          e.preventDefault(); // Prevent form submission
+        } else {
+          errorMessage.style.display = 'none'; // Hide the error message
+          this.sendMessage("text");
+        }
       }
     });
 
@@ -97,13 +103,13 @@ export default class extends Controller {
       this.handleScroll.bind(this));
 
     this.inputTarget.addEventListener("input", this.autoResize.bind(this));
-    this.autoResize();
+    // this.autoResize();
 
     // 设置 emoji 预览功能
-    if (this.hasInputTarget) {
-      this.cleanupEmojiPreview = setupEmojiInputPreview(this.inputTarget,
-        this.idValue);
-    }
+    // if (this.hasInputTarget) {
+    //   this.cleanupEmojiPreview = setupEmojiInputPreview(this.inputTarget,
+    //     this.idValue);
+    // }
   }
 
   debounce(fn, delay) {
@@ -138,10 +144,6 @@ export default class extends Controller {
         this.boundCloseAttachmentSelect);
     }
 
-    // 清理 emoji 预览
-    if (this.cleanupEmojiPreview) {
-      this.cleanupEmojiPreview();
-    }
 
     document.removeEventListener("click", this._boundHideAttachmentSelect);
 
@@ -1104,7 +1106,10 @@ export default class extends Controller {
 
   sendMessage(type, message) {
     const msg = this.createSendMessage(type, message);
+    if (type == "text") {
 
+    }
+    console.log("log send message", type, msg)
     let body;
     let headers;
     if (type === "file") {
@@ -1140,14 +1145,16 @@ export default class extends Controller {
       .then(res => res.json())
       .then(newMsg => {
         if (newMsg?.data) {
-          this.messages.remove(msg);
+          // this.messages.remove(msg);
           this.messages.add(
             { ...newMsg.data, sending: false, send_failed: false });
           this.renderMessages();
+        } else {
+          this.messages.add({ ...msg, sending: false, send_failed: true });
         }
       })
       .catch(error => {
-        this.messages.remove(msg);
+        // this.messages.remove(msg);
         this.messages.add({ ...msg, sending: false, send_failed: true });
         this.renderMessages();
       });
