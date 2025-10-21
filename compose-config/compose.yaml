@@ -1,12 +1,11 @@
 services:
   app:
     container_name: wechat_rails_app
-    # image: wechat_rails:0.0.7
     build: ..
     ports:
+      # 默认的
       - "41234:80"
-      - "33000:3000"
-    volumes:
+    volumes: # 这里的挂在路径注意一下
       - ./config/database.yml:/rails/config/database.yml
       - ./config/wechat_api.yml:/rails/config/wechat_api.yml
       - ./config/seeds.rb:/rails/db/seeds.rb
@@ -14,13 +13,12 @@ services:
     environment:
       - RAILS_MAX_THREADS=10
       - DB_HOST=10.0.0.230
-      # - DB_HOST=1.94.116.158
       - DB_USERNAME=wechat_rails
       - DB_PASSWORD=wechat_rails_password
       - DB_PORT=35432
-      # - DB_PORT=27005
       - DB_DATABASE=wechat_rails_production
-      - RAILS_MASTER_KEY=70b7878b47e06ae38f845a767698c770
+      # 
+      # - RAILS_MASTER_KEY=xxxxxxxx
 
   # 数据库，如果你已经有 PG了，可以注释掉，记得配置好数据库密码
 #  db:
