@@ -2,8 +2,8 @@ import { Controller } from "@hotwired/stimulus";
 import {
   get_file_base64,
   replaceEmojis,
-  // setupEmojiInputPreview,
-  // hideAllEmojiPreviews,
+  setupEmojiInputPreview,
+  hideAllEmojiPreviews,
   MessageSet
 } from "utils/file_utils";
 
@@ -15,7 +15,7 @@ export default class extends Controller {
   static values = { currentWxid: String, id: Number, members: Array };
 
   connect() {
-    // hideAllEmojiPreviews();
+    hideAllEmojiPreviews();
     const defaultTheme = {
       backgroundColor: "var(--color-gray-100)",
       backgroundImage: "",
@@ -87,14 +87,19 @@ export default class extends Controller {
     this.syncThemeInputs();
 
     this.inputTarget.addEventListener("keydown", (e) => {
-      const errorMessage = document.getElementById('errorMessage');
-      if (e.key === "Enter" && !e.shiftKey) {
-        if (this.inputTarget.value.trim() === '') {
-          errorMessage.style.display = 'inline'; // Show the error message
-          e.preventDefault(); // Prevent form submission
+      if (e.key === "Enter") {
+        if (e.shiftKey) {
+          // Shift + Enter: 允许换行
+          return; // 不阻止默认行为，允许换行
         } else {
-          errorMessage.style.display = 'none'; // Hide the error message
-          this.sendMessage("text");
+          // Enter: 发送消息
+          e.preventDefault(); // 阻止默认换行行为
+          if (this.inputTarget.value.trim() === '') {
+            this.inputTarget.placeholder = "发送消息不能为空";
+          } else {
+            this.sendMessage("text");
+            this.autoResize();
+          }
         }
       }
     });
@@ -106,10 +111,10 @@ export default class extends Controller {
     // this.autoResize();
 
     // 设置 emoji 预览功能
-    // if (this.hasInputTarget) {
-    //   this.cleanupEmojiPreview = setupEmojiInputPreview(this.inputTarget,
-    //     this.idValue);
-    // }
+    if (this.hasInputTarget) {
+      this.cleanupEmojiPreview = setupEmojiInputPreview(this.inputTarget,
+        this.idValue);
+    }
   }
 
   debounce(fn, delay) {
@@ -994,8 +999,8 @@ export default class extends Controller {
       retry.textContent = "重试";
       retry.addEventListener("click", () => {
         this.inputTarget.value = msg.content;
-        this.autoResize();
         this.sendMessage("text");
+        this.autoResize();
       });
       bubble.appendChild(retry);
     }
@@ -1097,9 +1102,8 @@ export default class extends Controller {
       tempMsg.msg_type = 6;
       tempMsg.wx_message.real_msg_type = "file_message"
     }
-    this.renderMessages();
     this.messages.add(tempMsg);
-    this.autoResize();
+    this.renderMessages();
     return tempMsg;
 
   }
@@ -1107,7 +1111,7 @@ export default class extends Controller {
   sendMessage(type, message) {
     const msg = this.createSendMessage(type, message);
     if (type == "text") {
-
+      hideAllEmojiPreviews();
     }
     console.log("log send message", type, msg)
     let body;
@@ -1145,16 +1149,17 @@ export default class extends Controller {
       .then(res => res.json())
       .then(newMsg => {
         if (newMsg?.data) {
-          // this.messages.remove(msg);
+          this.messages.remove(msg.id);
           this.messages.add(
             { ...newMsg.data, sending: false, send_failed: false });
           this.renderMessages();
         } else {
+          this.messages.remove(msg.id)
           this.messages.add({ ...msg, sending: false, send_failed: true });
         }
       })
       .catch(error => {
-        // this.messages.remove(msg);
+        this.messages.remove(msg.id);
         this.messages.add({ ...msg, sending: false, send_failed: true });
         this.renderMessages();
       });
@@ -1593,7 +1598,8 @@ export default class extends Controller {
         }
 
         // Add new messages to the Set
-        data.forEach(msg => this.messages.add(msg));
+        // data.forEach(msg => this.messages.add(msg));
+        this.messages.merge(data)
         this.renderMessages({ preserveBottomOffset });
       })
       .catch(console.error);
