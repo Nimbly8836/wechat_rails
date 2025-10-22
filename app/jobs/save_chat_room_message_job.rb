@@ -29,11 +29,11 @@ class SaveChatRoomMessageJob < ApplicationJob
         }
       end.compact
 
-      Rails.logger.info "Insert Message List: #{messages_to_save}"
+      Rails.logger.debug "Insert Message List: #{messages_to_save}"
 
       if messages_to_save.any?
         result = Message.insert_all(messages_to_save)
-        Rails.logger.info "Insert result: #{result.to_json}" # 输出插入结果
+        Rails.logger.debug "Insert result: #{result.to_json}" # 输出插入结果
 
         # 批量查出插入的 messages
         message_ids = messages_to_save.map { |m| m[:wx_messages_id] }
@@ -41,7 +41,6 @@ class SaveChatRoomMessageJob < ApplicationJob
                               .where(wx_messages_id: message_ids)
 
         new_messages.each do |m|
-          next if m.wx_message.nil? || m.wx_message.self_send
           m.notify_chat_room
         end
       end

@@ -78,19 +78,16 @@ class MessagesController < ApplicationController
 
   def callback
     # 收到回掉消息才去主动去同步消息
-    Rails.logger.debug "message callback"
     wxid = params[:wxid]
     if wxid.present?
-      message_api_service = MessageApiService.new(wxid)
-      @contact_service = ContactApiService.new(wxid)
-      response = message_api_service.sync_messages(wxid)
-      unless response["Success"]
-        render json: response and return
+      # message_api_service = MessageApiService.new(wxid)
+      # @contact_service = ContactApiService.new(wxid)
+      # response = message_api_service.sync_messages(wxid)
+      if params[:Success]
+        saves = WechatModels::SyncMessageModel.parse_saves(params.as_json, wxid)
+        SaveChatRoomMessageJob.perform_later(saves.as_json, wxid)
+        SyncCreateContactsJob.perform_later(saves.as_json, wxid)
       end
-      saves = WechatModels::SyncMessageModel.parse_saves(response, wxid)
-      SaveChatRoomMessageJob.perform_later(saves.as_json, wxid)
-      SyncCreateContactsJob.perform_later(saves.as_json, wxid)
-      render json: { "save_number": saves.length, "error": false, "message": "success" }
     end
   end
 
@@ -566,4 +563,3 @@ class MessagesController < ApplicationController
     params.permit(:chat_room_id, :msg_type, :content, :file, extra: {})
   end
 end
-

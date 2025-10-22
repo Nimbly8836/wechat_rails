@@ -1094,7 +1094,7 @@ export default class extends Controller {
     }
     if (type === "image") {
       tempMsg.msg_type = 3;
-      tempMsg.wx_message.extra = {
+      tempMsg.extra = {
         base64: message.extra?.base64,
       }
     }
@@ -1134,7 +1134,7 @@ export default class extends Controller {
         chat_room_id: this.idValue,
         content: msg.wx_message.content,
         msg_type: msg.msg_type,
-        extra: msg.wx_message.extra || {},
+        extra: msg.extra || {},
       })
       headers = {
         "Content-Type": "application/json",

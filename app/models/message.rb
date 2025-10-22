@@ -7,7 +7,7 @@ class Message < ApplicationRecord
   def notify_chat_room
     msg = self.wx_message
     Rails.logger.debug "notify_chat_room: #{msg.as_json}"
-    return if msg.nil? || msg.self_send
+    return unless msg.msg_source.present?
 
     payload = {
       chat_room_id: self.chat_room_id,
