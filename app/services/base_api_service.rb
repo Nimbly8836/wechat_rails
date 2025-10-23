@@ -76,9 +76,9 @@ class BaseApiService
     # 上传的文件包装
     upload_io = if file.is_a?(ActionDispatch::Http::UploadedFile)
                   UploadIO.new(file.tempfile, file.content_type, file.original_filename)
-                else
+    else
                   UploadIO.new(file, "application/octet-stream", File.basename(file.path))
-                end
+    end
 
     # 组合 FormData 参数
     form_data = { wxid: self.class.wx_id, file: upload_io }.merge(extra_params.compact)
@@ -183,5 +183,4 @@ class BaseApiService
       end
     end
   end
-
 end

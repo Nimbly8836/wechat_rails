@@ -62,7 +62,7 @@ class MessageApiService
         <extinfo></extinfo>
       </appmsg>
     XML
-
+    xml = xml.gsub(/\n\s*/, "")
     send_app(to_wxid, 6, xml.strip)
   end
 

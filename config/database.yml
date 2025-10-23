@@ -17,12 +17,12 @@ default: &default
   encoding: unicode
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  username: wechat_rails
-  password: wechat_rails_password
-  host: 198.51.100.20
-  port: 35432
-  # url: <%= Rails.application.credentials.dig(:development, :database, :url) %>
+  # pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  # username: wechat_rails
+  # password: wechat_rails_password
+  # host: 198.51.100.20
+  # port: 35432
+  url: <%= Rails.application.credentials.dig(:development, :database, :url) %>
 
 development:
   primary:

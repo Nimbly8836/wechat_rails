@@ -58,7 +58,7 @@ class MessageSender
     return unless msg_res.is_a?(Hash)
 
     # 统一提取字段，集中处理兼容性问题
-    msg_id = msg_res["Msgid"] || msg_res["ClientMsgid"] || msg_res["clientMsgId"]
+    msg_id = msg_res["Msgid"] || msg_res["ClientMsgid"] || msg_res["clientMsgId"] || msg_res["msgId"]
     new_msg_id = msg_res["Newmsgid"] || msg_res["NewMsgId"] || msg_res["newMsgId"]
 
     timestamp = msg_res["servertime"] || msg_res["CreateTime"]
