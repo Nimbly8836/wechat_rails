@@ -10,11 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Clone the repository manually and navigate to it
+      # Use the standard checkout action
       - name: Checkout Repository
-        run: |
-          git clone https://github.com/${{ github.repository }}.git
-          cd $(basename "$GITHUB_REPOSITORY")
+        uses: actions/checkout@v4
 
       # 获取当前的 git tag 作为版本号
       - name: Get current tag
@@ -24,7 +22,6 @@ jobs:
       # 确保在仓库目录下执行 git fetch 和 git tag
       - name: Fetch and set latest tag
         run: |
-          cd $(basename "$GITHUB_REPOSITORY")  # 确保我们在 Git 仓库目录下
           git fetch --tags
           git tag -f latest
 
