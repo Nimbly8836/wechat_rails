@@ -10,34 +10,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Clone the repository manually and navigate to it
-    - name: Checkout Repository
-      run: |
-        git clone https://github.com/${{ github.repository }}.git
-        cd $(basename "$GITHUB_REPOSITORY")
+      # Clone the repository manually and navigate to it
+      - name: Checkout Repository
+        run: |
+          git clone https://github.com/${{ github.repository }}.git
+          cd $(basename "$GITHUB_REPOSITORY")
 
-    # 获取当前的 git tag 作为版本号
-    - name: Get current tag
-      id: get_tag
-      run: echo "TAG=$(echo ${GITHUB_REF} | sed 's/refs\/tags\///')" >> $GITHUB_ENV
+      # 获取当前的 git tag 作为版本号
+      - name: Get current tag
+        id: get_tag
+        run: echo "TAG=$(echo ${GITHUB_REF} | sed 's/refs\/tags\///')" >> $GITHUB_ENV
 
-    # 确保在仓库目录下执行 git fetch 和 git tag
-    - name: Fetch and set latest tag
-      run: |
-        cd $(basename "$GITHUB_REPOSITORY")  # 确保我们在 Git 仓库目录下
-        git fetch --tags
-        git tag -f latest
+      # 确保在仓库目录下执行 git fetch 和 git tag
+      - name: Fetch and set latest tag
+        run: |
+          cd $(basename "$GITHUB_REPOSITORY")  # 确保我们在 Git 仓库目录下
+          git fetch --tags
+          git tag -f latest
 
-    # Build the Docker image
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag ghcr.io/${{ github.repository }}:${{ env.TAG }} --tag ghcr.io/${{ github.repository }}:latest
+      # Convert the repository name to lowercase for Docker tag
+      - name: Set lowercase repo name
+        run: echo "LOWER_REPO=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-    # Log in to GitHub Container Registry manually
-    - name: Log in to GitHub Container Registry
-      run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+      # Build the Docker image
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag ghcr.io/${{ env.LOWER_REPO }}:${{ env.TAG }} --tag ghcr.io/${{ env.LOWER_REPO }}:latest
 
-    # Push the Docker image to GitHub Container Registry
-    - name: Push the Docker image
-      run: |
-        docker push ghcr.io/${{ github.repository }}:${{ env.TAG }}
-        docker push ghcr.io/${{ github.repository }}:latest
+      # Log in to GitHub Container Registry manually
+      - name: Log in to GitHub Container Registry
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+
+      # Push the Docker image to GitHub Container Registry
+      - name: Push the Docker image
+        run: |
+          docker push ghcr.io/${{ env.LOWER_REPO }}:${{ env.TAG }}
+          docker push ghcr.io/${{ env.LOWER_REPO }}:latest
