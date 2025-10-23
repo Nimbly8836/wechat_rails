@@ -1,0 +1,75 @@
+<div class="
+place-items-center
+grid
+grid-cols-1
+gap-6
+max-w-md
+mx-auto
+mt-40
+ bg-white
+ rounded-2xl
+shadow-lg
+relative
+overflow-hidden"
+     data-controller="contact"
+     data-contact-contact-value="<%= @contact.to_json %>"
+>
+  <!-- 上半部分：头像 + 基础信息 -->
+  <div class="p-6 text-center">
+    <% if @contact.big_head_img_url.present? %>
+      <img src="<%= @contact.big_head_img_url %>"
+           alt="<%= @contact.nick_name %>"
+           class="w-24 h-24 mx-auto rounded-full border-4 border-white shadow-md"/>
+    <% else %>
+      <div class="w-24 h-24 mx-auto flex items-center justify-center rounded-full bg-gray-200 text-2xl font-bold text-gray-600 shadow-md">
+        <%= @contact.nick_name.to_s.first || "?" %>
+      </div>
+    <% end %>
+
+    <h2 class="mt-4 text-2xl font-semibold text-gray-800">
+      <%= @contact.nick_name.presence || "未设置昵称" %>
+    </h2>
+    <p class=" text-sm text-gray-500">备注: <%= @contact.remark %></p>
+    <p class="text-sm text-gray-500"><%= @contact.country %> <%= @contact.city %></p>
+    <p class="mt-2 text-gray-600 text-sm italic"><%= @contact.signature.presence || "这个人很神秘，什么都没有写" %></p>
+  </div>
+
+  <!-- 浮动按钮 -->
+  <div class="text-center">
+    <button type="button"
+            data-action="click->contact#toChatRoom"
+            class="bg-transparent
+            text-center
+            hover:bg-blue-500 t
+            ext-blue-700
+            font-semibold
+            py-2 px-4
+            hover:text-white
+            border border-blue-500
+            hover:border-transparent
+            text-sm text-gray-600
+            rounded-full">
+      💬 发起聊天
+    </button>
+  </div>
+
+  <!-- 折叠详情 -->
+  <div class="pt-12 pb-6 px-6 text-center">
+    <button type="button"
+            data-action="click->contact#toggleDetails"
+            class="w-screen text-center text-sm text-gray-600 hover:text-gray-400 transition">
+      查看更多 ▾
+    </button>
+
+    <div data-contact-target="details" class="mt-4 hidden space-y-2 text-sm text-gray-700">
+      <p><strong>拼音首字母:</strong> <%= @contact.id %></p>
+      <p><strong>拼音首字母:</strong> <%= @contact.py_initial %></p>
+      <p><strong>全拼:</strong> <%= @contact.quan_pin %></p>
+      <p><strong>性别:</strong> <%= @contact.sex %></p>
+      <p><strong>备注:</strong> <%= @contact.remark %></p>
+      <p><strong>别名:</strong> <%= @contact.alias %></p>
+      <p><strong>手机号:</strong> <%= @contact.phone_num_list %></p>
+      <p><strong>标签:</strong> <%= @contact.label_list %></p>
+    </div>
+  </div>
+</div>

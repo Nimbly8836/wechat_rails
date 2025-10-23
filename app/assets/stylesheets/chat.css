@@ -1,0 +1,31 @@
+.letter {
+    transition: all 0.2s ease;
+}
+
+.letter.active {
+    background-color: #007bff; /* 高亮背景色 */
+    color: white; /* 高亮文字颜色 */
+    font-weight: bold;
+}
+
+#resizer {
+    min-width: 12px; /* 确保触摸区域足够大 */
+    touch-action: none; /* 防止触摸时的默认行为 */
+}
+
+@media (min-width: 640px) {
+    #resizer {
+        min-width: 4px; /* 桌面模式下恢复窄宽度 */
+    }
+}
+
+/*.emoji-panel {*/
+/*  z-index: 9999 !important;*/
+/*  position: absolute;*/
+/*  bottom: 4rem;*/
+/*  right: 2rem;*/
+/*  max-width: 30rem;*/
+/*  max-height: 30rem;*/
+/*  overflow-y: auto; */
+/*}*/
+

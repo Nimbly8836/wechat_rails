@@ -1,0 +1,26 @@
+/*
+ * This is a manifest file that'll be compiled into application.css.
+ *
+ * With Propshaft, assets are served efficiently without preprocessing steps. You can still include
+ * application-wide styles in this file, but keep in mind that CSS precedence will follow the standard
+ * cascading order, meaning styles declared later in the document or manifest will override earlier ones,
+ * depending on specificity.
+ *
+ * Consider organizing styles into separate files for maintainability.
+ */
+/*@import "tailwindcss";*/
+
+:root {
+  --bg-color: #f4f7fa; /* 背景颜色 */
+  --text-color: #333; /* 主文字颜色 */
+  --secondary-text-color: #666; /* 次要文字颜色 */
+  --success-color: #28a745; /* 成功状态 */
+  --error-color: #dc3545; /* 错误状态 */
+  --primary-color: #0076df; /* 主按钮/强调色 */
+  --border-color: #ddd; /* 边框颜色 */
+  --hover-color: #0056b3; /* 按钮悬停颜色 */
+  --font-family: IBM Plex Sans, SF Pro, Source Code Pro, sans-serif;
+}
+
+
+

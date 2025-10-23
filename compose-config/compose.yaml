@@ -1,0 +1,36 @@
+services:
+  app:
+    container_name: wechat_rails_app
+    build: ..
+    ports:
+      # 默认的
+      - "41234:80"
+    volumes: # 这里的挂在路径注意一下
+      - ./config/database.yml:/rails/config/database.yml
+      - ./config/wechat_api.yml:/rails/config/wechat_api.yml
+      - ./config/seeds.rb:/rails/db/seeds.rb
+      - ../storage:/rails/storage
+    environment:
+      - RAILS_MAX_THREADS=10
+      - DB_HOST=10.0.0.230
+      - DB_USERNAME=wechat_rails
+      - DB_PASSWORD=wechat_rails_password
+      - DB_PORT=35432
+      - DB_DATABASE=wechat_rails_production
+      # 
+      # - RAILS_MASTER_KEY=xxxxxxxx
+
+  # 数据库，如果你已经有 PG了，可以注释掉，记得配置好数据库密码
+#  db:
+#    container_name: wechat_rails_db
+#    image: postgres:17
+#    volumes:
+#      # 挂载位置 记得修改
+#      - ./db:/var/lib/postgresql/data
+#    environment:
+#      POSTGRES_PASSWORD: password # 记得修改
+#      POSTGRES_USER: wechat_rails # 记得修改
+#      POSTGRES_DB: wechat_rails
+#      PGDAT: /var/lib/postgresql/data/pgdata
+
+
