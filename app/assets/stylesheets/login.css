@@ -1,0 +1,172 @@
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 15px 0;
+  color: #666;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+
+.divider span {
+  padding: 0 10px;
+}
+
+.login-container {
+  font-family: var(--font-family);
+  color: var(--text-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+
+  width: 100%;
+  max-width: 450px;
+  background: white;
+  border-radius: 12px;
+  padding: 20px 30px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  margin: 60px auto 0; /* 顶部间距固定为 60px，左右自动居中 */
+  box-sizing: border-box;
+}
+
+/* 设置 h2 标题的布局 */
+.login-header {
+  display: flex;
+  align-items: center; /* 垂直居中对齐文本和图片 */
+  justify-content: center; /* 居中对齐整个内容 */
+  gap: 10px; /* 文字和图片之间的间距 */
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+/* 图标的样式调整 */
+.login-img {
+  width: 40px; /* 调整图片大小 */
+  height: 40px;
+  object-fit: cover; /* 保持图标比例 */
+}
+
+h2 {
+  margin-bottom: 18px;
+  font-size: 1.8rem;
+  color: var(--text-color);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  margin: 16px 0px;
+}
+
+label {
+  font-size: 1rem;
+  margin-bottom: 5px;
+  text-align: start;
+}
+
+select {
+  margin: 16px 0px;
+  width: 100%;
+  padding: 10px 15px;
+  font-size: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: border-color 0.3s ease;
+}
+
+select:focus {
+  outline: none;
+  border-color: #0076df;
+}
+
+.btn {
+  width: 100%;
+  padding: 12px 20px;
+  background: #0076df;
+  color: white;
+  font-size: 1rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+
+.btn-text {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: #0a66c2; /* 改成你的主题色 */
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-text:hover {
+  text-decoration: underline;
+}
+
+.btn-text:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.inline-form {
+  display: inline;
+}
+
+/* 让 button_to 表单不换行 */
+
+
+.instructions {
+  color: var(--text-color);
+}
+
+#error {
+  color: var(--error-color);
+}
+
+#login-status {
+  margin: 10px;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.footer {
+  margin-top: 20px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.footer p {
+  margin: 0;
+}
+
+.footer a {
+  color: #0076df;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+/* 移动端调整 */
+@media (max-width: 768px) {
+  .login-container {
+    margin-top: 40px; /* 在移动端减小顶部间距 */
+    width: 90%; /* 在移动端减小宽度比例 */
+    padding: 15px 20px; /* 减小内边距 */
+  }
+}
+
+#reTryBtn {
+  margin-top: 10px;
+}

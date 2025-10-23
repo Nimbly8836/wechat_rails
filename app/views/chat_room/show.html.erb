@@ -1,0 +1,241 @@
+<div class="flex flex-col h-full w-full bg-[#f7f8fa]"
+     data-controller="chat-room"
+     data-chat-room-current-wxid-value="<%= @chat_room.wx_id %>"
+     data-chat-room-id-value="<%= @chat_room.id %>"
+     data-chat-room-members-value="<%= @chat_room.members %>"
+>
+
+  <input type="file" data-chat-room-target="fileInput"
+         data-action="change->chat-room#handleFileSelect"
+         style="display: none;">
+
+  <!-- 顶部：会话信息 -->
+  <div class="flex sticky items-center justify-between px-4 h-13 bg-white">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
+        <img src='data:image/png;base64,<%= @chat_room.avatar_base64 %>' class='w-full h-full
+        object-cover'
+             alt='avatar'/>
+      </div>
+      <div class="leading-tight">
+        <div class="font-semibold text-gray-900"><%= @chat_room.name.presence || "聊天窗口" %></div>
+        <div class="text-xs text-gray-500">在线</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 text-gray-500">
+      <button class="hover:text-gray-700 w-5" title="搜索">
+        <img src="icon/search-svgrepo-com.svg" alt="搜索聊天信息"></button>
+      <!-- 菜单触发 -->
+      <button class="hover:text-gray-700 relative w-5"
+              data-action="click->chat-room#toggleMenu">
+        <img src="icon/setting.svg" alt="设置">
+      </button>
+    </div>
+  </div>
+
+
+  <!-- 二级菜单 -->
+  <div data-chat-room-target="menu"
+       class="hidden absolute right-3 top-14 w-60 bg-slate-900/95 text-slate-100 shadow-2xl
+       rounded-2xl ring-1 ring-white/10 overflow-hidden z-100 backdrop-blur">
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#openAppearanceSettings">
+      <span aria-hidden="true">🎨</span>
+      <span>外观设置</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#handleMenuClose">
+      <span aria-hidden="true">⚙️</span>
+      <span>设置界面</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#handleMenuClose">
+      <span aria-hidden="true">🔄</span>
+      <span>同步信息</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#syncMembers">
+      <span aria-hidden="true">👥</span>
+      <span>同步群组联系人</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            data-action="click->chat-room#syncContact">
+      <span aria-hidden="true">🧭</span>
+      <span>更新聊天室信息</span>
+    </button>
+  </div>
+
+  <div data-chat-room-target="themePanel"
+       class="hidden absolute right-3 top-36 w-64 bg-white/95 text-slate-900 shadow-xl rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-40">
+    <div class="px-5 py-4 space-y-4">
+      <div>
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>聊天室背景</span>
+          <input type="color" value="#ffffff"
+                 class="h-7 w-7 cursor-pointer border border-slate-200 rounded-full bg-transparent"
+                 data-chat-room-target="backgroundInput"
+                 data-action="input->chat-room#updateBackgroundColor"/>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">选择一个喜欢的背景色让聊天更有氛围。</p>
+      </div>
+      <div>
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>背景图片</span>
+          <button type="button"
+                  class="text-[11px] text-slate-400 hover:text-rose-500 transition"
+                  data-action="click->chat-room#clearBackgroundImage">
+            清除
+          </button>
+        </div>
+        <input type="url"
+               placeholder="输入图片链接，例如 https://example.com/bg.jpg"
+               class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+               data-chat-room-target="backgroundImageInput"
+               data-action="input->chat-room#updateBackgroundImage"/>
+        <p class="mt-2 text-xs text-slate-500">支持网络图片链接，留空可恢复纯色背景。</p>
+      </div>
+      <div>
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>我的气泡</span>
+          <input type="color" value="#6366f1"
+                 class="h-7 w-7 cursor-pointer border border-slate-200 rounded-full bg-transparent"
+                 data-chat-room-target="bubbleInput"
+                 data-action="input->chat-room#updateBubbleColor"/>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">即时预览你发出的消息颜色。</p>
+      </div>
+      <div>
+        <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
+          <span>聊天字体</span>
+        </div>
+        <select
+          class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+          data-chat-room-target="fontSelect"
+          data-action="change->chat-room#updateFontFamily">
+          <option value="inherit">系统默认</option>
+          <option value='"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif'>圆润无衬线</option>
+          <option value='"Source Han Serif SC", "Songti SC", serif'>优雅衬线</option>
+          <option value='"LXGW WenKai", cursive'>手写风</option>
+          <option value='"JetBrains Mono", monospace'>等宽代码体</option>
+          <option value="custom">自定义</option>
+        </select>
+        <input type="text"
+               placeholder="自定义字体栈，例如 'Roboto, sans-serif'"
+               class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+               data-chat-room-target="fontCustomInput"
+               data-action="input->chat-room#updateCustomFont"/>
+        <p class="mt-2 text-xs text-slate-500">随时切换聊天字体风格，打造独特体验。</p>
+      </div>
+      <div class="flex items-center justify-end gap-2">
+        <button type="button"
+                class="text-sm text-slate-400 hover:text-slate-600 transition"
+                data-action="click->chat-room#handleMenuClose click->chat-room#closeThemePanel">
+          取消
+        </button>
+        <button type="button"
+                class="px-3 py-1.5 text-sm font-medium rounded-full bg-slate-900 text-white hover:bg-slate-700 transition"
+                data-action="click->chat-room#closeThemePanel">
+          完成
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div data-chat-room-target="attachmentSelect"
+       class="hidden absolute left-3.5 bottom-14 w-auto bg-white/95 shadow-xl
+       rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-100">
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium transition-colors duration-150 focus:outline-none"
+            data-action="click->chat-room#openFilePicker"
+            data-upload-type-param="image">
+
+      <span aria-hidden="true"><img class="w-5" src="icon/picture-frame-svgrepo.svg"></span>
+      <span>图片</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150  focus:outline-none"
+            data-action="click->chat-room#openFilePicker"
+            data-upload-type-param="voice">
+
+      <span aria-hidden="true"><img class="w-5" src="icon/voice-square-svgrepo.svg"></span>
+      <span>语音</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150  focus:outline-none"
+            data-action="click->chat-room#openFilePicker"
+            data-upload-type-param="file">
+      <span aria-hidden="true"><img class="w-5" src="icon/document-svgrepo.svg"></span>
+      <span>附件</span>
+    </button>
+    <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150  focus:outline-none"
+            data-action="click->chat-room#openFilePicker"
+            data-upload-type-param="video">
+      <span aria-hidden="true"><img class="w-5" src="icon/video-svgrepo.svg"></span>
+      <span>视频</span>
+    </button>
+  </div>
+
+  <div id="show-more-message"
+       data-chat-room-target="showMore"
+       class="hidden text-xs text-gray-500 text-center relative my-2">
+    <div class="flex items-center justify-center">
+      <div class="flex-1 border-t border-gray-300"></div>
+      <button class="mx-2 px-2 py-1 text-gray-600 hover:text-blue-500 transition"
+              data-action="click->chat-room#loadMore">
+        <span class="loading hidden mr-1 animate-spin border-2 border-gray-400 border-t-transparent rounded-full w-3 h-3"></span>
+        查看更多
+      </button>
+      <div class="flex-1 border-t border-gray-300"></div>
+    </div>
+  </div>
+
+
+  <!-- 中间：消息列表 -->
+  <div class="flex-1 shadow-lg w-full overflow-y-auto overflow-x-clip px-5 py-5 flex flex-col
+  justify-start gap-2
+  min-h-0 bg-gray-200"
+       data-chat-room-target="messageList">
+    <div class="text-gray-400 text-center py-8" data-chat-room-target="emptyMessage">暂无消息</div>
+  </div>
+
+  <!-- 底部：输入区 -->
+  <div class="flex items-end gap-2 px-2 py-2 bg-white min-h-13">
+
+
+    <!-- 附件按钮 -->
+    <div class="flex-shrink-0 w-10"
+         data-action="mouseenter->chat-room#mouseenterAttachment">
+      <button class="px-2 text-xl w-10"><img src="icon/attachment.svg" alt="附件"></button>
+    </div>
+
+    <!-- 输入框 -->
+    <div class="flex-1">
+      <label>
+        <textarea
+          rows="1"
+          class="w-full resize-none px-2 py-2 focus-border-none focus:outline-none
+          overflow-hidden "
+          placeholder="输入消息…"
+          required
+          data-chat-room-target="input"
+        ></textarea>
+      </label>
+    </div>
+
+    <div class="flex-shrink-0" data-controller="emoji">
+      <button class="px-2 text-xl w-10"
+              data-action="mouseenter->emoji#mouseenter mouseleave->emoji#mouseleave">
+        <img src="icon/emoji-pleased-svgrepo-com.svg" alt="表情">
+      </button>
+    </div>
+
+
+  </div>
+  <%= render partial: "chat/emoji_templates" %>
+</div>

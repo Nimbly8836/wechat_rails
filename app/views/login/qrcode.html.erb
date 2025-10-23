@@ -1,0 +1,32 @@
+<%= turbo_frame_tag "qrcode_result" do %>
+  <div data-controller="qrcode" 
+       data-qrcode-uuid-value="<%= @qrcode_data[:uuid] %>"
+       data-qrcode-protocol-value="<%= @protocol_type %>">
+    <h2 class="login-header">
+      <img width="60" height="60" src="https://img.icons8.com/hands/50/qr-code.png" alt="qr-code"/>
+      <%= @protocol_label %> 协议
+    </h2>
+
+    <div class="qrcode-image">
+      <% if @qrcode_data[:qrcode_url].present? %>
+        <img src="<%= @qrcode_data[:qrcode_url] %>" alt="微信登录二维码">
+      <% elsif @qrcode_data[:qrcode_base64].present? %>
+        <!-- 不要添加 data:image/png;base64 前缀，因为 API 返回的数据已经包含了这个前缀 -->
+        <img src="<%= @qrcode_data[:qrcode_base64] %>" alt="微信登录二维码">
+      <% else %>
+        <div class="error">无法显示二维码</div>
+      <% end %>
+    </div>
+
+    <div id="login-status">等待扫描...</div>
+    <div id="login-error" style="display: none;">
+      <button id="reTryBtn" class="btn btn-primary"
+              data-action="click->qrcode#reGetQrCode">重新获取二维码
+      </button>
+    </div>
+
+    <div class="qr-info">
+      <p>二维码将在 <span id="countdown">240</span> 秒后过期</p>
+    </div>
+  </div>
+<% end %>
