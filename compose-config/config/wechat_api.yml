@@ -1,9 +1,9 @@
 # config/wechat_api.yml
 default: &default
   # 微信协议地址
-  base_url: 'http://10.0.0.230:8059/api'
+  base_url: 'http://wechat-rails-app:8059/api'
   # 这里写你的 微信协议能访问到的地址和端口
-  callback_url: 'http://10.0.0.198:33000/message/callback/{0}'
+  callback_url: 'http://wechat-rails-app/message/callback/{0}'
   timeout: 10
   retry_count: 3
 
