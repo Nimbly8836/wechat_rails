@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Clone the repository manually
+    # Clone the repository manually and navigate to it
     - name: Checkout Repository
       run: |
         git clone https://github.com/${{ github.repository }}.git
@@ -21,9 +21,10 @@ jobs:
       id: get_tag
       run: echo "TAG=$(echo ${GITHUB_REF} | sed 's/refs\/tags\///')" >> $GITHUB_ENV
 
-    # 设置 latest 标签
-    - name: Set latest tag
+    # 确保在仓库目录下执行 git fetch 和 git tag
+    - name: Fetch and set latest tag
       run: |
+        cd $(basename "$GITHUB_REPOSITORY")  # 确保我们在 Git 仓库目录下
         git fetch --tags
         git tag -f latest
 
