@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Use the standard checkout action
+      # 手动克隆仓库
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        run: |
+          git clone https://github.com/${{ github.repository }}.git
+          cd $(basename "$GITHUB_REPOSITORY")  # 确保进入正确的目录
 
       # 获取当前的 git tag 作为版本号
       - name: Get current tag
