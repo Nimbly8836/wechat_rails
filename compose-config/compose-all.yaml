@@ -18,8 +18,11 @@ services:
       - DB_PASSWORD=password
       - DB_PORT=5432
       - DB_DATABASE=wechat_rails_production
-      # 
-      # - RAILS_MASTER_KEY=xxxxxxxx
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE:-}
+      - RAILS_MASTER_KEY=${RAILS_MASTER_KEY:-}
+      - RAILS_MASTER_KEY_FILE=${RAILS_MASTER_KEY_FILE:-}
+      - RAILS_CREDENTIALS_YML_ENC_BASE64=${RAILS_CREDENTIALS_YML_ENC_BASE64:-}
+      - RAILS_CREDENTIALS_YML_ENC_FILE=${RAILS_CREDENTIALS_YML_ENC_FILE:-}
     depends_on:
       - db
       - wx-server

@@ -24,6 +24,14 @@ module WechatRails
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
     # config.force_ssl = false
+    if ENV["RAILS_CREDENTIALS_CONTENT_PATH"].present?
+      config.credentials.content_path = Pathname.new(ENV["RAILS_CREDENTIALS_CONTENT_PATH"])
+    end
+
+    if ENV["RAILS_CREDENTIALS_KEY_PATH"].present?
+      config.credentials.key_path = Pathname.new(ENV["RAILS_CREDENTIALS_KEY_PATH"])
+    end
+
     config.autoload_paths << Rails.root.join("app/errors")
     # config.active_job.queue_adapter = :sidekiq
   end

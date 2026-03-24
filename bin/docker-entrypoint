@@ -1,5 +1,115 @@
 #!/bin/bash -e
 
+runtime_secrets_dir="/rails/tmp/runtime-secrets"
+
+prepare_runtime_secrets_dir() {
+  mkdir -p "$runtime_secrets_dir"
+  chmod 700 "$runtime_secrets_dir"
+}
+
+read_secret_value() {
+  local value_var="$1"
+  local file_var="$2"
+  local value="${!value_var:-}"
+  local file_path="${!file_var:-}"
+
+  if [ -n "$value" ] && [ -n "$file_path" ]; then
+    echo "Both $value_var and $file_var are set; only one is allowed." >&2
+    exit 1
+  fi
+
+  if [ -n "$file_path" ]; then
+    cat "$file_path"
+  else
+    printf '%s' "$value"
+  fi
+}
+
+prepare_runtime_credentials() {
+  local inline_content base64_content target
+
+  inline_content="$(read_secret_value RAILS_CREDENTIALS_YML_ENC RAILS_CREDENTIALS_YML_ENC_FILE)"
+  base64_content="${RAILS_CREDENTIALS_YML_ENC_BASE64:-}"
+
+  if [ -n "$inline_content" ] && [ -n "$base64_content" ]; then
+    echo "RAILS_CREDENTIALS_YML_ENC/FILE and RAILS_CREDENTIALS_YML_ENC_BASE64 cannot be used together." >&2
+    exit 1
+  fi
+
+  if [ -n "$base64_content" ]; then
+    target="$runtime_secrets_dir/credentials.yml.enc"
+    printf '%s' "$base64_content" | base64 --decode > "$target"
+    chmod 600 "$target"
+    export RAILS_CREDENTIALS_CONTENT_PATH="$target"
+  elif [ -n "${RAILS_CREDENTIALS_YML_ENC_FILE:-}" ]; then
+    export RAILS_CREDENTIALS_CONTENT_PATH="${RAILS_CREDENTIALS_YML_ENC_FILE}"
+  elif [ -n "$inline_content" ]; then
+    target="$runtime_secrets_dir/credentials.yml.enc"
+    printf '%s' "$inline_content" > "$target"
+    chmod 600 "$target"
+    export RAILS_CREDENTIALS_CONTENT_PATH="$target"
+  fi
+}
+
+prepare_master_key() {
+  local file_path="${RAILS_MASTER_KEY_FILE:-}"
+
+  if [ -n "${RAILS_MASTER_KEY:-}" ] && [ -n "$file_path" ]; then
+    echo "Both RAILS_MASTER_KEY and RAILS_MASTER_KEY_FILE are set; only one is allowed." >&2
+    exit 1
+  fi
+
+  if [ -n "$file_path" ]; then
+    export RAILS_CREDENTIALS_KEY_PATH="$file_path"
+  fi
+}
+
+credentials_content_available() {
+  if [ -n "${RAILS_CREDENTIALS_CONTENT_PATH:-}" ] && [ -f "${RAILS_CREDENTIALS_CONTENT_PATH}" ]; then
+    return 0
+  fi
+
+  if [ -f "/rails/config/credentials.yml.enc" ]; then
+    return 0
+  fi
+
+  return 1
+}
+
+credentials_key_available() {
+  if [ -n "${RAILS_MASTER_KEY:-}" ]; then
+    return 0
+  fi
+
+  if [ -n "${RAILS_CREDENTIALS_KEY_PATH:-}" ] && [ -f "${RAILS_CREDENTIALS_KEY_PATH}" ]; then
+    return 0
+  fi
+
+  if [ -f "/rails/config/master.key" ]; then
+    return 0
+  fi
+
+  return 1
+}
+
+ensure_secret_key_base() {
+  if [ -n "${SECRET_KEY_BASE:-}" ]; then
+    return 0
+  fi
+
+  if credentials_content_available && credentials_key_available; then
+    return 0
+  fi
+
+  export SECRET_KEY_BASE="$(ruby -rsecurerandom -e 'print SecureRandom.hex(64)')"
+  echo "SECRET_KEY_BASE not provided and runtime credentials are incomplete; generated an ephemeral fallback for this container." >&2
+}
+
+prepare_runtime_secrets_dir
+prepare_runtime_credentials
+prepare_master_key
+ensure_secret_key_base
+
 # Enable jemalloc for reduced memory usage and latency.
 if [ -z "${LD_PRELOAD+x}" ]; then
     LD_PRELOAD=$(find /usr/lib -name libjemalloc.so.2 -print -quit)
