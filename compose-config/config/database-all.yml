@@ -3,9 +3,9 @@ default: &default
   encoding: unicode
   pool: 10
   username: wechat_rails
-  password: wechat_rails_password
-  host: 198.51.100.20
-  port: 35432
+  password: password
+  host: wechat-rails-db
+  port: 5432
 
 production:
   primary: &primary_production

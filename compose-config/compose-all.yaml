@@ -6,23 +6,18 @@ services:
     ports:
       - "41234:80"
     volumes: # 这里的挂在路径注意一下
-      - ./config/database.yml:/rails/config/database.yml
+      - ./config/database-all.yml:/rails/config/database.yml
       - ./config/wechat_api.yml:/rails/config/wechat_api.yml
       - ./config/seeds.rb:/rails/db/seeds.rb
       # 这个目录保存文件的
       - ../storage:/rails/storage
     environment:
       - RAILS_MAX_THREADS=10
-      - DB_HOST=wechat-rails-db
-      - DB_USERNAME=wechat_rails
-      - DB_PASSWORD=password
-      - DB_PORT=5432
-      - DB_DATABASE=wechat_rails_production
-      - SECRET_KEY_BASE=${SECRET_KEY_BASE:-}
-      - RAILS_MASTER_KEY=${RAILS_MASTER_KEY:-}
-      - RAILS_MASTER_KEY_FILE=${RAILS_MASTER_KEY_FILE:-}
-      - RAILS_CREDENTIALS_YML_ENC_BASE64=${RAILS_CREDENTIALS_YML_ENC_BASE64:-}
-      - RAILS_CREDENTIALS_YML_ENC_FILE=${RAILS_CREDENTIALS_YML_ENC_FILE:-}
+      - SECRET_KEY_BASE
+      - RAILS_MASTER_KEY
+      - RAILS_MASTER_KEY_FILE
+      - RAILS_CREDENTIALS_YML_ENC_BASE64
+      - RAILS_CREDENTIALS_YML_ENC_FILE
     depends_on:
       - db
       - wx-server
