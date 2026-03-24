@@ -3,7 +3,10 @@
 
 # This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
 # docker build -t wechat_rails .
-# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name wechat_rails wechat_rails
+# docker run -d -p 80:80 \
+#   -e RAILS_MASTER_KEY=<value from config/master.key> \
+#   -e RAILS_CREDENTIALS_YML_ENC_BASE64="$(base64 < config/credentials.yml.enc | tr -d '\n')" \
+#   --name wechat_rails wechat_rails
 
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 
