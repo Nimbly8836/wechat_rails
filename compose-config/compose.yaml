@@ -12,16 +12,11 @@ services:
       - ../storage:/rails/storage
     environment:
       - RAILS_MAX_THREADS=10
-      - DB_HOST=10.0.0.230
-      - DB_USERNAME=wechat_rails
-      - DB_PASSWORD=wechat_rails_password
-      - DB_PORT=35432
-      - DB_DATABASE=wechat_rails_production
-      - SECRET_KEY_BASE=${SECRET_KEY_BASE:-}
-      - RAILS_MASTER_KEY=${RAILS_MASTER_KEY:-}
-      - RAILS_MASTER_KEY_FILE=${RAILS_MASTER_KEY_FILE:-}
-      - RAILS_CREDENTIALS_YML_ENC_BASE64=${RAILS_CREDENTIALS_YML_ENC_BASE64:-}
-      - RAILS_CREDENTIALS_YML_ENC_FILE=${RAILS_CREDENTIALS_YML_ENC_FILE:-}
+      - SECRET_KEY_BASE
+      - RAILS_MASTER_KEY
+      - RAILS_MASTER_KEY_FILE
+      - RAILS_CREDENTIALS_YML_ENC_BASE64
+      - RAILS_CREDENTIALS_YML_ENC_FILE
 
   # 数据库，如果你已经有 PG了，可以注释掉，记得配置好数据库密码
 #  db:
@@ -35,4 +30,3 @@ services:
 #      POSTGRES_USER: wechat_rails # 记得修改
 #      POSTGRES_DB: wechat_rails
 #      PGDAT: /var/lib/postgresql/data/pgdata
-

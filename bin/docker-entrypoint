@@ -105,6 +105,26 @@ ensure_secret_key_base() {
   echo "SECRET_KEY_BASE not provided and runtime credentials are incomplete; generated an ephemeral fallback for this container." >&2
 }
 
+should_prepare_database() {
+  if [ "${SKIP_DB_PREPARE:-}" = "1" ]; then
+    return 1
+  fi
+
+  if [ "$#" -ge 4 ] && [ "$1" = "bundle" ] && [ "$2" = "exec" ] && [ "$3" = "foreman" ] && [ "$4" = "start" ]; then
+    return 0
+  fi
+
+  if [ "$#" -ge 2 ] && { [ "$1" = "./bin/rails" ] || [ "$1" = "bin/rails" ]; } && [ "$2" = "server" ]; then
+    return 0
+  fi
+
+  if [ "$#" -ge 1 ] && { [ "$1" = "./bin/jobs" ] || [ "$1" = "bin/jobs" ]; }; then
+    return 0
+  fi
+
+  return 1
+}
+
 prepare_runtime_secrets_dir
 prepare_runtime_credentials
 prepare_master_key
@@ -116,8 +136,8 @@ if [ -z "${LD_PRELOAD+x}" ]; then
     export LD_PRELOAD
 fi
 
-# If running the rails server then create or migrate existing database
-if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
+# Prepare all configured databases before starting the app/worker stack.
+if should_prepare_database "$@"; then
   ./bin/rails db:prepare
 fi
 
