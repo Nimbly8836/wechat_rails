@@ -15,6 +15,11 @@
 default: &default
   adapter: postgresql
   encoding: unicode
+  username: wechat_rails
+  password: wechat_rails_password
+  host: 203.0.113.10
+  port: 45001
+
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
   # pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
@@ -22,7 +27,7 @@ default: &default
   # password: wechat_rails_password
   # host: 198.51.100.20
   # port: 35432
-  url: <%= Rails.application.credentials.dig(:development, :database, :url) %>
+  # url: <%= Rails.application.credentials.dig(:development, :database, :url) %>
 
 development:
   primary:
@@ -89,6 +94,19 @@ test:
 # Read https://guides.rubyonrails.org/configuring.html#configuring-a-database
 # for a full overview on how database connection configuration can be specified.
 #
+
+# primary_production:
+#   adapter: postgresql
+#   encoding: unicode
+#   # For details on connection pooling, see Rails configuration guide
+#   # https://guides.rubyonrails.org/configuring.html#database-pooling
+#   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+#   username: wechat_rails
+#   password: wechat_rails_password
+#   host: 203.0.113.10
+#   port: 45001
+
+
 production:
   primary: &primary_production
     <<: *default
