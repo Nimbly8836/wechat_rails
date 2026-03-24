@@ -41,7 +41,7 @@ services:
 
 
   wx-server:
-    image: finalpi/wx2tg-server:v4-latest
+    image: finalpi/wx2tg-server:v5-latest
     container_name: wechat-rails-server
     volumes:
       - ./config/app.conf:/usr/wic-go/conf/app.conf
