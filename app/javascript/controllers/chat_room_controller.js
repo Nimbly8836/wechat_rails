@@ -12,7 +12,12 @@ export default class extends Controller {
     "showMore", "themePanel", "backgroundInput", "bubbleInput",
     "backgroundImageInput", "fileInput", "uploadStatus",
     "fontSelect", "fontCustomInput", "attachmentSelect"];
-  static values = { currentWxid: String, id: Number, members: Array };
+  static values = {
+    currentWxid: String,
+    ownerWxid: String,
+    id: Number,
+    members: Array
+  };
 
   connect() {
     hideAllEmojiPreviews();
@@ -1576,7 +1581,8 @@ export default class extends Controller {
   syncMessages(event = null) {
     event?.stopPropagation();
     this.closeMenu();
-    fetch(`/message/sync/${encodeURIComponent(this.currentWxidValue)}`, {
+    const syncWxid = this.ownerWxidValue || this.currentWxidValue;
+    fetch(`/message/sync/${encodeURIComponent(syncWxid)}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1591,7 +1597,10 @@ export default class extends Controller {
         }
         return resp.json();
       })
-      .then(() => {
+      .then((data) => {
+        if (data?.sync_wxid && data.sync_wxid !== syncWxid) {
+          console.info("message sync resolved owner wxid", data);
+        }
         this.loadMessages();
         setTimeout(() => this.loadMessages(), 1200);
         setTimeout(() => this.loadMessages(), 2600);
