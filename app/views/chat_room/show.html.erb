@@ -10,8 +10,16 @@
          style="display: none;">
 
   <!-- 顶部：会话信息 -->
-  <div class="flex sticky items-center justify-between px-4 h-13 bg-white">
+  <div class="sticky top-0 z-20 flex h-13 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur">
     <div class="flex items-center gap-3">
+      <button type="button"
+              class="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 sm:hidden"
+              data-action="click->chat-room#openSidebar"
+              aria-label="返回联系人和会话列表">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 18 9 12l6-6"/>
+        </svg>
+      </button>
       <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
         <img src='data:image/png;base64,<%= @chat_room.avatar_base64 %>' class='w-full h-full
         object-cover'
@@ -52,7 +60,7 @@
     </button>
     <button type="button"
             class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
-            data-action="click->chat-room#handleMenuClose">
+            data-action="click->chat-room#syncMessages">
       <span aria-hidden="true">🔄</span>
       <span>同步信息</span>
     </button>

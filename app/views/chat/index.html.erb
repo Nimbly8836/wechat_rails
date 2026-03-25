@@ -1,35 +1,49 @@
-<div class="flex h-[calc(100vh-10px)] bg-white" data-controller="chat">
+<div class="relative flex h-[calc(100vh-10px)] overflow-hidden bg-slate-100" data-controller="chat">
+  <button type="button"
+          class="hidden fixed inset-0 z-30 bg-slate-950/35 backdrop-blur-[1px] sm:hidden"
+          aria-label="关闭侧边栏"
+          data-chat-target="overlay"
+          data-action="click->chat#closeSidebar"></button>
+
   <!-- 左侧 sidebar -->
   <div id="sidebar"
-       class="flex flex-col min-w-[65px] max-w-[500px] w-[330px] border-r border-gray-200 bg-white relative"
+       class="fixed inset-y-0 left-0 z-40 flex w-[min(24rem,calc(100vw-2.5rem))] max-w-[500px] -translate-x-full flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-200 ease-out sm:static sm:z-auto sm:min-w-[65px] sm:w-[330px] sm:translate-x-0 sm:shadow-none"
        data-chat-target="sidebar">
     <!-- header -->
-    <div class="flex items-center h-[60px] px-4 border-b border-gray-200 bg-white">
-      <div class="flex items-center w-64 font-medium">
+    <div class="flex h-[60px] items-center border-b border-slate-200 bg-white px-4">
+      <div class="flex w-64 items-center gap-3 font-medium text-slate-900">
         <img width="30" height="30" src="https://img.icons8.com/hands/50/sms.png" alt="sms"/>
         <span>Wechat</span>
       </div>
+      <button type="button"
+              class="ml-auto flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 sm:hidden"
+              aria-label="关闭联系人侧栏"
+              data-action="click->chat#closeSidebar">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18 18 6M6 6l12 12"/>
+        </svg>
+      </button>
     </div>
 
     <!-- 搜索栏 -->
-    <label class="m-2 rounded-full border-none bg-gray-100 px-4 py-2 outline-none">
-      <input type="text" id="sidebar-search" placeholder="搜索消息或者通讯录..." data-action="keyup->chat#search">
+    <label class="m-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none">
+      <input type="text"
+             id="sidebar-search"
+             class="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+             placeholder="搜索消息或者通讯录..."
+             data-action="keyup->chat#search">
     </label>
 
     <!-- tab 栏 -->
-    <div class="flex border-b border-gray-100 rounded-sm ">
+    <div class="flex border-b border-slate-100 rounded-sm">
       <div data-active="false"
-           class="flex-1 px-2 py-4 text-center font-medium cursor-pointer
-           rounded-sm
-                  data-[active=true]:border-b-2 data-[active=true]:border-blue-500 data-[active=true]:text-blue-500"
+           class="flex-1 cursor-pointer rounded-sm px-2 py-4 text-center font-medium text-slate-500 data-[active=true]:border-b-2 data-[active=true]:border-sky-500 data-[active=true]:text-sky-600"
            data-action="click->chat#switchTab"
            data-tab="messages">
         消息
       </div>
       <div data-active="true"
-           class="flex-1 px-2 py-4 text-center font-medium cursor-pointer
-           rounded-sm
-                  data-[active=true]:border-b-2 data-[active=true]:border-blue-500 data-[active=true]:text-blue-500"
+           class="flex-1 cursor-pointer rounded-sm px-2 py-4 text-center font-medium text-slate-500 data-[active=true]:border-b-2 data-[active=true]:border-sky-500 data-[active=true]:text-sky-600"
            data-action="click->chat#switchTab"
            data-tab="contacts">
         通讯录
@@ -37,7 +51,9 @@
     </div>
     <!-- 消息列表容器 -->
     <div class="relative flex-1 min-h-0">
-      <div id="message-list" class="hidden h-full overflow-y-auto">
+      <div id="message-list"
+           class="hidden h-full overflow-y-auto"
+           data-chat-target="messagesList">
         <div id="chat-room-list"></div>
       </div>
       <!-- 联系人滚动区 -->
@@ -50,12 +66,11 @@
             <div id="group-<%= initial %>" data-chat-target="group">
               <div class="px-2 py-1 h-10 font-medium bg-gray-100"><%= initial %></div>
               <% contacts.each do |contact| %>
-                <div class="flex items-center px-4 py-2 cursor-pointer border-b border-gray-100 hover:bg-gray-100"
+                <div class="flex cursor-pointer items-center border-b border-slate-100 px-4 py-3 transition hover:bg-slate-50"
                      data-contact-id="<%= contact.id %>"
                      data-chat-target="contact"
                      data-action="click->chat#selectContact">
-                  <div class="flex items-center justify-center w-12 h-10 mr-3 rounded-full
-                  bg-gray-300 text-gray-600 text-lg font-medium overflow-hidden flex-shrink-0">
+                  <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-200 text-lg font-medium text-slate-600">
                     <% if contact.avatar_url.present? %>
                       <%= image_tag contact.avatar_url, class: "w-full h-full object-cover", alt: contact.display_name %>
                     <% else %>
@@ -63,7 +78,7 @@
                     <% end %>
                   </div>
                   <div class="flex-1 overflow-hidden">
-                    <div class="font-medium truncate"><%= contact.display_name %></div>
+                    <div class="truncate font-medium text-slate-900"><%= contact.display_name %></div>
                   </div>
                 </div>
               <% end %>
@@ -73,13 +88,11 @@
       </div>
 
       <!-- 字母导航 -->
-      <div class="absolute right-2 top-1 flex flex-col items-center
-      justify-center gap-y-0.5 px-0.5 py-1 bg-white/85 rounded-md shadow-md z-50 antialiased sm:flex
-      overflow-y-hidden"
-           id="letter-nav">
+      <div class="absolute right-2 top-1 z-20 flex flex-col items-center justify-center gap-y-0.5 overflow-y-hidden rounded-md bg-white/85 px-0.5 py-1 shadow-md antialiased sm:flex"
+           id="letter-nav"
+           data-chat-target="letterNav">
         <% @letters.each do |letter| %>
-          <div class="letter px-1 py-0.5 text-tiny cursor-pointer select-none rounded
-          hover:bg-black/15"
+          <div class="letter cursor-pointer select-none rounded px-1 py-0.5 text-tiny hover:bg-black/15"
                data-letter="<%= letter %>"
                data-chat-target="letter"
                data-action="click->chat#scrollToGroup">
@@ -92,16 +105,30 @@
 
   <!-- 拖拽分隔线 -->
   <div id="resizer"
-       class="w-2 sm:w-1 cursor-col-resize bg-gray-200 hover:bg-gray-400 touch-none"
+       class="hidden cursor-col-resize bg-slate-200 touch-none hover:bg-slate-400 sm:block sm:w-1"
+       data-chat-target="resizer"
        data-action="mousedown->chat#startResize touchstart->chat#startResize">
   </div>
 
   <!-- 右侧内容区 -->
-  <div class="flex flex-col flex-1 bg-gray-100 overflow-x-hidden">
-    <div id="chat-box" class="flex-1 h-full relative" data-chat-target="chatBox">
-      <div class="flex flex-col items-center justify-center h-full text-gray-500">
-        <div class="text-lg font-medium">欢迎使用聊天应用</div>
-        <div class="text-sm">选择一个聊天来开始对话</div>
+  <div class="flex min-w-0 flex-1 flex-col overflow-x-hidden bg-slate-100">
+    <div class="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white/95 px-3 py-3 backdrop-blur sm:hidden">
+      <button type="button"
+              class="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+              aria-controls="sidebar"
+              aria-label="打开联系人和消息列表"
+              data-chat-target="toggleButton"
+              data-action="click->chat#toggleSidebar"></button>
+      <div class="min-w-0">
+        <div class="text-[11px] uppercase tracking-[0.18em] text-slate-400">Wechat Rails</div>
+        <div class="truncate text-sm font-semibold text-slate-900" data-chat-target="mobileTitle">消息</div>
+      </div>
+    </div>
+
+    <div id="chat-box" class="relative flex-1 h-full min-h-0" data-chat-target="chatBox">
+      <div class="flex h-full flex-col items-center justify-center px-6 text-center text-slate-500">
+        <div class="text-lg font-medium text-slate-700">欢迎使用聊天应用</div>
+        <div class="mt-2 text-sm">选择一个联系人或者会话开始对话</div>
       </div>
     </div>
   </div>

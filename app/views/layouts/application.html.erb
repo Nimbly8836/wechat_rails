@@ -3,27 +3,47 @@
 <head>
   <title><%= content_for(:title) || "Wechat Rails" %></title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <%= csrf_meta_tags %>
   <%= csp_meta_tag %>
 
   <%= yield :head %>
 
-  <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-  <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
-<!--  <link rel="icon" href="/chat-50.png" type="image/png">-->
-  <!--    <link rel="icon" href="/chat-50.png" type="image/svg+xml">-->
-<!--  <link rel="apple-touch-icon" href="/chat-50.png">-->
+  <%= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+  <link rel="icon" href="/icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/icon-180.png">
 
   <%# Includes all stylesheet files in app/assets/stylesheets %>
   <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
   <%= javascript_importmap_tags %>
 </head>
 
-<body>
+<body data-controller="pwa-install" class="bg-slate-100 text-slate-900">
 <%= yield %>
+
+<div data-pwa-install-target="banner"
+     class="pointer-events-none fixed inset-x-0 bottom-4 z-[80] hidden px-4">
+  <div class="pointer-events-auto mx-auto flex max-w-md items-center gap-3 rounded-[24px] border border-slate-200 bg-white/95 px-4 py-4 shadow-[0_18px_55px_rgba(15,23,42,0.14)] backdrop-blur">
+    <img src="/icon-180.png" alt="Wechat Rails" class="h-11 w-11 rounded-2xl">
+    <div class="min-w-0 flex-1">
+      <div class="text-sm font-semibold text-slate-900">安装到手机主屏幕</div>
+      <div class="mt-1 text-xs leading-5 text-slate-500">像应用一样打开聊天和通讯录，支持独立窗口使用。</div>
+    </div>
+    <button type="button"
+            class="rounded-full px-3 py-2 text-xs font-medium text-slate-500 transition hover:bg-slate-100"
+            data-action="click->pwa-install#dismiss">
+      稍后
+    </button>
+    <button type="button"
+            class="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
+            data-action="click->pwa-install#install">
+      安装
+    </button>
+  </div>
+</div>
 
 <!-- 错误提示框 -->
 <div id="error-toast"
