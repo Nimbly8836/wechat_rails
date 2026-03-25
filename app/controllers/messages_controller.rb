@@ -77,18 +77,34 @@ class MessagesController < ApplicationController
   end
 
   def callback
-    # 收到回掉消息才去主动去同步消息
     wxid = params[:wxid]
-    if wxid.present?
-      # message_api_service = MessageApiService.new(wxid)
-      # @contact_service = ContactApiService.new(wxid)
-      # response = message_api_service.sync_messages(wxid)
-      if params[:Success]
-        saves = WechatModels::SyncMessageModel.parse_saves(params.as_json, wxid)
-        SaveChatRoomMessageJob.perform_later(saves.as_json, wxid)
-        SyncCreateContactsJob.perform_later(saves.as_json, wxid)
-      end
+    return head :bad_request if wxid.blank?
+
+    payload = params.to_unsafe_h
+    unless success_response?(payload)
+      Rails.logger.warn { "message callback ignored: success flag missing or false for wxid=#{wxid}" }
+      return head :ok
     end
+
+    source_payload = payload
+    unless message_batch_present?(source_payload)
+      Rails.logger.info { "message callback missing AddMsgs, triggering one sync for wxid=#{wxid}" }
+      sync_payload = MessageApiService.new(wxid).sync_messages(wxid)
+      source_payload = sync_payload if sync_payload.is_a?(Hash)
+    end
+
+    unless message_batch_present?(source_payload)
+      Rails.logger.info { "message callback produced no messages after sync for wxid=#{wxid}" }
+      return head :ok
+    end
+
+    saves = WechatModels::SyncMessageModel.parse_saves(source_payload, wxid)
+    return head :ok if saves.blank?
+
+    SaveChatRoomMessageJob.perform_later(saves.as_json, wxid)
+    SyncCreateContactsJob.perform_later(saves.as_json, wxid)
+
+    head :ok
   end
 
   def send_image_message
@@ -357,6 +373,16 @@ class MessagesController < ApplicationController
   end
 
   private
+
+  def success_response?(payload)
+    value = payload["Success"] || payload[:Success]
+    value == true || value.to_s.casecmp("true").zero?
+  end
+
+  def message_batch_present?(payload)
+    add_msgs = payload.dig("Data", "AddMsgs") || payload.dig(:Data, :AddMsgs)
+    add_msgs.is_a?(Array) && add_msgs.any?
+  end
 
   def try_cdn_image_download(api_service, image_meta)
     aes_key = image_meta[:aes_key].presence
