@@ -80,4 +80,43 @@ class SaveChatRoomMessageJobTest < ActiveJob::TestCase
       SaveChatRoomMessageJob.perform_now(payload, owner_wxid)
     end
   end
+
+  test "routes incoming group messages to the group chat room instead of sender direct chat" do
+    owner_wxid = "wxid_owner"
+    room_wxid = "123456@chatroom"
+    member_wxid = "wxid_member"
+
+    group_contact = Contact.create!(
+      own_wxid: owner_wxid,
+      user_name: room_wxid,
+      nick_name: "Project Group"
+    )
+    member_contact = Contact.create!(
+      own_wxid: owner_wxid,
+      user_name: member_wxid,
+      nick_name: "Alice"
+    )
+
+    group_room = ChatRoom.create!(contact: group_contact, wx_id: room_wxid, name: "Project Group")
+    member_room = ChatRoom.create!(contact: member_contact, wx_id: member_wxid, name: "Alice")
+
+    wx_message = WxMessage.create!(
+      msg_id: 401,
+      new_msg_id: 402,
+      msg_seq: 1,
+      msg_create_time: Time.current,
+      msg_type: 1,
+      from_user_name: member_wxid,
+      to_user_name: room_wxid,
+      content: "group hello"
+    )
+
+    assert_difference("Message.count", 1) do
+      SaveChatRoomMessageJob.perform_now([ wx_message.as_json ], owner_wxid)
+    end
+
+    created_message = Message.order(:id).last
+    assert_equal group_room.id, created_message.chat_room_id
+    assert_not_equal member_room.id, created_message.chat_room_id
+  end
 end
