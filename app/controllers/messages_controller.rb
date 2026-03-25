@@ -105,16 +105,29 @@ class MessagesController < ApplicationController
 
     unless message_batch_present?(source_payload)
       Rails.logger.info { "message callback produced no messages after sync for wxid=#{wxid}" }
+      BackfillMissingMessagesJob.perform_later(wxid)
       return head :ok
     end
 
-    saves = WechatModels::SyncMessageModel.parse_saves(source_payload, wxid)
-    return head :ok if saves.blank?
-
-    SaveChatRoomMessageJob.perform_later(saves.as_json, wxid)
-    SyncCreateContactsJob.perform_later(saves.as_json, wxid)
-
+    process_synced_payload(source_payload, wxid, full_backfill: true)
     head :ok
+  end
+
+  def sync
+    wxid = params[:wxid]
+    return render json: { success: false, message: "wxid is required" }, status: :bad_request if wxid.blank?
+
+    payload = MessageApiService.new(wxid).sync_messages(wxid)
+    unless success_response?(payload)
+      return render json: { success: false, message: "sync failed", payload: payload }, status: :bad_gateway
+    end
+
+    process_synced_payload(payload, wxid, full_backfill: true)
+
+    render json: {
+      success: true,
+      synced_count: (payload.dig("Data", "AddMsgs") || []).size
+    }
   end
 
   def send_image_message
@@ -383,6 +396,22 @@ class MessagesController < ApplicationController
   end
 
   private
+
+  def process_synced_payload(payload, wxid, full_backfill: false)
+    saves = WechatModels::SyncMessageModel.parse_saves(payload, wxid)
+    if saves.blank?
+      BackfillMissingMessagesJob.perform_later(wxid) if full_backfill
+      return
+    end
+
+    synced_ids = saves.pluck(:id)
+    SaveChatRoomMessageJob.perform_later(saves.as_json, wxid)
+    SyncCreateContactsJob.perform_later(saves.as_json, wxid)
+
+    if full_backfill
+      BackfillMissingMessagesJob.perform_later(wxid, nil, synced_ids)
+    end
+  end
 
   def success_response?(payload)
     value = payload["Success"] || payload[:Success]

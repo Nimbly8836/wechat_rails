@@ -1559,8 +1559,56 @@ export default class extends Controller {
     });
   }
 
+  openSidebar(event = null) {
+    event?.stopPropagation();
+    const inChatShell = this.element.closest('[data-controller~="chat"]');
+    if (!inChatShell) {
+      window.location.href = "/chat";
+      return;
+    }
+
+    const sidebarEvent = new CustomEvent("chat:sidebar:open", {
+      bubbles: true
+    });
+    this.element.dispatchEvent(sidebarEvent);
+  }
+
+  syncMessages(event = null) {
+    event?.stopPropagation();
+    this.closeMenu();
+    fetch(`/message/sync/${encodeURIComponent(this.currentWxidValue)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRF-Token": document.querySelector(
+          'meta[name="csrf-token"]').content
+      }
+    })
+      .then((resp) => {
+        if (!resp.ok) {
+          throw new Error(`同步消息失败: ${resp.status}`);
+        }
+        return resp.json();
+      })
+      .then(() => {
+        this.loadMessages();
+        setTimeout(() => this.loadMessages(), 1200);
+        setTimeout(() => this.loadMessages(), 2600);
+      })
+      .catch((error) => {
+        console.error("同步消息失败", error);
+        if (typeof window.showErrorToast === "function") {
+          window.showErrorToast("同步消息失败，请稍后重试");
+        } else {
+          alert("同步消息失败，请稍后重试");
+        }
+      });
+  }
+
   syncContact(event = null) {
     event?.stopPropagation();
+    this.closeMenu();
     fetch(`/chat_room/${this.idValue}/sync_chat_contact`, {
       method: "PUT", headers: {
         "Content-Type": "application/json",
