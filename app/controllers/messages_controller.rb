@@ -114,18 +114,30 @@ class MessagesController < ApplicationController
   end
 
   def sync
-    wxid = params[:wxid]
-    return render json: { success: false, message: "wxid is required" }, status: :bad_request if wxid.blank?
+    requested_wxid = params[:wxid]
+    return render json: { success: false, message: "wxid is required" }, status: :bad_request if requested_wxid.blank?
 
-    payload = MessageApiService.new(wxid).sync_messages(wxid)
+    sync_wxid = resolve_sync_wxid(requested_wxid)
+    payload = MessageApiService.new(sync_wxid).sync_messages(sync_wxid)
     unless success_response?(payload)
-      return render json: { success: false, message: "sync failed", payload: payload }, status: :bad_gateway
+      Rails.logger.warn do
+        "message sync failed: requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid} payload=#{payload.inspect}"
+      end
+      return render json: {
+        success: false,
+        message: "sync failed",
+        requested_wxid: requested_wxid,
+        sync_wxid: sync_wxid,
+        payload: payload
+      }, status: :bad_gateway
     end
 
-    process_synced_payload(payload, wxid, full_backfill: true)
+    process_synced_payload(payload, sync_wxid, full_backfill: true)
 
     render json: {
       success: true,
+      requested_wxid: requested_wxid,
+      sync_wxid: sync_wxid,
       synced_count: (payload.dig("Data", "AddMsgs") || []).size
     }
   end
@@ -416,6 +428,18 @@ class MessagesController < ApplicationController
   def success_response?(payload)
     value = payload["Success"] || payload[:Success]
     value == true || value.to_s.casecmp("true").zero?
+  end
+
+  def resolve_sync_wxid(requested_wxid)
+    return requested_wxid if Contact.where(own_wxid: requested_wxid).exists?
+
+    chat_room = ChatRoom.includes(:contact).find_by(wx_id: requested_wxid)
+    return chat_room.contact.own_wxid if chat_room&.contact&.own_wxid.present?
+
+    contact = Contact.find_by(user_name: requested_wxid)
+    return contact.own_wxid if contact&.own_wxid.present?
+
+    requested_wxid
   end
 
   def explicit_failure_response?(payload)
