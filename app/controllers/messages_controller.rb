@@ -81,16 +81,26 @@ class MessagesController < ApplicationController
     return head :bad_request if wxid.blank?
 
     payload = params.to_unsafe_h
-    unless success_response?(payload)
-      Rails.logger.warn { "message callback ignored: success flag missing or false for wxid=#{wxid}" }
-      return head :ok
-    end
-
     source_payload = payload
-    unless message_batch_present?(source_payload)
+    if message_batch_present?(source_payload)
+      unless success_response?(source_payload)
+        Rails.logger.warn { "message callback ignored: AddMsgs present but success flag is false for wxid=#{wxid}" }
+        return head :ok
+      end
+    else
+      if explicit_failure_response?(source_payload)
+        Rails.logger.warn { "message callback ignored: explicit failure for wxid=#{wxid}" }
+        return head :ok
+      end
+
       Rails.logger.info { "message callback missing AddMsgs, triggering one sync for wxid=#{wxid}" }
       sync_payload = MessageApiService.new(wxid).sync_messages(wxid)
       source_payload = sync_payload if sync_payload.is_a?(Hash)
+    end
+
+    unless success_response?(source_payload)
+      Rails.logger.warn { "message callback sync failed or success flag missing for wxid=#{wxid}" }
+      return head :ok
     end
 
     unless message_batch_present?(source_payload)
@@ -377,6 +387,12 @@ class MessagesController < ApplicationController
   def success_response?(payload)
     value = payload["Success"] || payload[:Success]
     value == true || value.to_s.casecmp("true").zero?
+  end
+
+  def explicit_failure_response?(payload)
+    return false unless payload.key?("Success") || payload.key?(:Success)
+
+    !success_response?(payload)
   end
 
   def message_batch_present?(payload)
