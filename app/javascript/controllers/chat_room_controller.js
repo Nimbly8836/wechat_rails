@@ -79,6 +79,7 @@ export default class extends Controller {
     this.voicePlaybackOptions = [0.5, 1.0, 1.5, 2.0];
     this.highlightedRow = null;
     this.highlightTimer = null;
+    this.loadingOlderMessages = false;
     const cachedMembers = this.readCachedChatMembers();
     this.chatMembers = cachedMembers;
     if (!this.chatMembers.length && Array.isArray(this.membersValue)) {
@@ -99,6 +100,9 @@ export default class extends Controller {
 
     if (this.isRoom()) {
       this.loadChatMembers({ force: cachedMembers.length === 0 });
+      if (cachedMembers.length) {
+        requestAnimationFrame(() => this.loadChatMembers({ force: true }));
+      }
     }
 
     if (restoredMessages > 0) {
@@ -295,8 +299,7 @@ export default class extends Controller {
   }
 
   loadMessages({ replace = false } = {}) {
-    return fetch(`/chat_room/${this.idValue}/messages`)
-      .then(res => res.json())
+    return this.fetchMessages()
       .then(data => {
         if (replace) {
           this.messages.clear();
@@ -308,8 +311,24 @@ export default class extends Controller {
       .catch(error => console.error("加载消息失败:", error));
   }
 
+  fetchMessages({ beforeId = null, afterId = null } = {}) {
+    const params = new URLSearchParams();
+    if (beforeId != null) {
+      params.set("before_id", beforeId);
+    }
+    if (afterId != null) {
+      params.set("after_id", afterId);
+    }
+
+    const query = params.toString();
+    const url = query ? `/chat_room/${this.idValue}/messages?${query}`
+      : `/chat_room/${this.idValue}/messages`;
+
+    return fetch(url).then(res => res.json());
+  }
+
   getMessageType(msg) {
-    return msg.real_msg_type;
+    return this.normalizeMessageType(msg);
   }
 
   renderMessages(options = {}) {
@@ -399,10 +418,10 @@ export default class extends Controller {
 
   replaceRoomSenderWxid(msg) {
     if (this.chatMembers && msg.content) {
-      const title_send_wxid = msg.content.match(/\w+:\n/)?.[0];
+      const title_send_wxid = msg.content.match(/^[^:\n]+:\n/)?.[0];
       if (title_send_wxid) {
         const wxid = title_send_wxid.slice(0, -2);
-        const member_info = this.chatMembers.find(it => it.user_name === wxid);
+        const member_info = this.findChatMember(wxid);
         if (member_info) {
           msg.content = msg.content.replace(wxid + ":\n", "");
         }
@@ -591,7 +610,6 @@ export default class extends Controller {
         placeholder.classList.add("hidden");
         image.classList.remove("hidden");
         image.dataset.loaded = "true";
-        wrapper.classList.add("cursor-zoom-in");
       };
 
       const showFallback = (message) => {
@@ -619,13 +637,7 @@ export default class extends Controller {
         showFallback("[暂不支持的图片]");
       }
 
-      wrapper.addEventListener("click", (event) => {
-        if (image.dataset.loaded === "true" && image.src) {
-          event.stopPropagation();
-          window.open(image.dataset.sourceUrl || image.src, "_blank",
-            "noopener");
-        }
-      });
+      wrapper.style.cursor = "default";
     }
 
     const applied = this.applyBubbleStyle(imageBubble, msg, isNewGroup,
@@ -715,6 +727,8 @@ export default class extends Controller {
 
       videoElement.src = videoUrl;
       videoElement.controls = true;
+      videoElement.playsInline = true;
+      videoElement.disablePictureInPicture = true;
       videoElement.style.maxWidth = "250px";
       videoElement.style.display = "block";
       videoElement.dataset.messageId = messageId;
@@ -984,6 +998,8 @@ export default class extends Controller {
     if (referenced && referenced.wx_message) {
       const refWx = referenced.wx_message;
       this.replaceRoomSenderWxid(refWx);
+      const preview = this.buildMessagePreview(refWx);
+      const referenceSender = this.lookupSenderInfo(refWx, refWx.content);
 
       if (quoted) {
         quoted.classList.remove("cursor-not-allowed", "opacity-60");
@@ -1001,17 +1017,18 @@ export default class extends Controller {
       }
 
       if (quotedMeta) {
-        quotedMeta.textContent = `引用的${this.humanizeMessageType(
-          refWx.msg_type)}消息`;
+        const typeLabel = this.humanizeMessageType(preview.type);
+        quotedMeta.textContent = referenceSender?.name
+          ? `${referenceSender.name} · ${typeLabel}`
+          : `引用的${typeLabel}消息`;
       }
 
       if (quotedContent) {
         quotedContent.innerHTML = "";
-        if (refWx.msg_type === "text" && refWx.content) {
-          quotedContent.appendChild(this.buildLinkedText(refWx.content));
+        if (preview.asLinkedText) {
+          quotedContent.appendChild(this.buildLinkedText(preview.content));
         } else {
-          quotedContent.textContent = `[${this.humanizeMessageType(
-            refWx.msg_type)}]`;
+          quotedContent.textContent = preview.content;
         }
       }
     } else {
@@ -1289,6 +1306,9 @@ export default class extends Controller {
     try {
       const parser = new DOMParser();
       const xml = parser.parseFromString(xmlString, "application/xml");
+      if (xml.querySelector("parsererror")) {
+        return { type: "text", content: xmlString };
+      }
 
       const title = xml.querySelector("title")?.textContent?.trim() || "";
       const desc = xml.querySelector("des")?.textContent?.trim() || "";
@@ -1765,36 +1785,7 @@ export default class extends Controller {
   }
 
   loadMore() {
-    if (this.messages.length === 0) {
-      return;
-    }
-
-    // Get the earliest message by sorting and taking the first
-    // const sortedMessages = [...this.messages].sort((a, b) => {
-    //   const timeA = a.message_time || a.created_at || a.wx_message?.message_time
-    //     || 0;
-    //   const timeB = b.message_time || b.created_at || b.wx_message?.message_time
-    //     || 0;
-    //   return new Date(timeA) - new Date(timeB);
-    // });
-    const firstMsg = this.messages.at(0);
-    const firstMsgId = firstMsg.id;
-    const container = this.messageListTarget;
-    const preserveBottomOffset = container.scrollHeight - container.scrollTop;
-
-    fetch(`/chat_room/${this.idValue}/messages?before_id=${firstMsgId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!data.length) {
-          return;
-        }
-
-        // Add new messages to the Set
-        // data.forEach(msg => this.messages.add(msg));
-        this.messages.merge(data)
-        this.renderMessages({ preserveBottomOffset });
-      })
-      .catch(console.error);
+    this.loadOlderMessagesChunk();
   }
 
   loadNewMessages(msg) {
@@ -1816,8 +1807,7 @@ export default class extends Controller {
     const lastMsg = sortedMessages.at(sortedMessages.length - 1);
     const lastMsgId = lastMsg.id;
 
-    fetch(`/chat_room/${this.idValue}/messages?after_id=${lastMsgId}`)
-      .then(res => res.json())
+    this.fetchMessages({ afterId: lastMsgId })
       .then(data => {
         if (!data.length) {
           return;
@@ -2213,43 +2203,125 @@ export default class extends Controller {
       return;
     }
 
-    const row = this.messageListTarget.querySelector(
-      `[data-message-id="${messageId}"]`);
-    if (!row) {
-      return;
-    }
-
-    if (this.highlightedRow && this.highlightedRow !== row) {
-      this.highlightedRow.classList.remove("ring-2", "ring-blue-400",
-        "ring-offset-2", "ring-offset-gray-100");
-    }
-
-    row.scrollIntoView({ behavior: "smooth", block: "center" });
-    row.classList.add("ring-2", "ring-blue-400", "ring-offset-2",
-      "ring-offset-gray-100");
-    this.highlightedRow = row;
-
-    if (this.highlightTimer) {
-      clearTimeout(this.highlightTimer);
-    }
-    this.highlightTimer = setTimeout(() => {
-      row.classList.remove("ring-2", "ring-blue-400", "ring-offset-2",
-        "ring-offset-gray-100");
-      if (this.highlightedRow === row) {
-        this.highlightedRow = null;
+    this.ensureMessageLoaded(messageId).then((isLoaded) => {
+      if (!isLoaded) {
+        return;
       }
-    }, 2000);
+
+      const row = this.messageListTarget.querySelector(
+        `[data-message-id="${messageId}"]`);
+      if (!row) {
+        return;
+      }
+
+      if (this.highlightedRow && this.highlightedRow !== row) {
+        this.highlightedRow.classList.remove("ring-2", "ring-blue-400",
+          "ring-offset-2", "ring-offset-gray-100");
+      }
+
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      row.classList.add("ring-2", "ring-blue-400", "ring-offset-2",
+        "ring-offset-gray-100");
+      this.highlightedRow = row;
+
+      if (this.highlightTimer) {
+        clearTimeout(this.highlightTimer);
+      }
+      this.highlightTimer = setTimeout(() => {
+        row.classList.remove("ring-2", "ring-blue-400", "ring-offset-2",
+          "ring-offset-gray-100");
+        if (this.highlightedRow === row) {
+          this.highlightedRow = null;
+        }
+      }, 2000);
+    });
+  }
+
+  async ensureMessageLoaded(messageId) {
+    const targetId = Number(messageId);
+    if (!this.hasMessageListTarget) {
+      return false;
+    }
+
+    if (!Number.isFinite(targetId)) {
+      return Boolean(this.messageListTarget.querySelector(
+        `[data-message-id="${messageId}"]`));
+    }
+
+    let row = this.messageListTarget.querySelector(
+      `[data-message-id="${messageId}"]`);
+    if (row) {
+      return true;
+    }
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const firstMsg = this.messages.at(0);
+      const firstMsgId = Number(firstMsg?.id);
+      if (!Number.isFinite(firstMsgId) || targetId >= firstMsgId) {
+        break;
+      }
+
+      const loaded = await this.loadOlderMessagesChunk();
+      if (!loaded) {
+        break;
+      }
+
+      row = this.messageListTarget.querySelector(
+        `[data-message-id="${messageId}"]`);
+      if (row) {
+        return true;
+      }
+    }
+
+    return Boolean(this.messageListTarget.querySelector(
+      `[data-message-id="${messageId}"]`));
+  }
+
+  loadOlderMessagesChunk() {
+    if (this.loadingOlderMessages || this.messages.length === 0) {
+      return Promise.resolve(false);
+    }
+
+    const firstMsg = this.messages.at(0);
+    const firstMsgId = firstMsg?.id;
+    if (!firstMsgId) {
+      return Promise.resolve(false);
+    }
+
+    this.loadingOlderMessages = true;
+    const container = this.messageListTarget;
+    const preserveBottomOffset = container.scrollHeight - container.scrollTop;
+
+    return this.fetchMessages({ beforeId: firstMsgId })
+      .then(data => {
+        if (!data.length) {
+          return false;
+        }
+
+        this.messages.merge(data)
+        this.renderMessages({ preserveBottomOffset });
+        return true;
+      })
+      .catch(error => {
+        console.error("加载更多消息失败:", error);
+        return false;
+      })
+      .finally(() => {
+        this.loadingOlderMessages = false;
+      });
   }
 
   humanizeMessageType(msgType) {
     const mapping = {
+      quote: "引用",
+      refer: "引用",
       text: "文本",
       image: "图片",
       voice: "语音",
       video: "视频",
       file: "文件",
+      file_message: "文件",
       emoji: "表情",
-      refer: "引用",
       card: "卡片",
       html: "网页",
       micro_video: "小视频"
@@ -2263,6 +2335,117 @@ export default class extends Controller {
       return null;
     }
     return template.content.firstElementChild.cloneNode(true);
+  }
+
+  findChatMember(wxid) {
+    if (!wxid || !Array.isArray(this.chatMembers)) {
+      return null;
+    }
+
+    return this.chatMembers.find((member) => {
+      const candidates = [
+        member?.user_name,
+        member?.userName,
+        member?.username,
+        member?.wx_id,
+        member?.wxid
+      ].filter(Boolean);
+      return candidates.includes(wxid);
+    }) || null;
+  }
+
+  resolveMemberName(member, fallback = "") {
+    return member?.display_name || member?.displayName || member?.remark
+      || member?.nick_name || member?.nickName || fallback;
+  }
+
+  resolveMemberAvatar(member) {
+    return member?.small_head_img_url || member?.smallHeadImgUrl
+      || member?.big_head_img_url || member?.bigHeadImgUrl || "";
+  }
+
+  stripRoomSenderPrefix(text = "") {
+    return text.replace(/^[^:\n]+:\n/, "");
+  }
+
+  normalizeMessageType(msg) {
+    const stringType = msg?.real_msg_type || msg?.msg_type;
+    if (typeof stringType === "string" && stringType.length > 0) {
+      return stringType;
+    }
+
+    const numericType = Number(msg?.real_msg_type ?? msg?.msg_type);
+    const mapping = {
+      1: "text",
+      3: "image",
+      5: "card",
+      6: "file_message",
+      34: "voice",
+      43: "video",
+      47: "emoji",
+      49: "refer",
+      57: "quote",
+      62: "micro_video"
+    };
+    return mapping[numericType] || "unknown";
+  }
+
+  buildMessagePreview(msg) {
+    const type = this.normalizeMessageType(msg);
+    const content = this.stripRoomSenderPrefix(msg?.content || "");
+
+    switch (type) {
+      case "text":
+        return {
+          type,
+          content: content || "[文本]",
+          asLinkedText: true
+        };
+      case "quote": {
+        const parsed = this.parseWxXmlMessage(msg?.content || "");
+        return {
+          type,
+          content: msg?.refer_title || parsed.title || parsed.refContent
+            || "[引用消息]",
+          asLinkedText: false
+        };
+      }
+      case "card": {
+        const parsed = this.parseWxXmlMessage(msg?.content || "");
+        return {
+          type,
+          content: parsed.title || "[卡片消息]",
+          asLinkedText: false
+        };
+      }
+      case "file_message": {
+        const fileInfo = this.parseWxFileAttachment(msg?.content || "") || {};
+        return {
+          type,
+          content: fileInfo.title || msg?.refer_title || "[文件消息]",
+          asLinkedText: false
+        };
+      }
+      case "image":
+      case "voice":
+      case "video":
+      case "emoji":
+      case "micro_video":
+        return {
+          type,
+          content: `[${this.humanizeMessageType(type)}]`,
+          asLinkedText: false
+        };
+      default: {
+        const parsed = this.parseWxXmlMessage(msg?.content || "");
+        return {
+          type,
+          content: content || parsed.title || parsed.desc
+            || `[${this.humanizeMessageType(type)}]`,
+          asLinkedText: !content.startsWith("<")
+        };
+      }
+    }
   }
 
   lookupSenderInfo(msg, rawContent = "") {
@@ -2295,9 +2478,9 @@ export default class extends Controller {
         wxid = match ? match[1] : null;
       }
       wxid = wxid || msg.to_user_name || msg.from_user_name;
-      const member = this.chatMembers?.find(m => m.user_name === wxid);
-      const name = member?.remark || member?.nick_name || wxid;
-      const avatar = member?.small_head_img_url || "";
+      const member = this.findChatMember(wxid);
+      const name = this.resolveMemberName(member, wxid);
+      const avatar = this.resolveMemberAvatar(member);
       const initial = (name || wxid || "?").slice(0, 1).toUpperCase();
       return {
         key: `room:${wxid}`, name, avatar, initial
