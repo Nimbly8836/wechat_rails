@@ -11,9 +11,12 @@ class Message < ApplicationRecord
 
     payload = {
       chat_room_id: self.chat_room_id,
+      chat_room_name: chat_room&.name,
       wx_messages_id: msg.id,
       message_id: self.id,
-      content_preview: msg.content&.truncate(50)
+      content_preview: msg.preview_content&.truncate(50),
+      message_time: message_time&.iso8601,
+      self_send: msg.self_send
     }.to_json
 
     # 使用 PG NOTIFY

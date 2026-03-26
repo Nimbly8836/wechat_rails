@@ -6,6 +6,23 @@ import {
   hideAllEmojiPreviews,
   MessageSet
 } from "utils/file_utils";
+import {
+  chatStorageKeys,
+  readCache,
+  writeCache,
+  removeCache
+} from "utils/chat_storage";
+
+const MESSAGE_CACHE_LIMIT = 80;
+const DEFAULT_THEME = {
+  backgroundColor: "var(--color-gray-100)",
+  backgroundImage: "",
+  selfBubbleColor: "#6387f2",
+  selfBubbleTextColor: "#ffffff",
+  otherBubbleColor: "rgba(255,255,255,0.92)",
+  otherBubbleBorderColor: "rgba(148,163,184,0.45)",
+  fontFamily: "inherit"
+};
 
 export default class extends Controller {
   static targets = ["messageList", "input", "emptyMessage", "menu",
@@ -21,16 +38,11 @@ export default class extends Controller {
 
   connect() {
     hideAllEmojiPreviews();
-    const defaultTheme = {
-      backgroundColor: "var(--color-gray-100)",
-      backgroundImage: "",
-      selfBubbleColor: "#6387f2",
-      selfBubbleTextColor: "#ffffff",
-      otherBubbleColor: "rgba(255,255,255,0.92)",
-      otherBubbleBorderColor: "rgba(148,163,184,0.45)",
-      fontFamily: "inherit"
+    this.theme = {
+      ...DEFAULT_THEME,
+      ...this.readChatRoomTheme(),
+      ...(this.theme || {})
     };
-    this.theme = { ...defaultTheme, ...(this.theme || {}) };
 
     this.boundCloseMenu = this.closeMenu.bind(this);
     this.boundCloseThemePanel = this.closeThemePanel.bind(this);
@@ -67,26 +79,33 @@ export default class extends Controller {
     this.voicePlaybackOptions = [0.5, 1.0, 1.5, 2.0];
     this.highlightedRow = null;
     this.highlightTimer = null;
-
-    window.addEventListener("chat:notify", (e) => {
+    const cachedMembers = this.readCachedChatMembers();
+    this.chatMembers = cachedMembers;
+    if (!this.chatMembers.length && Array.isArray(this.membersValue)) {
+      this.chatMembers = this.membersValue;
+    }
+    this.boundChatNotify = (e) => {
       const payload = e.detail;
       if (payload.chat_room_id === this.idValue) {
         this.debouncedLoadNewMessages(payload);
       }
-    });
+    };
 
-    if (this.isRoom()) {
-      fetch(`/chat_room/${this.idValue}/chat_members`)
-        .then(res => res.json())
-        .then(data => {
-          this.chatMembers = data;
-          this.renderMessages();
-        })
-        .catch(error => console.error("加载room members 失败", error));
-    }
+    window.addEventListener("chat:notify", this.boundChatNotify);
+
     // Initialize messages as a Set
     this.messages = new MessageSet();
-    this.loadMessages();
+    const restoredMessages = this.restoreCachedMessages();
+
+    if (this.isRoom()) {
+      this.loadChatMembers({ force: cachedMembers.length === 0 });
+    }
+
+    if (restoredMessages > 0) {
+      this.renderMessages();
+    } else {
+      this.loadMessages();
+    }
 
     this.applyTheme({ refreshBubbles: false });
     this.syncThemeInputs();
@@ -130,6 +149,91 @@ export default class extends Controller {
     };
   }
 
+  readChatRoomTheme() {
+    const [namespace, identifier] = chatStorageKeys.chatRoomTheme(this.idValue);
+    return readCache(namespace, identifier, {}) || {};
+  }
+
+  persistTheme() {
+    const [namespace, identifier] = chatStorageKeys.chatRoomTheme(this.idValue);
+    writeCache(namespace, identifier, this.theme);
+  }
+
+  readCachedChatMembers() {
+    const [namespace, identifier] = chatStorageKeys.chatRoomMembers(this.idValue);
+    const cached = readCache(namespace, identifier, []);
+    return Array.isArray(cached) ? cached : [];
+  }
+
+  persistChatMembers() {
+    const [namespace, identifier] = chatStorageKeys.chatRoomMembers(this.idValue);
+    writeCache(namespace, identifier, this.chatMembers || []);
+  }
+
+  loadChatMembers({ force = false } = {}) {
+    if (!this.isRoom()) {
+      return Promise.resolve([]);
+    }
+
+    if (!force && this.chatMembers?.length) {
+      return Promise.resolve(this.chatMembers);
+    }
+
+    return fetch(`/chat_room/${this.idValue}/chat_members`)
+      .then(res => res.json())
+      .then(data => {
+        this.chatMembers = Array.isArray(data) ? data : [];
+        this.persistChatMembers();
+        this.renderMessages();
+        return this.chatMembers;
+      })
+      .catch(error => {
+        console.error("加载room members 失败", error);
+        return [];
+      });
+  }
+
+  sanitizeMessageForCache(wrapper) {
+    if (!wrapper || wrapper.id == null || String(wrapper.id).startsWith("temp-")) {
+      return null;
+    }
+
+    try {
+      const cloned = JSON.parse(JSON.stringify(wrapper));
+      if (cloned.extra?.base64) {
+        delete cloned.extra.base64;
+      }
+      if (cloned.wx_message?.extra?.base64) {
+        delete cloned.wx_message.extra.base64;
+      }
+      return cloned;
+    } catch (error) {
+      console.warn("消息缓存序列化失败", error);
+      return null;
+    }
+  }
+
+  persistMessages() {
+    const [namespace, identifier] = chatStorageKeys.chatRoomMessages(this.idValue);
+    const cacheableMessages = this.messages.all
+      .map((wrapper) => this.sanitizeMessageForCache(wrapper))
+      .filter(Boolean)
+      .slice(-MESSAGE_CACHE_LIMIT);
+
+    writeCache(namespace, identifier, cacheableMessages);
+  }
+
+  restoreCachedMessages() {
+    const [namespace, identifier] = chatStorageKeys.chatRoomMessages(this.idValue);
+    const cached = readCache(namespace, identifier, []);
+    if (!Array.isArray(cached) || cached.length === 0) {
+      return 0;
+    }
+
+    this.messages.merge(cached);
+    return cached.length;
+  }
+
   disconnect() {
 
     if (this.highlightTimer) {
@@ -154,6 +258,13 @@ export default class extends Controller {
         this.boundCloseAttachmentSelect);
     }
 
+    if (this.boundChatNotify) {
+      window.removeEventListener("chat:notify", this.boundChatNotify);
+    }
+
+    if (typeof this.cleanupEmojiPreview === "function") {
+      this.cleanupEmojiPreview();
+    }
 
     document.removeEventListener("click", this._boundHideAttachmentSelect);
 
@@ -183,14 +294,15 @@ export default class extends Controller {
     el.style.height = el.scrollHeight + "px";
   }
 
-  loadMessages() {
-    fetch(`/chat_room/${this.idValue}/messages`)
+  loadMessages({ replace = false } = {}) {
+    return fetch(`/chat_room/${this.idValue}/messages`)
       .then(res => res.json())
       .then(data => {
-        // Clear existing messages and add new ones to the Set
-        // this.messages.clear();
-        // data.forEach(msg => this.messages.add(msg));
+        if (replace) {
+          this.messages.clear();
+        }
         this.messages.merge(data)
+        this.persistMessages();
         this.renderMessages();
       })
       .catch(error => console.error("加载消息失败:", error));
@@ -222,6 +334,7 @@ export default class extends Controller {
       if (this.hasEmptyMessageTarget) {
         this.emptyMessageTarget.style.display = "block";
       }
+      this.persistMessages();
       return;
     }
     if (this.hasEmptyMessageTarget) {
@@ -280,6 +393,8 @@ export default class extends Controller {
     } else {
       container.scrollTop = container.scrollHeight;
     }
+
+    this.persistMessages();
   }
 
   replaceRoomSenderWxid(msg) {
@@ -1387,6 +1502,13 @@ export default class extends Controller {
     this.syncThemeInputs();
   }
 
+  resetTheme(event = null) {
+    event?.preventDefault();
+    this.theme = { ...DEFAULT_THEME };
+    this.syncThemeInputs();
+    this.applyTheme();
+  }
+
   updateFontFamily(event) {
     const value = event?.target?.value ?? "inherit";
     if (value === "custom") {
@@ -1451,6 +1573,9 @@ export default class extends Controller {
         this.element.style.backgroundPosition = "center";
       } else {
         this.element.style.backgroundImage = "";
+        this.element.style.backgroundSize = "";
+        this.element.style.backgroundRepeat = "";
+        this.element.style.backgroundPosition = "";
       }
       this.element.style.fontFamily = fontFamily;
     }
@@ -1478,6 +1603,8 @@ export default class extends Controller {
     if (refreshBubbles) {
       this.refreshBubbleStyles();
     }
+
+    this.persistTheme();
   }
 
   refreshBubbleStyles() {
@@ -1552,6 +1679,8 @@ export default class extends Controller {
   syncMembers(event = null) {
     event?.stopPropagation();
     this.closeMenu();
+    const [namespace, identifier] = chatStorageKeys.chatRoomMembers(this.idValue);
+    removeCache(namespace, identifier);
     fetch(`/chat_room/${this.idValue}/sync_chat_members`, {
       method: "PUT", headers: {
         "Content-Type": "application/json",
@@ -1562,6 +1691,8 @@ export default class extends Controller {
         chat_room_id: this.idValue,
       })
     });
+    setTimeout(() => this.loadChatMembers({ force: true }), 1200);
+    setTimeout(() => this.loadChatMembers({ force: true }), 2600);
   }
 
   openSidebar(event = null) {
@@ -1601,9 +1732,9 @@ export default class extends Controller {
         if (data?.sync_wxid && data.sync_wxid !== syncWxid) {
           console.info("message sync resolved owner wxid", data);
         }
-        this.loadMessages();
-        setTimeout(() => this.loadMessages(), 1200);
-        setTimeout(() => this.loadMessages(), 2600);
+        this.loadMessages({ replace: true });
+        setTimeout(() => this.loadMessages({ replace: true }), 1200);
+        setTimeout(() => this.loadMessages({ replace: true }), 2600);
       })
       .catch((error) => {
         console.error("同步消息失败", error);
@@ -1618,6 +1749,10 @@ export default class extends Controller {
   syncContact(event = null) {
     event?.stopPropagation();
     this.closeMenu();
+    const [shellNamespace, shellIdentifier] = chatStorageKeys.chatRoomShell(this.idValue);
+    const [listNamespace, listIdentifier] = chatStorageKeys.chatRoomList();
+    removeCache(shellNamespace, shellIdentifier);
+    removeCache(listNamespace, listIdentifier);
     fetch(`/chat_room/${this.idValue}/sync_chat_contact`, {
       method: "PUT", headers: {
         "Content-Type": "application/json",
@@ -1668,7 +1803,6 @@ export default class extends Controller {
     }
 
     const container = this.messageListTarget;
-    const oldHeight = container.scrollHeight;
 
     // Get the latest message by sorting and taking the last
     // const sortedMessages = [...this.messages].sort((a, b) => {

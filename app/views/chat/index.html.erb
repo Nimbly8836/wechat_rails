@@ -10,19 +10,82 @@
        class="fixed inset-y-0 left-0 z-40 flex w-[min(24rem,calc(100vw-2.5rem))] max-w-[500px] -translate-x-full flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-200 ease-out sm:static sm:z-auto sm:min-w-[65px] sm:w-[330px] sm:translate-x-0 sm:shadow-none"
        data-chat-target="sidebar">
     <!-- header -->
-    <div class="flex h-[60px] items-center border-b border-slate-200 bg-white px-4">
+    <div class="relative flex h-[60px] items-center border-b border-slate-200 bg-white px-4">
       <div class="flex w-64 items-center gap-3 font-medium text-slate-900">
         <img width="30" height="30" src="https://img.icons8.com/hands/50/sms.png" alt="sms"/>
         <span>Wechat</span>
       </div>
-      <button type="button"
-              class="ml-auto flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 sm:hidden"
-              aria-label="关闭联系人侧栏"
-              data-action="click->chat#closeSidebar">
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18 18 6M6 6l12 12"/>
-        </svg>
-      </button>
+      <div class="ml-auto flex items-center gap-2">
+        <button type="button"
+                class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+                aria-label="通知设置"
+                data-chat-target="notificationButton"
+                data-action="click->chat#toggleNotificationPanel">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M14.857 17H9.143m9.714 0A2.143 2.143 0 0 1 16.714 19.143H7.286A2.143 2.143 0 0 1 5.143 17m13.714 0V11.857a6.857 6.857 0 1 0-13.714 0V17m13.714 0H5.143"/>
+          </svg>
+        </button>
+        <button type="button"
+                class="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 sm:hidden"
+                aria-label="关闭联系人侧栏"
+                data-action="click->chat#closeSidebar">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18 18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="absolute right-4 top-14 z-50 hidden w-72 rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur"
+           data-chat-target="notificationPanel">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm font-semibold text-slate-900">通知设置</div>
+            <div class="mt-1 text-xs text-slate-500" data-chat-target="notificationStatus"></div>
+          </div>
+          <button type="button"
+                  class="rounded-full px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                  data-action="click->chat#closeNotificationPanel">
+            关闭
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-3 text-sm text-slate-700">
+          <label class="flex items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3">
+            <input type="checkbox"
+                   class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                   data-chat-target="notificationToggle"
+                   data-action="change->chat#updateNotificationsEnabled">
+            <span>
+              <span class="block font-medium text-slate-900">启用桌面通知</span>
+              <span class="mt-1 block text-xs text-slate-500">收到新消息时允许浏览器弹出通知。</span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3">
+            <input type="checkbox"
+                   class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                   data-chat-target="notificationHiddenOnly"
+                   data-action="change->chat#updateNotificationsOnlyWhenHidden">
+            <span>
+              <span class="block font-medium text-slate-900">仅后台提醒</span>
+              <span class="mt-1 block text-xs text-slate-500">页面正在前台使用时不弹通知，避免打扰。</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button type="button"
+                  class="rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                  data-action="click->chat#requestNotificationPermission">
+            请求权限
+          </button>
+          <button type="button"
+                  class="rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
+                  data-action="click->chat#sendTestNotification">
+            测试通知
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 搜索栏 -->

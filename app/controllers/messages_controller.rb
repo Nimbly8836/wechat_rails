@@ -15,7 +15,7 @@ class MessagesController < ApplicationController
 
     # 如果前端传了 before_id，就取更早的消息
     messages = messages.where("id < ?", before_id) if before_id.present?
-    messages = messages.where("id >= ?", after_id) if after_id.present?
+    messages = messages.where("id > ?", after_id) if after_id.present?
 
     messages = messages.order(id: :desc).limit(100).to_a
     refer_ids = messages.filter_map { |msg| msg.wx_message&.refer_new_msg_id }.presence || []

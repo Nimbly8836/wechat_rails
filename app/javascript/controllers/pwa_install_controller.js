@@ -9,12 +9,12 @@ export default class extends Controller {
     this.deferredPrompt = null
     this.boundBeforeInstallPrompt = this.captureInstallPrompt.bind(this)
     this.boundAppInstalled = this.handleAppInstalled.bind(this)
+    this.registerServiceWorker()
 
     if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone) {
       return
     }
 
-    this.registerServiceWorker()
     window.addEventListener("beforeinstallprompt", this.boundBeforeInstallPrompt)
     window.addEventListener("appinstalled", this.boundAppInstalled)
   }
