@@ -20,6 +20,12 @@ Rails.application.routes.draw do
 
   # chat
   get "chat" => "chat#index"
+  resources :chat_folders, only: [ :index, :create, :destroy ] do
+    member do
+      patch :toggle_room
+      patch :toggle_pin
+    end
+  end
 
   # contact management
   get "contact" => "contact#index"

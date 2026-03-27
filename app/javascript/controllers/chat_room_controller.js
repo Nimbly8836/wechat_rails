@@ -33,6 +33,7 @@ export default class extends Controller {
     currentWxid: String,
     ownerWxid: String,
     id: Number,
+    name: String,
     members: Array
   };
 
@@ -553,6 +554,9 @@ export default class extends Controller {
       case "voice":
         return this.renderVoiceMessage(bubble, msg, isNewGroup, senderInfo,
           isFirstMessage);
+      case "voip":
+        return this.renderVoipMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
       case "video_account":
         return this.renderVideoAccountMessage(bubble, msg, isNewGroup,
           senderInfo, isFirstMessage);
@@ -627,6 +631,24 @@ export default class extends Controller {
     }
 
     return this.applyBubbleStyle(cardBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderVoipMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-voip");
+    const voipBubble = template || bubble;
+    const parsed = this.parseWxVoipMessage(msg.content || "");
+    const title = voipBubble.querySelector("[data-role='voip-title']");
+    const meta = voipBubble.querySelector("[data-role='voip-meta']");
+
+    if (title) {
+      title.textContent = parsed.title || "微信通话";
+    }
+    if (meta) {
+      meta.textContent = parsed.summary || "通话消息";
+    }
+
+    return this.applyBubbleStyle(voipBubble, msg, isNewGroup, senderInfo,
       isFirstMessage);
   }
 
@@ -1337,6 +1359,35 @@ export default class extends Controller {
     }) + ` ${timePart}`;
   }
 
+  buildLocalMessagePreview(type, tempMsg) {
+    switch (type) {
+      case "text":
+        return tempMsg?.wx_message?.content || "新消息"
+      case "image":
+        return "[图片]"
+      case "file":
+        return "[文件]"
+      case "voice":
+        return "[语音]"
+      case "video":
+        return "[视频]"
+      default:
+        return "[新消息]"
+    }
+  }
+
+  dispatchLocalChatMessage(type, tempMsg) {
+    window.dispatchEvent(new CustomEvent("chat:local-message", {
+      detail: {
+        chat_room_id: this.idValue,
+        chat_room_name: this.nameValue || "聊天窗口",
+        content_preview: this.buildLocalMessagePreview(type, tempMsg),
+        message_time: tempMsg?.message_time || new Date().toISOString(),
+        self_send: true
+      }
+    }));
+  }
+
   createSendMessage(type, message) {
     const tempId = "temp-" + Date.now();
 
@@ -1373,6 +1424,7 @@ export default class extends Controller {
     }
     this.messages.add(tempMsg);
     this.renderMessages({ forceScrollToBottom: true });
+    this.dispatchLocalChatMessage(type, tempMsg);
     return tempMsg;
 
   }
@@ -1522,6 +1574,62 @@ export default class extends Controller {
       console.error("Video XML parse error:", error);
       return null;
     }
+  }
+
+  parseWxVoipMessage(xmlString) {
+    try {
+      const xml = this.parseXmlDocument(xmlString);
+      if (!xml) {
+        return { title: "微信通话", summary: "通话消息" };
+      }
+
+      const voipNode = xml.querySelector("voipmsg");
+      const bubble = xml.querySelector("VoIPBubbleMsg");
+      const rawMsg = bubble?.querySelector("msg")?.textContent?.trim() || "";
+      const roomType = bubble?.querySelector("room_type")?.textContent?.trim()
+        || "";
+      const durationSeconds = Number(
+        bubble?.querySelector("duration")?.textContent || 0
+      );
+
+      let durationLabel = "";
+      const durationMatch = rawMsg.match(/Duration:\s*([0-9:]+)/i);
+      if (durationMatch?.[1]) {
+        durationLabel = durationMatch[1];
+      } else if (durationSeconds > 0) {
+        durationLabel = this.formatVoipDuration(durationSeconds);
+      }
+
+      const title = roomType === "1" ? "微信通话" : "微信语音通话";
+      const summary = durationLabel ? `通话时长 ${durationLabel}`
+        : rawMsg || voipNode?.getAttribute("type") || "通话消息";
+
+      return {
+        title,
+        summary,
+        durationLabel
+      };
+    } catch (error) {
+      console.error("VoIP XML parse error:", error);
+      return { title: "微信通话", summary: "通话消息" };
+    }
+  }
+
+  formatVoipDuration(totalSeconds) {
+    const seconds = Math.max(Number(totalSeconds) || 0, 0);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainSeconds = seconds % 60;
+
+    if (hours > 0) {
+      return [hours, minutes, remainSeconds]
+        .map((value) => String(value).padStart(2, "0"))
+        .join(":");
+    }
+
+    return [minutes, remainSeconds]
+      .map((value) => String(value).padStart(2, "0"))
+      .join(":");
   }
 
   parseWxFileAttachment(xmlString) {
@@ -2551,6 +2659,7 @@ export default class extends Controller {
       text: "文本",
       image: "图片",
       voice: "语音",
+      voip: "通话",
       video: "视频",
       file: "文件",
       file_message: "文件",
@@ -2603,7 +2712,11 @@ export default class extends Controller {
   }
 
   normalizeMessageType(msg) {
-    const stringType = msg?.real_msg_type || msg?.msg_type;
+    const rawStringType = msg?.real_msg_type || msg?.msg_type;
+    const stringAliases = {
+      voip_msg: "voip"
+    };
+    const stringType = stringAliases[rawStringType] || rawStringType;
     if (typeof stringType === "string" && stringType.length > 0) {
       if ((stringType === "refer" || stringType === "unknown")
         && msg?.content) {
@@ -2629,6 +2742,7 @@ export default class extends Controller {
       5: "card",
       6: "file_message",
       34: "voice",
+      50: "voip",
       43: "video",
       47: "emoji",
       49: "refer",
@@ -2679,6 +2793,14 @@ export default class extends Controller {
         return {
           type,
           content: fileInfo.title || msg?.refer_title || "[文件消息]",
+          asLinkedText: false
+        };
+      }
+      case "voip": {
+        const parsed = this.parseWxVoipMessage(msg?.content || "");
+        return {
+          type,
+          content: parsed.summary || "[通话消息]",
           asLinkedText: false
         };
       }

@@ -3,6 +3,7 @@
      data-chat-room-current-wxid-value="<%= @chat_room.wx_id %>"
      data-chat-room-owner-wxid-value="<%= @chat_room.contact&.own_wxid %>"
      data-chat-room-id-value="<%= @chat_room.id %>"
+     data-chat-room-name-value="<%= @chat_room.name.presence || "聊天窗口" %>"
      data-chat-room-members-value="<%= json_escape((@chat_room.members || []).to_json) %>"
 >
 

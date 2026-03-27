@@ -125,6 +125,37 @@ should_prepare_database() {
   return 1
 }
 
+should_run_db_merge_script() {
+  case "${RUN_DB_MERGE_SCRIPT:-0}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+run_db_merge_script() {
+  local script_path="${DB_MERGE_SCRIPT_PATH:-/rails/bin/db-merge}"
+
+  if ! should_run_db_merge_script; then
+    return 0
+  fi
+
+  if [ ! -f "$script_path" ]; then
+    echo "RUN_DB_MERGE_SCRIPT is enabled but DB_MERGE_SCRIPT_PATH does not exist: $script_path" >&2
+    exit 1
+  fi
+
+  if [ ! -x "$script_path" ]; then
+    chmod +x "$script_path"
+  fi
+
+  echo "Running database merge script: $script_path"
+  "$script_path"
+}
+
 prepare_runtime_secrets_dir
 prepare_runtime_credentials
 prepare_master_key
@@ -139,6 +170,7 @@ fi
 # Prepare all configured databases before starting the app/worker stack.
 if should_prepare_database "$@"; then
   ./bin/rails db:prepare
+  run_db_merge_script
 fi
 
 exec "${@}"

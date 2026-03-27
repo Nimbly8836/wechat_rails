@@ -63,6 +63,7 @@ export function removeCache(namespace, identifier = "") {
 export const chatStorageKeys = {
   notificationSettings: () => ["notification-settings", ""],
   chatRoomList: () => ["chat-room-list", ""],
+  activeChatFolder: () => ["active-chat-folder", ""],
   chatRoomTheme: (roomId) => ["chat-room-theme", String(roomId)],
   chatRoomMessages: (roomId) => ["chat-room-messages", String(roomId)],
   chatRoomMembers: (roomId) => ["chat-room-members", String(roomId)],
