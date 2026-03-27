@@ -613,6 +613,15 @@ export default class extends Controller {
     const roomTitle = this.chatRoomNames[String(chatRoomId)] || "聊天窗口"
     const [namespace, identifier] = chatStorageKeys.chatRoomShell(chatRoomId)
     const cachedHtml = readCache(namespace, identifier, "")
+    const renderChatRoomHtml = (html) => {
+      if (this.currentRoomId !== String(chatRoomId)) {
+        return
+      }
+
+      writeCache(namespace, identifier, html)
+      this.chatBoxTarget.innerHTML = html
+      this.closeSidebar()
+    }
 
     this.currentRoomId = String(chatRoomId)
     this.setMobileTitle(roomTitle)
@@ -621,24 +630,21 @@ export default class extends Controller {
     if (cachedHtml) {
       this.chatBoxTarget.innerHTML = cachedHtml
       this.closeSidebar()
-      return
+    } else {
+      this.chatBoxTarget.innerHTML = '<div class="flex h-full items-center justify-center px-6 text-sm text-slate-400">加载中...</div>'
     }
-
-    this.chatBoxTarget.innerHTML = '<div class="flex h-full items-center justify-center px-6 text-sm text-slate-400">加载中...</div>'
 
     fetch(`/chat_room/${chatRoomId}`)
       .then((resp) => resp.text())
       .then((html) => {
+        renderChatRoomHtml(html)
+      })
+      .catch(() => {
         if (this.currentRoomId !== String(chatRoomId)) {
           return
         }
 
-        writeCache(namespace, identifier, html)
-        this.chatBoxTarget.innerHTML = html
-        this.closeSidebar()
-      })
-      .catch(() => {
-        if (this.currentRoomId !== String(chatRoomId)) {
+        if (cachedHtml) {
           return
         }
 
