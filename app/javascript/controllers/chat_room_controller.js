@@ -276,7 +276,7 @@ export default class extends Controller {
   }
 
   isRoom() {
-    return this.currentWxidValue.endsWith("@chatroom");
+    return String(this.currentWxidValue || "").endsWith("@chatroom");
   }
 
   handleScroll() {
@@ -336,7 +336,10 @@ export default class extends Controller {
       return;
     }
     const container = this.messageListTarget;
-    container.innerHTML = "";
+    const emptyState = this.hasEmptyMessageTarget
+      ? this.emptyMessageTarget.cloneNode(true)
+      : this.buildEmptyState();
+    container.replaceChildren();
 
     let bottomOffset = null;
     if (typeof options.preserveBottomOffset === "number") {
@@ -350,14 +353,10 @@ export default class extends Controller {
     this.highlightedRow = null;
 
     if (this.messages.length === 0) {
-      if (this.hasEmptyMessageTarget) {
-        this.emptyMessageTarget.style.display = "block";
-      }
       this.persistMessages();
+      emptyState.style.display = "block";
+      container.appendChild(emptyState);
       return;
-    }
-    if (this.hasEmptyMessageTarget) {
-      this.emptyMessageTarget.style.display = "none";
     }
 
     let lastSenderKey = null;
@@ -414,6 +413,13 @@ export default class extends Controller {
     }
 
     this.persistMessages();
+  }
+
+  buildEmptyState() {
+    const emptyState = document.createElement("div");
+    emptyState.className = "text-gray-400 text-center py-8";
+    emptyState.textContent = "暂无消息";
+    return emptyState;
   }
 
   replaceRoomSenderWxid(msg) {
