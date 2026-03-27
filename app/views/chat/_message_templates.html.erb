@@ -37,6 +37,25 @@
   </div>
 </template>
 
+<template id="message-template-video-account">
+  <div class="relative inline-block max-w-[75%] overflow-hidden rounded-2xl border border-slate-200 bg-white text-gray-900 shadow-sm message-bubble">
+    <a class="block transition hover:bg-slate-50" data-role="video-account-link" target="_blank" rel="noopener noreferrer">
+      <div class="relative overflow-hidden bg-slate-100" data-role="video-account-cover-shell">
+        <img data-role="video-account-cover" alt="视频号封面" class="hidden max-h-[320px] w-full object-cover" referrerpolicy="no-referrer">
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span class="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-lg text-white">▶</span>
+        </div>
+        <div class="absolute bottom-2 right-2 hidden rounded-full bg-black/65 px-2 py-1 text-[11px] text-white" data-role="video-account-duration"></div>
+      </div>
+      <div class="space-y-1 p-3">
+        <div class="text-sm font-semibold text-slate-900" data-role="video-account-title"></div>
+        <div class="line-clamp-3 text-sm text-slate-600" data-role="video-account-desc"></div>
+        <div class="text-xs text-slate-400" data-role="video-account-source"></div>
+      </div>
+    </a>
+  </div>
+</template>
+
 <template id="message-template-refer">
   <div class="relative inline-block max-w-[75%] rounded-2xl shadow-sm message-bubble" data-role="refer-root">
     <div class="px-3 pt-2 pr-14 text-sm text-gray-900 whitespace-pre-wrap break-words" data-role="refer-body"></div>

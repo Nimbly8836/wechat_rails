@@ -80,6 +80,7 @@ export default class extends Controller {
     this.highlightedRow = null;
     this.highlightTimer = null;
     this.loadingOlderMessages = false;
+    this.autoScrollPinnedToBottom = true;
     const cachedMembers = this.readCachedChatMembers();
     this.chatMembers = cachedMembers;
     if (!this.chatMembers.length && Array.isArray(this.membersValue)) {
@@ -280,6 +281,8 @@ export default class extends Controller {
   }
 
   handleScroll() {
+    this.syncAutoScrollState();
+
     if (!this.hasShowMoreTarget) {
       return;
     }
@@ -289,6 +292,42 @@ export default class extends Controller {
       this.showMoreTarget.style.display = "block";
     } else {
       this.showMoreTarget.style.display = "none";
+    }
+  }
+
+  isNearBottom(threshold = 96) {
+    if (!this.hasMessageListTarget) {
+      return true;
+    }
+
+    const container = this.messageListTarget;
+    const distanceToBottom = container.scrollHeight - container.clientHeight
+      - container.scrollTop;
+    return distanceToBottom <= threshold;
+  }
+
+  syncAutoScrollState() {
+    this.autoScrollPinnedToBottom = this.isNearBottom();
+  }
+
+  scrollToBottom() {
+    if (!this.hasMessageListTarget) {
+      return;
+    }
+
+    this.messageListTarget.scrollTop = this.messageListTarget.scrollHeight;
+  }
+
+  scheduleScrollToBottom() {
+    requestAnimationFrame(() => {
+      this.scrollToBottom();
+      requestAnimationFrame(() => this.scrollToBottom());
+    });
+  }
+
+  stickToBottomIfNeeded() {
+    if (this.autoScrollPinnedToBottom) {
+      this.scheduleScrollToBottom();
     }
   }
 
@@ -345,6 +384,7 @@ export default class extends Controller {
     if (typeof options.preserveBottomOffset === "number") {
       bottomOffset = options.preserveBottomOffset;
     }
+    const forceScrollToBottom = options.forceScrollToBottom === true;
 
     if (this.highlightTimer) {
       clearTimeout(this.highlightTimer);
@@ -406,10 +446,14 @@ export default class extends Controller {
       this.addTimestamp(bubble, wrapper, msg);
     });
 
-    if (bottomOffset !== null) {
+    if (forceScrollToBottom) {
+      this.autoScrollPinnedToBottom = true;
+      this.scheduleScrollToBottom();
+    } else if (bottomOffset !== null) {
       container.scrollTop = Math.max(container.scrollHeight - bottomOffset, 0);
     } else {
-      container.scrollTop = container.scrollHeight;
+      this.autoScrollPinnedToBottom = true;
+      this.scheduleScrollToBottom();
     }
 
     this.persistMessages();
@@ -509,9 +553,21 @@ export default class extends Controller {
       case "voice":
         return this.renderVoiceMessage(bubble, msg, isNewGroup, senderInfo,
           isFirstMessage);
+      case "video_account":
+        return this.renderVideoAccountMessage(bubble, msg, isNewGroup,
+          senderInfo, isFirstMessage);
       case "card":
         return this.renderCardMessage(bubble, msg, isNewGroup, senderInfo,
           isFirstMessage);
+      case "refer": {
+        const parsed = this.parseWxXmlMessage(msg.content || "");
+        if (parsed.title || parsed.desc || parsed.cover || parsed.url) {
+          return this.renderCardMessage(bubble, msg, isNewGroup, senderInfo,
+            isFirstMessage);
+        }
+        return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      }
       case "xml_unparsed":
         return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo,
           isFirstMessage);
@@ -548,7 +604,12 @@ export default class extends Controller {
     const source = cardBubble.querySelector("[data-role='card-source']");
 
     if (link) {
-      link.href = parsed.url || "#";
+      if (parsed.url) {
+        link.href = parsed.url;
+      } else {
+        link.removeAttribute("href");
+        link.classList.add("pointer-events-none");
+      }
     }
     if (cover) {
       cover.innerHTML = parsed.cover
@@ -566,6 +627,67 @@ export default class extends Controller {
     }
 
     return this.applyBubbleStyle(cardBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderVideoAccountMessage(bubble, msg, isNewGroup, senderInfo,
+    isFirstMessage) {
+    const template = this.cloneTemplate("message-template-video-account");
+    const accountBubble = template || bubble;
+    const parsed = this.parseWxXmlMessage(msg.content || "");
+    const link = accountBubble.querySelector("[data-role='video-account-link']");
+    const coverShell = accountBubble.querySelector(
+      "[data-role='video-account-cover-shell']");
+    const cover = accountBubble.querySelector("[data-role='video-account-cover']");
+    const title = accountBubble.querySelector("[data-role='video-account-title']");
+    const desc = accountBubble.querySelector("[data-role='video-account-desc']");
+    const source = accountBubble.querySelector(
+      "[data-role='video-account-source']");
+    const duration = accountBubble.querySelector(
+      "[data-role='video-account-duration']");
+
+    const targetUrl = parsed.url || parsed.mediaUrl || "";
+    if (link) {
+      if (targetUrl) {
+        link.href = targetUrl;
+      } else {
+        link.removeAttribute("href");
+        link.classList.add("pointer-events-none");
+      }
+    }
+
+    if (coverShell && cover) {
+      if (parsed.cover) {
+        cover.addEventListener("load", () => {
+          this.stickToBottomIfNeeded();
+        }, { once: true });
+        cover.src = parsed.cover;
+        cover.classList.remove("hidden");
+      } else {
+        coverShell.classList.add("hidden");
+      }
+    }
+
+    if (title) {
+      title.textContent = parsed.title || "视频号分享";
+    }
+    if (desc) {
+      desc.textContent = parsed.desc || "";
+      desc.classList.toggle("hidden", !parsed.desc);
+    }
+    if (source) {
+      source.textContent = parsed.source || "视频号";
+    }
+    if (duration) {
+      if (parsed.durationSeconds) {
+        duration.textContent = this.formatVideoDuration(parsed.durationSeconds);
+        duration.classList.remove("hidden");
+      } else {
+        duration.classList.add("hidden");
+      }
+    }
+
+    return this.applyBubbleStyle(accountBubble, msg, isNewGroup, senderInfo,
       isFirstMessage);
   }
 
@@ -616,6 +738,7 @@ export default class extends Controller {
         placeholder.classList.add("hidden");
         image.classList.remove("hidden");
         image.dataset.loaded = "true";
+        this.stickToBottomIfNeeded();
       };
 
       const showFallback = (message) => {
@@ -750,6 +873,9 @@ export default class extends Controller {
         event.stopPropagation();
         videoElement.play();
       });
+      videoElement.addEventListener("loadedmetadata", () => {
+        this.stickToBottomIfNeeded();
+      }, { once: true });
     }
 
     const applied = this.applyBubbleStyle(videoBubble, msg, isNewGroup,
@@ -1246,7 +1372,7 @@ export default class extends Controller {
       tempMsg.wx_message.real_msg_type = "file_message"
     }
     this.messages.add(tempMsg);
-    this.renderMessages();
+    this.renderMessages({ forceScrollToBottom: true });
     return tempMsg;
 
   }
@@ -1295,43 +1421,77 @@ export default class extends Controller {
           this.messages.remove(msg.id);
           this.messages.add(
             { ...newMsg.data, sending: false, send_failed: false });
-          this.renderMessages();
+          this.renderMessages({ forceScrollToBottom: true });
         } else {
           this.messages.remove(msg.id)
           this.messages.add({ ...msg, sending: false, send_failed: true });
+          this.renderMessages({ forceScrollToBottom: true });
         }
       })
       .catch(error => {
         this.messages.remove(msg.id);
         this.messages.add({ ...msg, sending: false, send_failed: true });
-        this.renderMessages();
+        this.renderMessages({ forceScrollToBottom: true });
       });
   }
 
   parseWxXmlMessage(xmlString) {
     try {
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(xmlString, "application/xml");
-      if (xml.querySelector("parsererror")) {
+      const xml = this.parseXmlDocument(xmlString);
+      if (!xml) {
         return { type: "text", content: xmlString };
       }
 
-      const title = xml.querySelector("title")?.textContent?.trim() || "";
+      const rawTitle = xml.querySelector("title")?.textContent?.trim() || "";
       const desc = xml.querySelector("des")?.textContent?.trim() || "";
-      const url = xml.querySelector("url")?.textContent?.trim() || "";
+      const rawUrl = xml.querySelector("url")?.textContent?.trim() || "";
       const cover = xml.querySelector("thumburl")?.textContent?.trim()
         || xml.querySelector("cover")?.textContent?.trim();
       const source = xml.querySelector(
         "publisher > nickname")?.textContent?.trim() || xml.querySelector(
           "appname")?.textContent?.trim();
-      const msgType = xml.querySelector("type")?.textContent?.trim() || 0;
+      const msgType = Number(xml.querySelector("appmsg > type")?.textContent
+        || xml.querySelector("type")?.textContent || 0);
       const refContent = xml.querySelector("refermsg")?.querySelector(
-        "content")?.textContent.trim();
+        "content")?.textContent?.trim() || "";
+
+      const finderFeed = xml.querySelector("finderFeed");
+      if (finderFeed) {
+        const nickname = finderFeed.querySelector("nickname")?.textContent?.trim()
+          || "";
+        const finderDesc = finderFeed.querySelector("desc")?.textContent?.trim()
+          || desc;
+        const media = finderFeed.querySelector("mediaList > media");
+        const mediaUrl = media?.querySelector("url")?.textContent?.trim() || "";
+        const finderCover = media?.querySelector("coverUrl")?.textContent?.trim()
+          || media?.querySelector("thumbUrl")?.textContent?.trim()
+          || media?.querySelector("fullCoverUrl")?.textContent?.trim()
+          || finderFeed.querySelector("avatar")?.textContent?.trim()
+          || cover;
+
+        return {
+          type: "xml",
+          detectedType: "video_account",
+          title: nickname || this.cleanXmlTitle(rawTitle) || "视频号分享",
+          desc: finderDesc,
+          url: this.isPlaceholderUpgradeUrl(rawUrl) ? "" : rawUrl,
+          cover: finderCover,
+          source: nickname ? `视频号 · ${nickname}` : "视频号",
+          mediaUrl,
+          msgType,
+          refContent,
+          durationSeconds: Math.round(
+            Number(media?.querySelector("videoPlayDuration")?.textContent || 0)
+          )
+        };
+      }
+
       return {
         type: "xml",
-        title,
+        detectedType: this.mapAppMessageType(msgType),
+        title: this.cleanXmlTitle(rawTitle),
         desc,
-        url,
+        url: this.isPlaceholderUpgradeUrl(rawUrl) ? "" : rawUrl,
         cover,
         source,
         msgType,
@@ -1345,8 +1505,10 @@ export default class extends Controller {
 
   parseWxVideoMessage(xmlString) {
     try {
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(xmlString, "application/xml");
+      const xml = this.parseXmlDocument(xmlString);
+      if (!xml) {
+        return null;
+      }
       const videoNode = xml.querySelector("videomsg");
       if (!videoNode) {
         return null;
@@ -1364,8 +1526,10 @@ export default class extends Controller {
 
   parseWxFileAttachment(xmlString) {
     try {
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(xmlString, "application/xml");
+      const xml = this.parseXmlDocument(xmlString);
+      if (!xml) {
+        return null;
+      }
       const appmsg = xml.querySelector("appmsg");
       if (!appmsg) {
         return null;
@@ -1384,6 +1548,65 @@ export default class extends Controller {
       console.error("File XML parse error:", error);
       return null;
     }
+  }
+
+  extractXmlPayload(xmlString = "") {
+    const raw = String(xmlString || "").trim();
+    if (!raw) {
+      return "";
+    }
+    if (raw.startsWith("<")) {
+      return raw;
+    }
+
+    const xmlStartIndex = raw.indexOf("<");
+    return xmlStartIndex >= 0 ? raw.slice(xmlStartIndex) : raw;
+  }
+
+  parseXmlDocument(xmlString) {
+    const payload = this.extractXmlPayload(xmlString);
+    if (!payload.startsWith("<")) {
+      return null;
+    }
+
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(payload, "application/xml");
+    if (xml.querySelector("parsererror")) {
+      return null;
+    }
+    return xml;
+  }
+
+  mapAppMessageType(msgType) {
+    const mapping = {
+      5: "card",
+      6: "file_message",
+      19: "chat_history",
+      33: "mini_app",
+      36: "mini_game",
+      51: "video_account",
+      57: "quote",
+      74: "file_transfer_start",
+      2000: "transfer",
+      2001: "red_packet"
+    };
+    return mapping[Number(msgType)] || null;
+  }
+
+  cleanXmlTitle(title = "") {
+    const cleaned = String(title || "").trim();
+    if (!cleaned || this.isUnsupportedXmlTitle(cleaned)) {
+      return "";
+    }
+    return cleaned;
+  }
+
+  isUnsupportedXmlTitle(title = "") {
+    return /当前版本不支持展示该内容|请升级至最新版本/.test(title);
+  }
+
+  isPlaceholderUpgradeUrl(url = "") {
+    return /support\.weixin\.qq\.com\/security\/readtemplate/.test(url);
   }
 
   attachmentUrl(type, msg, { cacheKey } = {}) {
@@ -1800,6 +2023,9 @@ export default class extends Controller {
     }
 
     const container = this.messageListTarget;
+    const shouldStickToBottom = this.isNearBottom();
+    const preserveBottomOffset = shouldStickToBottom ? null
+      : container.scrollHeight - container.scrollTop;
 
     // Get the latest message by sorting and taking the last
     // const sortedMessages = [...this.messages].sort((a, b) => {
@@ -1822,7 +2048,8 @@ export default class extends Controller {
         // Add new messages to the Set
         this.messages.merge(data)
         this.renderMessages({
-          preserveBottomOffset: container.scrollHeight - container.scrollTop
+          preserveBottomOffset,
+          forceScrollToBottom: shouldStickToBottom
         });
       })
       .catch(console.error);
@@ -2329,6 +2556,7 @@ export default class extends Controller {
       file_message: "文件",
       emoji: "表情",
       card: "卡片",
+      video_account: "视频号",
       html: "网页",
       micro_video: "小视频"
     };
@@ -2377,10 +2605,24 @@ export default class extends Controller {
   normalizeMessageType(msg) {
     const stringType = msg?.real_msg_type || msg?.msg_type;
     if (typeof stringType === "string" && stringType.length > 0) {
+      if ((stringType === "refer" || stringType === "unknown")
+        && msg?.content) {
+        const parsed = this.parseWxXmlMessage(msg.content);
+        if (parsed?.detectedType) {
+          return parsed.detectedType;
+        }
+      }
       return stringType;
     }
 
     const numericType = Number(msg?.real_msg_type ?? msg?.msg_type);
+    if (numericType === 49 && msg?.content) {
+      const parsed = this.parseWxXmlMessage(msg.content);
+      if (parsed?.detectedType) {
+        return parsed.detectedType;
+      }
+    }
+
     const mapping = {
       1: "text",
       3: "image",
@@ -2421,6 +2663,14 @@ export default class extends Controller {
         return {
           type,
           content: parsed.title || "[卡片消息]",
+          asLinkedText: false
+        };
+      }
+      case "video_account": {
+        const parsed = this.parseWxXmlMessage(msg?.content || "");
+        return {
+          type,
+          content: parsed.desc || parsed.title || "[视频号消息]",
           asLinkedText: false
         };
       }
