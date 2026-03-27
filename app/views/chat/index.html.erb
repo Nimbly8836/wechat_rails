@@ -1,147 +1,189 @@
-<div class="relative flex h-[calc(100vh-10px)] overflow-hidden bg-slate-100" data-controller="chat">
+<div class="tg-app-shell relative flex h-[calc(100vh-10px)] overflow-hidden" data-controller="chat">
   <button type="button"
           class="hidden fixed inset-0 z-30 bg-slate-950/35 backdrop-blur-[1px] sm:hidden"
           aria-label="关闭侧边栏"
           data-chat-target="overlay"
           data-action="click->chat#closeSidebar"></button>
 
-  <!-- 左侧 sidebar -->
   <div id="sidebar"
-       class="fixed inset-y-0 left-0 z-40 flex w-[min(24rem,calc(100vw-2.5rem))] max-w-[500px] -translate-x-full flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-200 ease-out sm:static sm:z-auto sm:min-w-[65px] sm:w-[330px] sm:translate-x-0 sm:shadow-none"
+       class="fixed inset-y-0 left-0 z-40 flex w-[min(26rem,calc(100vw-1.5rem))] max-w-[520px] -translate-x-full overflow-hidden rounded-r-[2rem] shadow-2xl transition-transform duration-200 ease-out sm:static sm:z-auto sm:min-w-[330px] sm:translate-x-0 sm:rounded-none sm:shadow-none"
        data-chat-target="sidebar">
-    <!-- header -->
-    <div class="relative flex h-[60px] items-center border-b border-slate-200 bg-white px-4">
-      <div class="flex w-64 items-center gap-3 font-medium text-slate-900">
-        <img width="30" height="30" src="https://img.icons8.com/hands/50/sms.png" alt="sms"/>
-        <span>Wechat</span>
+    <div class="tg-nav-rail">
+      <div class="tg-brand-pill">
+        <img width="28" height="28" src="https://img.icons8.com/hands/50/sms.png" alt="sms"/>
       </div>
-      <div class="ml-auto flex items-center gap-2">
+
+      <div class="flex flex-col gap-2">
         <button type="button"
-                class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+                data-active="false"
+                class="tg-nav-pill"
+                data-action="click->chat#switchTab"
+                data-tab="messages">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M7 8h10M7 12h7m-7 4h5M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-4 3V7a2 2 0 0 1 2-2Z"/>
+          </svg>
+          <span>消息</span>
+        </button>
+        <button type="button"
+                data-active="true"
+                class="tg-nav-pill"
+                data-action="click->chat#switchTab"
+                data-tab="contacts">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 19a4 4 0 1 0-8 0m12 0a6 6 0 0 0-12 0m10-9a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/>
+          </svg>
+          <span>通讯录</span>
+        </button>
+      </div>
+
+      <div class="mt-auto flex flex-col gap-2">
+        <button type="button"
+                class="tg-nav-pill"
                 aria-label="通知设置"
                 data-chat-target="notificationButton"
                 data-action="click->chat#toggleNotificationPanel">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M14.857 17H9.143m9.714 0A2.143 2.143 0 0 1 16.714 19.143H7.286A2.143 2.143 0 0 1 5.143 17m13.714 0V11.857a6.857 6.857 0 1 0-13.714 0V17m13.714 0H5.143"/>
           </svg>
+          <span>通知</span>
         </button>
         <button type="button"
-                class="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 sm:hidden"
+                class="tg-nav-pill sm:hidden"
                 aria-label="关闭联系人侧栏"
                 data-action="click->chat#closeSidebar">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18 18 6M6 6l12 12"/>
           </svg>
+          <span>关闭</span>
         </button>
       </div>
-
-      <div class="absolute right-4 top-14 z-50 hidden w-72 rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur"
-           data-chat-target="notificationPanel">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="text-sm font-semibold text-slate-900">通知设置</div>
-            <div class="mt-1 text-xs text-slate-500" data-chat-target="notificationStatus"></div>
-          </div>
-          <button type="button"
-                  class="rounded-full px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                  data-action="click->chat#closeNotificationPanel">
-            关闭
-          </button>
-        </div>
-
-        <div class="mt-4 space-y-3 text-sm text-slate-700">
-          <label class="flex items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3">
-            <input type="checkbox"
-                   class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                   data-chat-target="notificationToggle"
-                   data-action="change->chat#updateNotificationsEnabled">
-            <span>
-              <span class="block font-medium text-slate-900">启用桌面通知</span>
-              <span class="mt-1 block text-xs text-slate-500">收到新消息时允许浏览器弹出通知。</span>
-            </span>
-          </label>
-
-          <label class="flex items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3">
-            <input type="checkbox"
-                   class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                   data-chat-target="notificationHiddenOnly"
-                   data-action="change->chat#updateNotificationsOnlyWhenHidden">
-            <span>
-              <span class="block font-medium text-slate-900">仅后台提醒</span>
-              <span class="mt-1 block text-xs text-slate-500">页面正在前台使用时不弹通知，避免打扰。</span>
-            </span>
-          </label>
-        </div>
-
-        <div class="mt-4 flex items-center justify-end gap-2">
-          <button type="button"
-                  class="rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-                  data-action="click->chat#requestNotificationPermission">
-            请求权限
-          </button>
-          <button type="button"
-                  class="rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
-                  data-action="click->chat#sendTestNotification">
-            测试通知
-          </button>
-        </div>
-      </div>
     </div>
 
-    <!-- 搜索栏 -->
-    <label class="m-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none">
-      <input type="text"
-             id="sidebar-search"
-             class="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
-             placeholder="搜索消息或者通讯录..."
-             data-action="keyup->chat#search">
-    </label>
-
-    <!-- tab 栏 -->
-    <div class="flex border-b border-slate-100 rounded-sm">
-      <div data-active="false"
-           class="flex-1 cursor-pointer rounded-sm px-2 py-4 text-center font-medium text-slate-500 data-[active=true]:border-b-2 data-[active=true]:border-sky-500 data-[active=true]:text-sky-600"
-           data-action="click->chat#switchTab"
-           data-tab="messages">
-        消息
-      </div>
-      <div data-active="true"
-           class="flex-1 cursor-pointer rounded-sm px-2 py-4 text-center font-medium text-slate-500 data-[active=true]:border-b-2 data-[active=true]:border-sky-500 data-[active=true]:text-sky-600"
-           data-action="click->chat#switchTab"
-           data-tab="contacts">
-        通讯录
-      </div>
-    </div>
-    <!-- 消息列表容器 -->
-    <div class="relative flex-1 min-h-0">
-      <div id="message-list"
-           class="hidden h-full min-h-0 flex flex-col"
-           data-chat-target="messagesList">
-        <div class="border-b border-slate-100 bg-white/90 px-3 py-2 backdrop-blur">
-          <div class="flex items-center gap-2 overflow-x-auto pb-1" data-chat-target="folderBar"></div>
-        </div>
-        <div class="min-h-0 flex-1 overflow-y-auto">
-          <div id="chat-room-list"></div>
-        </div>
-      </div>
-      <!-- 联系人滚动区 -->
-      <div id="contacts-list"
-           class="h-full overflow-y-auto"
-           data-chat-target="contactsList"
-           data-action="scroll->chat#highlightLetter">
+    <div class="tg-sidebar-panel relative flex min-w-0 flex-1 flex-col">
+      <div class="tg-sidebar-header">
         <div>
+          <div class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Telegram Style</div>
+          <div class="mt-1 text-2xl font-semibold tracking-tight text-slate-900" data-chat-target="sidebarTitle">Chats</div>
+        </div>
+        <button type="button"
+                class="tg-compose-button"
+                data-action="click->chat#createChatFolder">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 5v14m7-7H5"/>
+          </svg>
+        </button>
+
+        <div class="absolute right-5 top-16 z-50 hidden w-72 rounded-[1.5rem] border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur"
+             data-chat-target="notificationPanel">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-semibold text-slate-900">通知设置</div>
+              <div class="mt-1 text-xs text-slate-500" data-chat-target="notificationStatus"></div>
+            </div>
+            <button type="button"
+                    class="rounded-full px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                    data-action="click->chat#closeNotificationPanel">
+              关闭
+            </button>
+          </div>
+
+          <div class="mt-4 space-y-3 text-sm text-slate-700">
+            <label class="flex items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3">
+              <input type="checkbox"
+                     class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                     data-chat-target="notificationToggle"
+                     data-action="change->chat#updateNotificationsEnabled">
+              <span>
+                <span class="block font-medium text-slate-900">启用桌面通知</span>
+                <span class="mt-1 block text-xs text-slate-500">收到新消息时允许浏览器弹出通知。</span>
+              </span>
+            </label>
+
+            <label class="flex items-start gap-3 rounded-2xl bg-slate-50 px-3 py-3">
+              <input type="checkbox"
+                     class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                     data-chat-target="notificationHiddenOnly"
+                     data-action="change->chat#updateNotificationsOnlyWhenHidden">
+              <span>
+                <span class="block font-medium text-slate-900">仅后台提醒</span>
+                <span class="mt-1 block text-xs text-slate-500">页面正在前台使用时不弹通知，避免打扰。</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="mt-4 flex items-center justify-end gap-2">
+            <button type="button"
+                    class="rounded-full border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                    data-action="click->chat#requestNotificationPermission">
+              请求权限
+            </button>
+            <button type="button"
+                    class="rounded-full bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
+                    data-action="click->chat#sendTestNotification">
+              测试通知
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-4 pb-3">
+        <label class="tg-search-shell">
+          <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/>
+          </svg>
+          <input type="text"
+                 id="sidebar-search"
+                 class="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                 placeholder="搜索消息或者通讯录..."
+                 data-action="keyup->chat#search">
+        </label>
+      </div>
+
+      <div class="relative flex-1 min-h-0">
+        <div id="message-list"
+             class="hidden h-full min-h-0 flex flex-col"
+             data-chat-target="messagesList">
+          <div class="tg-folder-bar-shell">
+            <div class="flex items-center gap-2 overflow-x-auto pb-1" data-chat-target="folderBar"></div>
+          </div>
+          <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            <div id="chat-room-list"></div>
+          </div>
+        </div>
+
+        <div id="contacts-list"
+             class="h-full overflow-y-auto px-2 pb-3"
+             data-chat-target="contactsList"
+             data-action="scroll->chat#highlightLetter">
+          <div class="space-y-3 px-1">
           <% if @official_contacts.any? %>
-            <div id="group-official-accounts" data-chat-target="group">
-              <div class="flex h-10 items-center justify-between bg-amber-50 px-3 py-1">
-                <span class="font-medium text-amber-900">公众号</span>
-                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700"><%= @official_contacts.size %></span>
-              </div>
+            <div id="group-official-accounts"
+                 data-chat-target="group"
+                 data-chat-collapsible-group
+                 data-group-key="official_accounts">
+              <button type="button"
+                      class="tg-contact-section-header"
+                      data-chat-group-toggle
+                      data-action="click->chat#toggleContactGroup"
+                      data-chat-group-key-param="official_accounts">
+                <span class="flex items-center gap-3">
+                  <span class="tg-contact-section-accent is-official"></span>
+                  <span>公众号</span>
+                </span>
+                <span class="flex items-center gap-2">
+                  <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700"><%= @official_contacts.size %></span>
+                  <svg class="h-4 w-4 text-slate-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-chat-group-chevron>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m6 9 6 6 6-6"/>
+                  </svg>
+                </span>
+              </button>
+              <div class="space-y-1 pt-2" data-chat-group-body>
               <% @official_contacts.each do |contact| %>
-                <div class="flex cursor-pointer items-center border-b border-amber-100 px-4 py-3 transition hover:bg-amber-50/70"
+                <div class="tg-contact-row flex cursor-pointer items-center px-4 py-3 transition hover:bg-amber-50/70"
                      data-contact-id="<%= contact.id %>"
                      data-chat-target="contact"
                      data-action="click->chat#selectContact">
-                  <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-amber-100 text-sm font-semibold text-amber-700">
+                  <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-[1.15rem] bg-amber-100 text-sm font-semibold text-amber-700">
                     <% if contact.avatar_url.present? %>
                       <%= image_tag contact.avatar_url, class: "w-full h-full object-cover", alt: contact.display_name %>
                     <% else %>
@@ -157,21 +199,38 @@
                   </div>
                 </div>
               <% end %>
+              </div>
             </div>
           <% end %>
 
           <% if @group_chat_contacts.any? %>
-            <div id="group-chatrooms" data-chat-target="group">
-              <div class="flex h-10 items-center justify-between bg-sky-50 px-3 py-1">
-                <span class="font-medium text-sky-900">群聊</span>
-                <span class="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-700"><%= @group_chat_contacts.size %></span>
-              </div>
+            <div id="group-chatrooms"
+                 data-chat-target="group"
+                 data-chat-collapsible-group
+                 data-group-key="group_chats">
+              <button type="button"
+                      class="tg-contact-section-header"
+                      data-chat-group-toggle
+                      data-action="click->chat#toggleContactGroup"
+                      data-chat-group-key-param="group_chats">
+                <span class="flex items-center gap-3">
+                  <span class="tg-contact-section-accent is-group"></span>
+                  <span>群聊</span>
+                </span>
+                <span class="flex items-center gap-2">
+                  <span class="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-700"><%= @group_chat_contacts.size %></span>
+                  <svg class="h-4 w-4 text-slate-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-chat-group-chevron>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m6 9 6 6 6-6"/>
+                  </svg>
+                </span>
+              </button>
+              <div class="space-y-1 pt-2" data-chat-group-body>
               <% @group_chat_contacts.each do |contact| %>
-                <div class="flex cursor-pointer items-center border-b border-sky-100 px-4 py-3 transition hover:bg-sky-50/70"
+                <div class="tg-contact-row flex cursor-pointer items-center px-4 py-3 transition hover:bg-sky-50/70"
                      data-contact-id="<%= contact.id %>"
                      data-chat-target="contact"
                      data-action="click->chat#selectContact">
-                  <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-sky-100 text-sm font-semibold text-sky-700">
+                  <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-[1.15rem] bg-sky-100 text-sm font-semibold text-sky-700">
                     <% if contact.avatar_url.present? %>
                       <%= image_tag contact.avatar_url, class: "w-full h-full object-cover", alt: contact.display_name %>
                     <% else %>
@@ -187,18 +246,19 @@
                   </div>
                 </div>
               <% end %>
+              </div>
             </div>
           <% end %>
 
           <% @grouped_contacts.sort.each do |initial, contacts| %>
             <div id="group-<%= initial %>" data-chat-target="group" data-letter="<%= initial %>">
-              <div class="px-2 py-1 h-10 font-medium bg-gray-100"><%= initial %></div>
+              <div class="tg-letter-section-header"><%= initial %></div>
               <% contacts.each do |contact| %>
-                <div class="flex cursor-pointer items-center border-b border-slate-100 px-4 py-3 transition hover:bg-slate-50"
+                <div class="tg-contact-row flex cursor-pointer items-center px-4 py-3 transition hover:bg-slate-50"
                      data-contact-id="<%= contact.id %>"
                      data-chat-target="contact"
                      data-action="click->chat#selectContact">
-                  <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-200 text-lg font-medium text-slate-600">
+                  <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-[1.15rem] bg-slate-200 text-lg font-medium text-slate-600">
                     <% if contact.avatar_url.present? %>
                       <%= image_tag contact.avatar_url, class: "w-full h-full object-cover", alt: contact.display_name %>
                     <% else %>
@@ -214,33 +274,31 @@
             </div>
           <% end %>
         </div>
-      </div>
+        </div>
 
-      <!-- 字母导航 -->
-      <div class="absolute right-2 top-1 z-20 flex flex-col items-center justify-center gap-y-0.5 overflow-y-hidden rounded-md bg-white/85 px-0.5 py-1 shadow-md antialiased sm:flex"
-           id="letter-nav"
-           data-chat-target="letterNav">
-        <% @letters.each do |letter| %>
-          <div class="letter cursor-pointer select-none rounded px-1 py-0.5 text-tiny hover:bg-black/15"
-               data-letter="<%= letter %>"
-               data-chat-target="letter"
-               data-action="click->chat#scrollToGroup">
-            <%= letter %>
-          </div>
-        <% end %>
+        <div class="absolute right-3 top-2 z-20 flex flex-col items-center justify-center gap-y-0.5 overflow-y-hidden rounded-2xl bg-white/90 px-1.5 py-2 shadow-lg antialiased sm:flex"
+             id="letter-nav"
+             data-chat-target="letterNav">
+          <% @letters.each do |letter| %>
+            <div class="letter cursor-pointer select-none rounded-lg px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 hover:bg-slate-100"
+                 data-letter="<%= letter %>"
+                 data-chat-target="letter"
+                 data-action="click->chat#scrollToGroup">
+              <%= letter %>
+            </div>
+          <% end %>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- 拖拽分隔线 -->
   <div id="resizer"
-       class="hidden cursor-col-resize bg-slate-200 touch-none hover:bg-slate-400 sm:block sm:w-1"
+       class="hidden cursor-col-resize bg-slate-200/70 touch-none hover:bg-slate-400 sm:block sm:w-1"
        data-chat-target="resizer"
        data-action="mousedown->chat#startResize touchstart->chat#startResize">
   </div>
 
-  <!-- 右侧内容区 -->
-  <div class="flex min-w-0 flex-1 flex-col overflow-x-hidden bg-slate-100">
+  <div class="tg-main-panel flex min-w-0 flex-1 flex-col overflow-x-hidden">
     <div class="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white/95 px-3 py-3 backdrop-blur sm:hidden">
       <button type="button"
               class="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
@@ -255,9 +313,10 @@
     </div>
 
     <div id="chat-box" class="relative flex-1 h-full min-h-0" data-chat-target="chatBox">
-      <div class="flex h-full flex-col items-center justify-center px-6 text-center text-slate-500">
-        <div class="text-lg font-medium text-slate-700">欢迎使用聊天应用</div>
-        <div class="mt-2 text-sm">选择一个联系人或者会话开始对话</div>
+      <div class="tg-chat-empty-state flex h-full flex-col items-center justify-center px-6 text-center text-slate-500">
+        <div class="tg-chat-empty-icon">✈</div>
+        <div class="mt-5 text-lg font-semibold text-slate-800">选择一个会话开始聊天</div>
+        <div class="mt-2 max-w-sm text-sm leading-6 text-slate-500">左侧已经切成更接近 Telegram 的文件夹式布局。选择联系人、群聊或公众号后，右侧会直接进入聊天。</div>
       </div>
     </div>
   </div>

@@ -71,8 +71,7 @@ export default class extends Controller {
       this._boundHideAttachmentSelect = this.hideAttachmentSelect.bind(this);
     }
 
-    this.debouncedLoadNewMessages = this.debounce(
-      this.loadNewMessages.bind(this), 400);
+    this.pendingNotifyRefreshTimer = null;
     this.voiceBlobUrls = new Map();
     this.currentVoicePlayback = null;
     this.voicePlaybackRates = new Map();
@@ -88,9 +87,9 @@ export default class extends Controller {
       this.chatMembers = this.membersValue;
     }
     this.boundChatNotify = (e) => {
-      const payload = e.detail;
-      if (payload.chat_room_id === this.idValue) {
-        this.debouncedLoadNewMessages(payload);
+      const payload = e.detail || {};
+      if (this.matchesCurrentRoom(payload)) {
+        this.refreshRoomFromNotification(payload);
       }
     };
 
@@ -145,14 +144,6 @@ export default class extends Controller {
       this.cleanupEmojiPreview = setupEmojiInputPreview(this.inputTarget,
         this.idValue);
     }
-  }
-
-  debounce(fn, delay) {
-    let timer = null;
-    return function(...args) {
-      clearTimeout(timer);
-      timer = setTimeout(() => fn.apply(this, args), delay);
-    };
   }
 
   readChatRoomTheme() {
@@ -268,6 +259,11 @@ export default class extends Controller {
       window.removeEventListener("chat:notify", this.boundChatNotify);
     }
 
+    if (this.pendingNotifyRefreshTimer) {
+      clearTimeout(this.pendingNotifyRefreshTimer);
+      this.pendingNotifyRefreshTimer = null;
+    }
+
     if (typeof this.cleanupEmojiPreview === "function") {
       this.cleanupEmojiPreview();
     }
@@ -347,8 +343,12 @@ export default class extends Controller {
         this.messages.merge(data)
         this.persistMessages();
         this.renderMessages();
+        return Array.isArray(data) ? data.length : 0;
       })
-      .catch(error => console.error("加载消息失败:", error));
+      .catch(error => {
+        console.error("加载消息失败:", error);
+        return 0;
+      });
   }
 
   fetchMessages({ beforeId = null, afterId = null } = {}) {
@@ -2125,6 +2125,63 @@ export default class extends Controller {
     this.loadOlderMessagesChunk();
   }
 
+  matchesCurrentRoom(payload) {
+    return String(payload?.chat_room_id || "") === String(this.idValue);
+  }
+
+  hasMessage(messageId) {
+    if (messageId == null) {
+      return false;
+    }
+
+    return this.messages.all.some((wrapper) => String(wrapper?.id) === String(messageId));
+  }
+
+  latestServerMessageId() {
+    for (let index = this.messages.all.length - 1; index >= 0; index -= 1) {
+      const candidateId = this.messages.all[index]?.id;
+      if (candidateId != null && !String(candidateId).startsWith("temp-")) {
+        return candidateId;
+      }
+    }
+
+    return null;
+  }
+
+  refreshRoomFromNotification(payload, attempt = 0) {
+    if (this.pendingNotifyRefreshTimer) {
+      clearTimeout(this.pendingNotifyRefreshTimer);
+      this.pendingNotifyRefreshTimer = null;
+    }
+
+    this.pendingNotifyRefreshTimer = setTimeout(() => {
+      this.pendingNotifyRefreshTimer = null;
+      if (!this.element?.isConnected) {
+        return;
+      }
+      const expectedMessageId = payload?.wx_messages_id;
+
+      this.loadNewMessages(payload)
+        .then((loadedCount) => {
+          const alreadyLoaded = expectedMessageId ? this.hasMessage(expectedMessageId)
+            : loadedCount > 0;
+          if (alreadyLoaded) {
+            return;
+          }
+
+          if (attempt >= 3) {
+            this.loadMessages();
+            return;
+          }
+
+          this.refreshRoomFromNotification(payload, attempt + 1);
+        })
+        .catch((error) => {
+          console.error("刷新当前聊天室失败:", error);
+        });
+    }, attempt === 0 ? 120 : 250 * (attempt + 1));
+  }
+
   loadNewMessages(msg) {
     if (this.messages.size === 0) {
       return this.loadMessages();
@@ -2143,14 +2200,15 @@ export default class extends Controller {
     //     || 0;
     //   return new Date(timeA) - new Date(timeB);
     // });
-    const sortedMessages = this.messages
-    const lastMsg = sortedMessages.at(sortedMessages.length - 1);
-    const lastMsgId = lastMsg.id;
+    const lastMsgId = this.latestServerMessageId();
+    if (lastMsgId == null) {
+      return this.loadMessages();
+    }
 
-    this.fetchMessages({ afterId: lastMsgId })
+    return this.fetchMessages({ afterId: lastMsgId })
       .then(data => {
         if (!data.length) {
-          return;
+          return 0;
         }
 
         // Add new messages to the Set
@@ -2159,8 +2217,12 @@ export default class extends Controller {
           preserveBottomOffset,
           forceScrollToBottom: shouldStickToBottom
         });
+        return data.length;
       })
-      .catch(console.error);
+      .catch(error => {
+        console.error(error);
+        return 0;
+      });
   }
 
   handleVoiceClick(messageId, container, label, context) {

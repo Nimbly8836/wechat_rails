@@ -44,6 +44,7 @@ export default class extends Controller {
     "folderBar",
     "letterNav",
     "mobileTitle",
+    "sidebarTitle",
     "resizer",
     "notificationPanel",
     "notificationButton",
@@ -61,6 +62,7 @@ export default class extends Controller {
     this.chatRooms = this.cachedChatRooms()
     this.chatFolders = this.loadChatFolders()
     this.activeChatFolderId = this.loadActiveChatFolderId()
+    this.collapsedContactGroups = this.loadCollapsedContactGroups()
     this.notificationSettings = this.loadNotificationSettings()
     this.currentRoomId = null
     this.isSidebarOpen = !this.isMobileViewport()
@@ -80,6 +82,7 @@ export default class extends Controller {
     this.applyChatRoomNames(this.chatRooms)
     this.ensureActiveFolder()
     this.syncNotificationUi()
+    this.applyContactGroupVisibility()
     this.refreshChatFolders()
 
     const messageTab = this.sidebarTarget.querySelector('[data-tab="messages"]')
@@ -149,6 +152,17 @@ export default class extends Controller {
   persistActiveChatFolderId() {
     const [namespace, identifier] = chatStorageKeys.activeChatFolder()
     writeCache(namespace, identifier, this.activeChatFolderId)
+  }
+
+  loadCollapsedContactGroups() {
+    const [namespace, identifier] = chatStorageKeys.collapsedContactGroups()
+    const cached = readCache(namespace, identifier, {})
+    return cached && typeof cached === "object" ? cached : {}
+  }
+
+  persistCollapsedContactGroups() {
+    const [namespace, identifier] = chatStorageKeys.collapsedContactGroups()
+    writeCache(namespace, identifier, this.collapsedContactGroups)
   }
 
   ensureActiveFolder() {
@@ -265,6 +279,35 @@ export default class extends Controller {
     return typeof window !== "undefined" && "Notification" in window
   }
 
+  isContactGroupCollapsed(groupKey) {
+    return !!this.collapsedContactGroups?.[String(groupKey)]
+  }
+
+  applyContactGroupVisibility({ searching = false } = {}) {
+    const groups = this.element.querySelectorAll("[data-chat-collapsible-group]")
+    groups.forEach((group) => {
+      const groupKey = String(group.dataset.groupKey || "")
+      const body = group.querySelector("[data-chat-group-body]")
+      const toggle = group.querySelector("[data-chat-group-toggle]")
+      const chevron = group.querySelector("[data-chat-group-chevron]")
+
+      if (!body || !toggle) {
+        return
+      }
+
+      const hasVisibleContact = !!group.querySelector('[data-chat-target="contact"]:not(.hidden)')
+      const collapsed = !searching && this.isContactGroupCollapsed(groupKey)
+
+      body.classList.toggle("hidden", collapsed)
+      toggle.setAttribute("aria-expanded", String(!collapsed))
+      toggle.classList.toggle("opacity-70", !hasVisibleContact)
+
+      if (chevron) {
+        chevron.classList.toggle("rotate-180", !collapsed)
+      }
+    })
+  }
+
   notificationPermissionLabel() {
     if (!this.notificationsSupported()) {
       return "当前浏览器不支持桌面通知"
@@ -377,6 +420,12 @@ export default class extends Controller {
   setMobileTitle(title) {
     if (this.hasMobileTitleTarget) {
       this.mobileTitleTarget.textContent = title || "消息"
+    }
+  }
+
+  setSidebarTitle(title) {
+    if (this.hasSidebarTitleTarget) {
+      this.sidebarTitleTarget.textContent = title || "Chats"
     }
   }
 
@@ -612,7 +661,7 @@ export default class extends Controller {
     }
 
     chatRoomList.innerHTML = `
-      <section data-chat-room-section>
+      <section class="tg-room-list" data-chat-room-section>
         ${visibleRooms.map((room) => this.renderChatRoomRow(room, activeFolder)).join("")}
       </section>
     `
@@ -874,6 +923,7 @@ export default class extends Controller {
       this.contactsListTarget.classList.add("hidden")
       this.letterNavTarget.hidden = true
       this.setMobileTitle("消息")
+      this.setSidebarTitle("Chats")
       this.refreshChatFolders()
       this.loadChatRooms()
     } else {
@@ -881,6 +931,8 @@ export default class extends Controller {
       this.contactsListTarget.classList.remove("hidden")
       this.letterNavTarget.hidden = false
       this.setMobileTitle("通讯录")
+      this.setSidebarTitle("Contacts")
+      this.applyContactGroupVisibility()
     }
   }
 
@@ -955,10 +1007,10 @@ export default class extends Controller {
       const chatRooms = document.querySelectorAll("[data-chat-room-id]")
       chatRooms.forEach((chatRoom) => {
         const matched = chatRoom.textContent.toLowerCase().includes(value)
-        chatRoom.classList.toggle("hidden", !matched)
+        chatRoom.closest("[data-chat-room-row]")?.classList.toggle("hidden", !matched)
       })
       document.querySelectorAll("[data-chat-room-section]").forEach((section) => {
-        const hasVisibleRoom = section.querySelector('[data-chat-room-id]:not(.hidden)')
+        const hasVisibleRoom = section.querySelector('[data-chat-room-row]:not(.hidden)')
         section.classList.toggle("hidden", !hasVisibleRoom)
       })
       return
@@ -976,9 +1028,28 @@ export default class extends Controller {
       group.classList.toggle("hidden", !hasVisibleContact && value.length > 0)
     })
 
+    this.applyContactGroupVisibility({ searching: value.length > 0 })
+
     if (this.messagesListTarget.classList.contains("hidden")) {
       this.letterNavTarget.hidden = value.length > 0 || visibleContacts.length === 0
     }
+  }
+
+  toggleContactGroup(event) {
+    event.preventDefault()
+
+    const groupKey = String(event.params?.groupKey || "")
+    if (!groupKey) {
+      return
+    }
+
+    this.collapsedContactGroups = {
+      ...this.collapsedContactGroups,
+      [groupKey]: !this.isContactGroupCollapsed(groupKey)
+    }
+    this.persistCollapsedContactGroups()
+    const searchValue = document.getElementById("sidebar-search")?.value?.trim() || ""
+    this.applyContactGroupVisibility({ searching: searchValue.length > 0 })
   }
 
   selectChatFolder(event) {
@@ -1084,17 +1155,15 @@ export default class extends Controller {
     const folderButtons = this.chatFolders.map((folder) => {
       const active = folder.id === currentFolder?.id
       const count = this.visibleRoomsForFolder(folder).length
-      const activeClass = active
-        ? "border-slate-900 bg-slate-900 text-white"
-        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+      const activeClass = active ? "is-active" : ""
 
       return `
         <button type="button"
-                class="inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition ${activeClass}"
+                class="tg-folder-chip ${activeClass}"
                 data-action="click->chat#selectChatFolder"
                 data-chat-folder-id-param="${this.escapeHtml(folder.id)}">
           <span>${this.escapeHtml(folder.name)}</span>
-          <span class="rounded-full ${active ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500"} px-2 py-0.5 text-[10px]">${count}</span>
+          <span class="tg-folder-chip-count">${count}</span>
         </button>
       `
     }).join("")
@@ -1102,7 +1171,7 @@ export default class extends Controller {
     const deleteButton = currentFolder && !currentFolder.builtIn
       ? `
         <button type="button"
-                class="inline-flex shrink-0 items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600 transition hover:bg-rose-100"
+                class="tg-folder-action is-danger"
                 data-action="click->chat#deleteActiveChatFolder">
           删除分组
         </button>
@@ -1110,9 +1179,9 @@ export default class extends Controller {
       : ""
 
     this.folderBarTarget.innerHTML = `
-      ${folderButtons}
+      <div class="tg-folder-chip-group">${folderButtons}</div>
       <button type="button"
-              class="inline-flex shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+              class="tg-folder-action"
               data-action="click->chat#createChatFolder">
         + 新建分组
       </button>
@@ -1122,15 +1191,15 @@ export default class extends Controller {
 
   renderChatRoomRow(room, folder) {
     const roomId = String(room.id)
-    const activeClass = roomId === String(this.currentRoomId)
-      ? "bg-slate-50"
-      : "bg-white"
+    const activeClass = roomId === String(this.currentRoomId) ? "is-active" : ""
     const pinned = this.isRoomPinnedInFolder(roomId, folder)
     const typeBadge = room.official_account
-      ? '<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">公众号</span>'
+      ? '<span class="tg-room-badge is-official">公众号</span>'
       : room.group_chat
-        ? '<span class="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700">群聊</span>'
+        ? '<span class="tg-room-badge is-group">群聊</span>'
         : ""
+    const preview = room.latest_wx_message?.preview_content || ""
+    const timeLabel = this.formatRoomTimestamp(room.latest_wx_message?.message_time)
 
     const customFolderActions = this.chatFolders
       .filter((item) => item.kind === "custom")
@@ -1160,36 +1229,65 @@ export default class extends Controller {
     `
 
     return `
-      <div class="group flex items-stretch border-b border-slate-100 ${activeClass}" data-chat-room-row>
+      <div class="tg-room-row ${activeClass}" data-chat-room-row>
         <button type="button"
-                class="flex min-w-0 flex-1 items-center px-4 py-3 text-left transition hover:bg-slate-50"
+                class="tg-room-button"
                 data-chat-room-id="${this.escapeHtml(roomId)}">
-          <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-200 text-lg font-medium text-slate-600">
+          <div class="tg-room-avatar">
             ${room.avatar_base64
               ? `<img src="data:image/png;base64,${room.avatar_base64}" class="h-full w-full object-cover" alt="头像"/>`
               : `<span>${this.escapeHtml((room.name || "?").slice(0, 1))}</span>`}
           </div>
           <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <div class="truncate font-medium text-slate-900">${this.escapeHtml(room.name || "未命名会话")}</div>
-              ${typeBadge}
-              ${pinned ? '<span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-medium text-white">PIN</span>' : ""}
+            <div class="flex items-start gap-3">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <div class="truncate font-semibold text-slate-900">${this.escapeHtml(room.name || "未命名会话")}</div>
+                  ${typeBadge}
+                </div>
+                <div class="mt-1 truncate text-sm text-slate-500">${this.escapeHtml(preview)}</div>
+              </div>
+              <div class="flex shrink-0 flex-col items-end gap-2">
+                <div class="text-[11px] font-medium text-slate-400">${this.escapeHtml(timeLabel)}</div>
+                ${pinned ? '<span class="tg-pin-pill">PIN</span>' : ""}
+              </div>
             </div>
-            <div class="truncate text-xs text-slate-500">${this.escapeHtml(room.latest_wx_message?.preview_content || "")}</div>
           </div>
         </button>
-        <div class="flex items-center pr-2">
+        <div class="flex items-center pr-3">
           <details class="relative">
-            <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+            <summary class="tg-room-menu-trigger">
               <span aria-hidden="true">⋯</span>
             </summary>
-            <div class="absolute right-0 top-11 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+            <div class="tg-room-menu">
               ${menuActions}
             </div>
           </details>
         </div>
       </div>
     `
+  }
+
+  formatRoomTimestamp(value) {
+    if (!value) {
+      return ""
+    }
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return ""
+    }
+
+    const now = new Date()
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    }
+
+    if (date.getFullYear() === now.getFullYear()) {
+      return date.toLocaleDateString([], { month: "numeric", day: "numeric" })
+    }
+
+    return date.toLocaleDateString()
   }
 
   escapeHtml(value) {
