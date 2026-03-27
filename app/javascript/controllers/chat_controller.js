@@ -6,6 +6,30 @@ const DEFAULT_NOTIFICATION_SETTINGS = {
   onlyWhenHidden: true
 }
 
+const DEFAULT_CHAT_FOLDERS = [
+  {
+    id: "groups",
+    name: "群聊",
+    kind: "groups",
+    builtIn: true,
+    pinned_room_ids: []
+  },
+  {
+    id: "contacts",
+    name: "联系人",
+    kind: "contacts",
+    builtIn: true,
+    pinned_room_ids: []
+  },
+  {
+    id: "official_accounts",
+    name: "公众号",
+    kind: "official_accounts",
+    builtIn: true,
+    pinned_room_ids: []
+  }
+]
+
 export default class extends Controller {
   static targets = [
     "chatBox",
@@ -17,6 +41,7 @@ export default class extends Controller {
     "sidebar",
     "overlay",
     "messagesList",
+    "folderBar",
     "letterNav",
     "mobileTitle",
     "resizer",
@@ -34,6 +59,8 @@ export default class extends Controller {
     this.eventSourceRetryDelay = 1500
     this.chatRoomNames = {}
     this.chatRooms = this.cachedChatRooms()
+    this.chatFolders = this.loadChatFolders()
+    this.activeChatFolderId = this.loadActiveChatFolderId()
     this.notificationSettings = this.loadNotificationSettings()
     this.currentRoomId = null
     this.isSidebarOpen = !this.isMobileViewport()
@@ -48,9 +75,12 @@ export default class extends Controller {
     this.boundHandleViewportChange = this.handleViewportChange.bind(this)
     this.boundCloseNotificationPanel = this.closeNotificationPanel.bind(this)
     this.boundServiceWorkerMessage = this.handleServiceWorkerMessage.bind(this)
+    this.boundLocalChatMessage = this.handleLocalChatMessage.bind(this)
 
     this.applyChatRoomNames(this.chatRooms)
+    this.ensureActiveFolder()
     this.syncNotificationUi()
+    this.refreshChatFolders()
 
     const messageTab = this.sidebarTarget.querySelector('[data-tab="messages"]')
     if (messageTab) {
@@ -63,6 +93,7 @@ export default class extends Controller {
     this.element.addEventListener("chat:open", this.boundHandleOpenChat)
     this.element.addEventListener("chat:sidebar:open", this.boundOpenSidebar)
     this.element.addEventListener("chat:sidebar:close", this.boundCloseSidebar)
+    window.addEventListener("chat:local-message", this.boundLocalChatMessage)
     window.addEventListener("resize", this.boundHandleViewportChange)
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("message", this.boundServiceWorkerMessage)
@@ -79,6 +110,7 @@ export default class extends Controller {
     this.element.removeEventListener("chat:open", this.boundHandleOpenChat)
     this.element.removeEventListener("chat:sidebar:open", this.boundOpenSidebar)
     this.element.removeEventListener("chat:sidebar:close", this.boundCloseSidebar)
+    window.removeEventListener("chat:local-message", this.boundLocalChatMessage)
     window.removeEventListener("resize", this.boundHandleViewportChange)
     document.removeEventListener("click", this.boundCloseNotificationPanel)
     if ("serviceWorker" in navigator) {
@@ -98,6 +130,115 @@ export default class extends Controller {
   persistNotificationSettings() {
     const [namespace, identifier] = chatStorageKeys.notificationSettings()
     writeCache(namespace, identifier, this.notificationSettings)
+  }
+
+  loadChatFolders() {
+    return DEFAULT_CHAT_FOLDERS.map((folder) => ({
+      ...folder,
+      room_ids: [],
+      pinned_room_ids: []
+    }))
+  }
+
+  loadActiveChatFolderId() {
+    const [namespace, identifier] = chatStorageKeys.activeChatFolder()
+    return readCache(namespace, identifier, DEFAULT_CHAT_FOLDERS[0].id)
+      || DEFAULT_CHAT_FOLDERS[0].id
+  }
+
+  persistActiveChatFolderId() {
+    const [namespace, identifier] = chatStorageKeys.activeChatFolder()
+    writeCache(namespace, identifier, this.activeChatFolderId)
+  }
+
+  ensureActiveFolder() {
+    if (!this.chatFolders.some((folder) => folder.id === this.activeChatFolderId)) {
+      this.activeChatFolderId = String(this.chatFolders[0]?.id || DEFAULT_CHAT_FOLDERS[0].id)
+      this.persistActiveChatFolderId()
+    }
+  }
+
+  csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || ""
+  }
+
+  normalizeFolder(folder) {
+    return {
+      id: String(folder?.id || ""),
+      name: String(folder?.name || "未命名分组"),
+      kind: folder?.kind || "custom",
+      builtIn: !!folder?.built_in || !!folder?.builtIn,
+      room_ids: Array.isArray(folder?.room_ids) ? folder.room_ids.map((id) => String(id)) : [],
+      pinned_room_ids: Array.isArray(folder?.pinned_room_ids)
+        ? folder.pinned_room_ids.map((id) => String(id))
+        : []
+    }
+  }
+
+  applyServerFolders(folders) {
+    if (!Array.isArray(folders) || folders.length === 0) {
+      return
+    }
+
+    this.chatFolders = folders.map((folder) => this.normalizeFolder(folder))
+    this.ensureActiveFolder()
+    if (this.hasMessagesListTarget && !this.messagesListTarget.classList.contains("hidden")) {
+      this.renderChatRoomList(this.chatRooms)
+    }
+  }
+
+  refreshChatFolders() {
+    return fetch("/chat_folders", {
+      headers: {
+        "Accept": "application/json"
+      }
+    })
+      .then((resp) => {
+        if (!resp.ok) {
+          throw new Error(`加载分组失败: ${resp.status}`)
+        }
+        return resp.json()
+      })
+      .then((folders) => {
+        this.applyServerFolders(folders)
+        return folders
+      })
+      .catch((error) => {
+        console.error("加载分组失败", error)
+        return this.chatFolders
+      })
+  }
+
+  submitFolderRequest(url, { method = "POST", body } = {}) {
+    return fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRF-Token": this.csrfToken()
+      },
+      body: body ? JSON.stringify(body) : undefined
+    })
+      .then((resp) => {
+        if (!resp.ok) {
+          throw new Error(`分组操作失败: ${resp.status}`)
+        }
+        return resp.json()
+      })
+      .then((payload) => {
+        if (Array.isArray(payload)) {
+          this.applyServerFolders(payload)
+          return payload
+        }
+        if (Array.isArray(payload?.folders)) {
+          this.applyServerFolders(payload.folders)
+        }
+        return payload
+      })
+      .catch((error) => {
+        console.error("分组操作失败", error)
+        return null
+      })
   }
 
   cachedChatRooms() {
@@ -450,34 +591,34 @@ export default class extends Controller {
       return
     }
 
+    this.renderFolderBar()
+
     if (!chatRooms || chatRooms.length === 0) {
       chatRoomList.innerHTML = '<div class="px-6 py-8 text-center text-sm text-slate-400">暂无会话</div>'
       return
     }
 
-    chatRoomList.innerHTML = chatRooms.map((room) => {
-      const activeClass = String(room.id) === String(this.currentRoomId)
-        ? " bg-slate-50"
-        : ""
-      return `
-        <button type="button"
-                class="flex w-full items-center border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50${activeClass}"
-                data-chat-room-id="${room.id}">
-          <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-200 text-lg font-medium text-slate-600">
-            ${room.avatar_base64
-              ? `<img src="data:image/png;base64,${room.avatar_base64}" class="h-full w-full object-cover" alt="头像"/>`
-              : `<span>${(room.name || "?").slice(0, 1)}</span>`}
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="truncate font-medium text-slate-900">${room.name || "未命名会话"}</div>
-            <div class="truncate text-xs text-slate-500">${room.latest_wx_message?.preview_content || ""}</div>
-          </div>
-        </button>
+    const activeFolder = this.currentChatFolder()
+    const visibleRooms = this.visibleRoomsForFolder(activeFolder, chatRooms)
+
+    if (visibleRooms.length === 0) {
+      chatRoomList.innerHTML = `
+        <div class="px-6 py-10 text-center">
+          <div class="text-sm font-medium text-slate-500">${this.escapeHtml(activeFolder?.name || "分组")}</div>
+          <div class="mt-2 text-xs text-slate-400">${activeFolder?.kind === "custom" ? "这个分组还没有会话" : "当前分组暂无会话"}</div>
+        </div>
       `
-    }).join("")
+      return
+    }
+
+    chatRoomList.innerHTML = `
+      <section data-chat-room-section>
+        ${visibleRooms.map((room) => this.renderChatRoomRow(room, activeFolder)).join("")}
+      </section>
+    `
 
     this.applyChatRoomNames(chatRooms)
-    chatRooms.forEach((room) => {
+    visibleRooms.forEach((room) => {
       const element = chatRoomList.querySelector(`[data-chat-room-id="${room.id}"]`)
       if (element) {
         element.addEventListener("click", () => this.openChatRoom(room.id))
@@ -490,6 +631,7 @@ export default class extends Controller {
     if (!force && cached.length > 0) {
       this.chatRooms = cached
       this.renderChatRoomList(cached)
+      requestAnimationFrame(() => this.loadChatRooms({ force: true }))
       return Promise.resolve(cached)
     }
 
@@ -511,6 +653,70 @@ export default class extends Controller {
         }
         return cached
       })
+  }
+
+  currentChatFolder() {
+    return this.chatFolders.find((folder) => folder.id === this.activeChatFolderId)
+      || this.chatFolders[0]
+      || DEFAULT_CHAT_FOLDERS[0]
+  }
+
+  visibleRoomsForFolder(folder, rooms = this.chatRooms) {
+    const targetFolder = folder || this.currentChatFolder()
+    const allRooms = Array.isArray(rooms) ? rooms : []
+    const matchedRooms = allRooms.filter((room) => this.roomInFolder(room, targetFolder))
+    const pinnedIds = new Set((targetFolder?.pinned_room_ids || []).map((id) => String(id)))
+    const pinnedRooms = []
+    const normalRooms = []
+
+    matchedRooms.forEach((room) => {
+      if (pinnedIds.has(String(room.id))) {
+        pinnedRooms.push(room)
+      } else {
+        normalRooms.push(room)
+      }
+    })
+
+    const pinnedOrder = new Map((targetFolder?.pinned_room_ids || [])
+      .map((id, index) => [String(id), index]))
+    pinnedRooms.sort((a, b) => {
+      return (pinnedOrder.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER)
+        - (pinnedOrder.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER)
+    })
+
+    return [...pinnedRooms, ...normalRooms]
+  }
+
+  roomInFolder(room, folder) {
+    if (!room || !folder) {
+      return false
+    }
+
+    switch (folder.kind) {
+      case "groups":
+        return !!room.group_chat
+      case "contacts":
+        return !room.group_chat && !room.official_account
+      case "official_accounts":
+        return !!room.official_account
+      case "custom":
+        return Array.isArray(folder.room_ids)
+          && folder.room_ids.includes(String(room.id))
+      default:
+        return false
+    }
+  }
+
+  isRoomPinnedInFolder(roomId, folder = this.currentChatFolder()) {
+    return (folder?.pinned_room_ids || []).includes(String(roomId))
+  }
+
+  handleLocalChatMessage(event) {
+    const payload = event?.detail
+    if (!payload?.chat_room_id) {
+      return
+    }
+    this.mergeChatRoomUpdate(payload)
   }
 
   mergeChatRoomUpdate(payload) {
@@ -542,6 +748,8 @@ export default class extends Controller {
         id: roomId,
         name: payload?.chat_room_name || `聊天室 ${roomId}`,
         avatar_base64: "",
+        official_account: !!payload?.official_account,
+        group_chat: !!payload?.group_chat,
         latest_wx_message: {
           id: payload?.wx_messages_id || null,
           preview_content: nextPreview,
@@ -552,7 +760,9 @@ export default class extends Controller {
 
     this.cacheChatRooms(nextRooms)
 
-    if (!payload?.chat_room_name || existingIndex < 0) {
+    if (!payload?.chat_room_name || existingIndex < 0
+      || (existingIndex >= 0 && nextRooms[0]
+        && typeof nextRooms[0].official_account === "undefined")) {
       this.loadChatRooms({ force: true })
       return
     }
@@ -664,6 +874,7 @@ export default class extends Controller {
       this.contactsListTarget.classList.add("hidden")
       this.letterNavTarget.hidden = true
       this.setMobileTitle("消息")
+      this.refreshChatFolders()
       this.loadChatRooms()
     } else {
       this.messagesListTarget.classList.add("hidden")
@@ -686,9 +897,12 @@ export default class extends Controller {
     const containerTop = this.contactsListTarget.getBoundingClientRect().top
 
     this.groupTargets.forEach((group) => {
+      if (!group.dataset.letter) {
+        return
+      }
       const rect = group.getBoundingClientRect()
       if (rect.top - containerTop <= 10) {
-        currentInitial = group.id.replace("group-", "")
+        currentInitial = group.dataset.letter
       }
     })
 
@@ -743,6 +957,10 @@ export default class extends Controller {
         const matched = chatRoom.textContent.toLowerCase().includes(value)
         chatRoom.classList.toggle("hidden", !matched)
       })
+      document.querySelectorAll("[data-chat-room-section]").forEach((section) => {
+        const hasVisibleRoom = section.querySelector('[data-chat-room-id]:not(.hidden)')
+        section.classList.toggle("hidden", !hasVisibleRoom)
+      })
       return
     }
 
@@ -761,5 +979,225 @@ export default class extends Controller {
     if (this.messagesListTarget.classList.contains("hidden")) {
       this.letterNavTarget.hidden = value.length > 0 || visibleContacts.length === 0
     }
+  }
+
+  selectChatFolder(event) {
+    event.preventDefault()
+    const folderId = String(event.params?.folderId || "")
+    if (!folderId || !this.chatFolders.some((folder) => folder.id === folderId)) {
+      return
+    }
+
+    this.activeChatFolderId = folderId
+    this.persistActiveChatFolderId()
+    this.renderChatRoomList(this.chatRooms)
+  }
+
+  createChatFolder(event = null) {
+    event?.preventDefault()
+    event?.stopPropagation()
+
+    const folderName = window.prompt("输入新的分组名称")
+    if (!folderName) {
+      return
+    }
+
+    const name = folderName.trim()
+    if (!name) {
+      return
+    }
+
+    this.submitFolderRequest("/chat_folders", {
+      method: "POST",
+      body: { name }
+    }).then((payload) => {
+      const createdId = payload?.folder?.id
+      if (createdId) {
+        this.activeChatFolderId = String(createdId)
+        this.persistActiveChatFolderId()
+        this.renderChatRoomList(this.chatRooms)
+      }
+    })
+  }
+
+  deleteActiveChatFolder(event = null) {
+    event?.preventDefault()
+    event?.stopPropagation()
+
+    const activeFolder = this.currentChatFolder()
+    if (!activeFolder || activeFolder.builtIn) {
+      return
+    }
+
+    const shouldDelete = window.confirm(`删除分组“${activeFolder.name}”？`)
+    if (!shouldDelete) {
+      return
+    }
+
+    this.submitFolderRequest(`/chat_folders/${activeFolder.id}`, {
+      method: "DELETE"
+    }).then(() => {
+      this.activeChatFolderId = DEFAULT_CHAT_FOLDERS[0].id
+      this.persistActiveChatFolderId()
+      this.renderChatRoomList(this.chatRooms)
+    })
+  }
+
+  togglePinInCurrentFolder(event) {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const roomId = String(event.params?.roomId || "")
+    const folder = this.currentChatFolder()
+    if (!roomId || !folder) {
+      return
+    }
+
+    this.submitFolderRequest(`/chat_folders/${folder.id}/toggle_pin`, {
+      method: "PATCH",
+      body: { chat_room_id: roomId }
+    })
+  }
+
+  toggleCustomFolderMembership(event) {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const roomId = String(event.params?.roomId || "")
+    const folderId = String(event.params?.folderId || "")
+    if (!roomId || !folderId) {
+      return
+    }
+
+    this.submitFolderRequest(`/chat_folders/${folderId}/toggle_room`, {
+      method: "PATCH",
+      body: { chat_room_id: roomId }
+    })
+  }
+
+  renderFolderBar() {
+    if (!this.hasFolderBarTarget) {
+      return
+    }
+
+    const currentFolder = this.currentChatFolder()
+    const folderButtons = this.chatFolders.map((folder) => {
+      const active = folder.id === currentFolder?.id
+      const count = this.visibleRoomsForFolder(folder).length
+      const activeClass = active
+        ? "border-slate-900 bg-slate-900 text-white"
+        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+
+      return `
+        <button type="button"
+                class="inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition ${activeClass}"
+                data-action="click->chat#selectChatFolder"
+                data-chat-folder-id-param="${this.escapeHtml(folder.id)}">
+          <span>${this.escapeHtml(folder.name)}</span>
+          <span class="rounded-full ${active ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500"} px-2 py-0.5 text-[10px]">${count}</span>
+        </button>
+      `
+    }).join("")
+
+    const deleteButton = currentFolder && !currentFolder.builtIn
+      ? `
+        <button type="button"
+                class="inline-flex shrink-0 items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600 transition hover:bg-rose-100"
+                data-action="click->chat#deleteActiveChatFolder">
+          删除分组
+        </button>
+      `
+      : ""
+
+    this.folderBarTarget.innerHTML = `
+      ${folderButtons}
+      <button type="button"
+              class="inline-flex shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+              data-action="click->chat#createChatFolder">
+        + 新建分组
+      </button>
+      ${deleteButton}
+    `
+  }
+
+  renderChatRoomRow(room, folder) {
+    const roomId = String(room.id)
+    const activeClass = roomId === String(this.currentRoomId)
+      ? "bg-slate-50"
+      : "bg-white"
+    const pinned = this.isRoomPinnedInFolder(roomId, folder)
+    const typeBadge = room.official_account
+      ? '<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">公众号</span>'
+      : room.group_chat
+        ? '<span class="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700">群聊</span>'
+        : ""
+
+    const customFolderActions = this.chatFolders
+      .filter((item) => item.kind === "custom")
+      .map((item) => {
+        const joined = (item.room_ids || []).includes(roomId)
+        return `
+          <button type="button"
+                  class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs text-slate-600 transition hover:bg-slate-50"
+                  data-action="click->chat#toggleCustomFolderMembership"
+                  data-chat-room-id-param="${this.escapeHtml(roomId)}"
+                  data-chat-folder-id-param="${this.escapeHtml(item.id)}">
+            <span>${joined ? "移出" : "加入"} ${this.escapeHtml(item.name)}</span>
+            <span class="text-slate-400">${joined ? "已加入" : "未加入"}</span>
+          </button>
+        `
+      }).join("")
+
+    const menuActions = `
+      <button type="button"
+              class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs text-slate-600 transition hover:bg-slate-50"
+              data-action="click->chat#togglePinInCurrentFolder"
+              data-chat-room-id-param="${this.escapeHtml(roomId)}">
+        <span>${pinned ? "取消置顶" : "置顶到当前分组"}</span>
+        <span class="text-slate-400">${pinned ? "Pinned" : "Pin"}</span>
+      </button>
+      ${customFolderActions || '<div class="px-3 py-2 text-xs text-slate-400">暂无自定义分组</div>'}
+    `
+
+    return `
+      <div class="group flex items-stretch border-b border-slate-100 ${activeClass}" data-chat-room-row>
+        <button type="button"
+                class="flex min-w-0 flex-1 items-center px-4 py-3 text-left transition hover:bg-slate-50"
+                data-chat-room-id="${this.escapeHtml(roomId)}">
+          <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-200 text-lg font-medium text-slate-600">
+            ${room.avatar_base64
+              ? `<img src="data:image/png;base64,${room.avatar_base64}" class="h-full w-full object-cover" alt="头像"/>`
+              : `<span>${this.escapeHtml((room.name || "?").slice(0, 1))}</span>`}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <div class="truncate font-medium text-slate-900">${this.escapeHtml(room.name || "未命名会话")}</div>
+              ${typeBadge}
+              ${pinned ? '<span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-medium text-white">PIN</span>' : ""}
+            </div>
+            <div class="truncate text-xs text-slate-500">${this.escapeHtml(room.latest_wx_message?.preview_content || "")}</div>
+          </div>
+        </button>
+        <div class="flex items-center pr-2">
+          <details class="relative">
+            <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+              <span aria-hidden="true">⋯</span>
+            </summary>
+            <div class="absolute right-0 top-11 z-30 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+              ${menuActions}
+            </div>
+          </details>
+        </div>
+      </div>
+    `
+  }
+
+  escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
   }
 }

@@ -36,9 +36,9 @@ class ChatRoomController < ApplicationController
   end
 
   def list
-    chat_rooms = ChatRoom.includes(messages: :wx_message).order_by_latest_message
+    chat_rooms = ChatRoom.includes(:contact, messages: :wx_message).order_by_latest_message
     render json: chat_rooms.as_json(only: [ :id, :name, :contact_id ],
-                                    methods: [ :avatar_base64 ],
+                                    methods: [ :avatar_base64, :official_account, :group_chat ],
                                     include: { latest_wx_message: { only: [ :id, :real_msg_type, :message_time ],
                                                methods: [ :preview_content ]
                                     } })

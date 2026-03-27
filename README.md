@@ -18,6 +18,17 @@
 4. build `docker compose build app`
 5. 运行 `docker compose up -d`
 
+### Docker 启动时自动跑数据库 merge 脚本
+
+默认不会执行任何自定义 merge 脚本。
+
+- 开关：`RUN_DB_MERGE_SCRIPT=0`
+- 脚本路径：`DB_MERGE_SCRIPT_PATH=/rails/bin/db-merge`
+
+只有当 `RUN_DB_MERGE_SCRIPT=1` 时，容器启动阶段才会在 `db:prepare` 之后执行这个脚本。
+
+更推荐这样做，而不是默认总是执行，因为 merge 脚本通常有副作用，容器重启时重复执行可能带来重复写入、慢启动或脏状态。
+
 ## 关于微信服务端
 
 1. 微信服务来源于互联网，修改了一点小问题，自己部署应该没有什么「安全性」的问题。
@@ -104,4 +115,3 @@ ocrurl = ""
 
 
 ```
-

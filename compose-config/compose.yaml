@@ -17,6 +17,8 @@ services:
       - RAILS_MASTER_KEY_FILE
       - RAILS_CREDENTIALS_YML_ENC_BASE64
       - RAILS_CREDENTIALS_YML_ENC_FILE
+      - RUN_DB_MERGE_SCRIPT=${RUN_DB_MERGE_SCRIPT:-0}
+      - DB_MERGE_SCRIPT_PATH=${DB_MERGE_SCRIPT_PATH:-/rails/bin/db-merge}
 
   # 数据库，如果你已经有 PG了，可以注释掉，记得配置好数据库密码
 #  db:

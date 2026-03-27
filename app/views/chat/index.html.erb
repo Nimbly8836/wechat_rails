@@ -115,9 +115,14 @@
     <!-- 消息列表容器 -->
     <div class="relative flex-1 min-h-0">
       <div id="message-list"
-           class="hidden h-full overflow-y-auto"
+           class="hidden h-full min-h-0 flex flex-col"
            data-chat-target="messagesList">
-        <div id="chat-room-list"></div>
+        <div class="border-b border-slate-100 bg-white/90 px-3 py-2 backdrop-blur">
+          <div class="flex items-center gap-2 overflow-x-auto pb-1" data-chat-target="folderBar"></div>
+        </div>
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <div id="chat-room-list"></div>
+        </div>
       </div>
       <!-- 联系人滚动区 -->
       <div id="contacts-list"
@@ -125,8 +130,68 @@
            data-chat-target="contactsList"
            data-action="scroll->chat#highlightLetter">
         <div>
+          <% if @official_contacts.any? %>
+            <div id="group-official-accounts" data-chat-target="group">
+              <div class="flex h-10 items-center justify-between bg-amber-50 px-3 py-1">
+                <span class="font-medium text-amber-900">公众号</span>
+                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700"><%= @official_contacts.size %></span>
+              </div>
+              <% @official_contacts.each do |contact| %>
+                <div class="flex cursor-pointer items-center border-b border-amber-100 px-4 py-3 transition hover:bg-amber-50/70"
+                     data-contact-id="<%= contact.id %>"
+                     data-chat-target="contact"
+                     data-action="click->chat#selectContact">
+                  <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-amber-100 text-sm font-semibold text-amber-700">
+                    <% if contact.avatar_url.present? %>
+                      <%= image_tag contact.avatar_url, class: "w-full h-full object-cover", alt: contact.display_name %>
+                    <% else %>
+                      公众号
+                    <% end %>
+                  </div>
+                  <div class="flex-1 overflow-hidden">
+                    <div class="flex items-center gap-2">
+                      <div class="truncate font-medium text-slate-900"><%= contact.display_name %></div>
+                      <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">公众号</span>
+                    </div>
+                    <div class="truncate text-xs text-slate-400"><%= contact.user_name %></div>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+
+          <% if @group_chat_contacts.any? %>
+            <div id="group-chatrooms" data-chat-target="group">
+              <div class="flex h-10 items-center justify-between bg-sky-50 px-3 py-1">
+                <span class="font-medium text-sky-900">群聊</span>
+                <span class="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-700"><%= @group_chat_contacts.size %></span>
+              </div>
+              <% @group_chat_contacts.each do |contact| %>
+                <div class="flex cursor-pointer items-center border-b border-sky-100 px-4 py-3 transition hover:bg-sky-50/70"
+                     data-contact-id="<%= contact.id %>"
+                     data-chat-target="contact"
+                     data-action="click->chat#selectContact">
+                  <div class="mr-3 flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-sky-100 text-sm font-semibold text-sky-700">
+                    <% if contact.avatar_url.present? %>
+                      <%= image_tag contact.avatar_url, class: "w-full h-full object-cover", alt: contact.display_name %>
+                    <% else %>
+                      群聊
+                    <% end %>
+                  </div>
+                  <div class="flex-1 overflow-hidden">
+                    <div class="flex items-center gap-2">
+                      <div class="truncate font-medium text-slate-900"><%= contact.display_name %></div>
+                      <span class="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700">群聊</span>
+                    </div>
+                    <div class="truncate text-xs text-slate-400"><%= contact.user_name %></div>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+
           <% @grouped_contacts.sort.each do |initial, contacts| %>
-            <div id="group-<%= initial %>" data-chat-target="group">
+            <div id="group-<%= initial %>" data-chat-target="group" data-letter="<%= initial %>">
               <div class="px-2 py-1 h-10 font-medium bg-gray-100"><%= initial %></div>
               <% contacts.each do |contact| %>
                 <div class="flex cursor-pointer items-center border-b border-slate-100 px-4 py-3 transition hover:bg-slate-50"
@@ -142,6 +207,7 @@
                   </div>
                   <div class="flex-1 overflow-hidden">
                     <div class="truncate font-medium text-slate-900"><%= contact.display_name %></div>
+                    <div class="truncate text-xs text-slate-400"><%= contact.user_name %></div>
                   </div>
                 </div>
               <% end %>

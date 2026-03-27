@@ -1,0 +1,4 @@
+#!/bin/bash -e
+
+echo "DB merge hook is enabled, but /rails/bin/db-merge is still the default placeholder."
+echo "Customize this script to run your database merge workflow."
