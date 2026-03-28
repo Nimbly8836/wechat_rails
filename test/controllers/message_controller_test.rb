@@ -171,6 +171,47 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     assert_equal owner_wxid, save_job[:args][1]
   end
 
+  test "callback accepts new messages payload format" do
+    ActiveJob::Base.queue_adapter = :test
+    group_wxid = @chat_room.wx_id
+    owner_wxid = @contact.own_wxid
+
+    post "/message/callback/#{group_wxid}", params: {
+      Code: 0,
+      Success: true,
+      Message: "成功",
+      Data: {
+        HasChanges: true,
+        HasNewMessage: true,
+        MessageCount: 1,
+        Messages: [
+          {
+            "MsgType" => 1,
+            "MsgTypeName" => "text",
+            "Talker" => group_wxid,
+            "SenderUserName" => "wxid_sender_xxx",
+            "Content" => "wxid_sender_xxx:\n你好",
+            "ContentText" => "你好"
+          }
+        ],
+        AddMsgs: [
+          {
+            "Content" => { "string" => "wxid_sender_xxx:\n你好" }
+          }
+        ]
+      }
+    }
+
+    assert_response :success
+    wx_message = WxMessage.order(:id).last
+    assert_equal "text", wx_message.msg_type
+    assert_equal "wxid_sender_xxx", wx_message.from_user_name
+    assert_equal group_wxid, wx_message.to_user_name
+    assert_equal "wxid_sender_xxx:\n你好", wx_message.content
+    assert wx_message.msg_id.present?
+    assert wx_message.new_msg_id.present?
+  end
+
   private
 
   def create_message!(new_msg_id:, content:, msg_id: nil, msg_type: :text, real_msg_type: :text,
