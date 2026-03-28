@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_14_055843) do
+ActiveRecord::Schema[8.0].define(version: 2026_03_29_110000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -149,6 +149,31 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_14_055843) do
     t.text "emoji_md5"
     t.integer "real_msg_type"
     t.index ["msg_id", "new_msg_id", "msg_seq"], name: "index_wx_messages_on_msg_id_and_new_msg_id_and_msg_seq", unique: true
+  end
+
+  create_table "wx_message_ingest_failures", force: :cascade do |t|
+    t.string "fingerprint", null: false
+    t.string "owner_wxid", null: false
+    t.string "stage", null: false
+    t.bigint "msg_id"
+    t.bigint "new_msg_id"
+    t.bigint "msg_seq"
+    t.integer "msg_type"
+    t.string "from_user_name"
+    t.string "to_user_name"
+    t.string "error_class", null: false
+    t.text "error_message", null: false
+    t.jsonb "payload", default: {}, null: false
+    t.integer "failure_count", default: 0, null: false
+    t.datetime "first_failed_at", null: false
+    t.datetime "last_failed_at", null: false
+    t.datetime "resolved_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["fingerprint"], name: "index_wx_message_ingest_failures_on_fingerprint", unique: true
+    t.index ["last_failed_at"], name: "index_wx_message_ingest_failures_on_last_failed_at"
+    t.index ["owner_wxid"], name: "index_wx_message_ingest_failures_on_owner_wxid"
+    t.index ["resolved_at"], name: "index_wx_message_ingest_failures_on_resolved_at"
   end
 
   add_foreign_key "chat_room_members", "chat_rooms"
