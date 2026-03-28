@@ -44,7 +44,7 @@ class MessageSenderTest < ActiveSupport::TestCase
     assert_includes xml, "<fromusr>#{@chat_room.wx_id}</fromusr>"
   end
 
-  test "emoji_file_metadata computes gif md5 and size" do
+  test "emoji_payload computes gif base64 md5 and size" do
     tempfile = Tempfile.new(["emoji", ".gif"])
     tempfile.binmode
     tempfile.write("GIF89a")
@@ -57,10 +57,11 @@ class MessageSenderTest < ActiveSupport::TestCase
     )
     sender = MessageSender.new(@chat_room, 47, "", {}, uploaded)
 
-    metadata = sender.send(:emoji_file_metadata)
+    payload = sender.send(:emoji_payload)
 
-    assert_equal Digest::MD5.hexdigest("GIF89a"), metadata[:md5]
-    assert_equal 6, metadata[:total_len]
+    assert_equal "data:image/gif;base64,R0lGODlh", payload[:base64]
+    assert_equal Digest::MD5.hexdigest("GIF89a"), payload[:md5]
+    assert_equal 6, payload[:total_len]
   ensure
     tempfile.close!
   end

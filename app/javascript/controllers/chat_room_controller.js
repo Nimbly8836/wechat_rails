@@ -1804,6 +1804,7 @@ export default class extends Controller {
     if (type === "emoji") {
       tempMsg.msg_type = 47;
       tempMsg.extra = {
+        base64: message?.extra?.base64 || "",
         preview_url: message?.extra?.preview_url || "",
       };
     }
@@ -1833,7 +1834,7 @@ export default class extends Controller {
     }
     let body;
     let headers;
-    const usesFormData = type === "file" || type === "emoji";
+    const usesFormData = type === "file";
     if (usesFormData) {
       const formData = new FormData();
       formData.append("chat_room_id", this.idValue);
@@ -1847,11 +1848,15 @@ export default class extends Controller {
           'meta[name="csrf-token"]').content
       }
     } else {
+      const requestExtra = { ...(msg.extra || {}) };
+      if (type === "emoji") {
+        delete requestExtra.preview_url;
+      }
       body = JSON.stringify({
         chat_room_id: this.idValue,
         content: msg.wx_message.content,
         msg_type: msg.msg_type,
-        extra: msg.extra || {},
+        extra: requestExtra,
       })
       headers = {
         "Content-Type": "application/json",
@@ -3829,7 +3834,7 @@ export default class extends Controller {
           event.target.value = "";
           return;
         }
-        sendMsg.file = file;
+        sendMsg.extra.base64 = await get_file_base64(file);
         sendMsg.extra.preview_url = URL.createObjectURL(file);
       }
       if (uploadType === "file") {

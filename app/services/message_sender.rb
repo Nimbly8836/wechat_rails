@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+require "base64"
 require "digest/md5"
 require "cgi"
 
@@ -26,17 +27,18 @@ class MessageSender
   def send
     case @message_type.to_i
     when MESSAGE_TYPES[:text]
-      res = message_api_service.send_text(@chat_room.wx_id, @message_content, @extra&.dig(:at) || "")
+      res = message_api_service.send_text(@chat_room.wx_id, @message_content, extra_value(:at) || "")
     when MESSAGE_TYPES[:image]
-      res = message_api_service.send_image(@chat_room.wx_id, @extra&.dig(:base64))
+      res = message_api_service.send_image(@chat_room.wx_id, extra_value(:base64))
     when MESSAGE_TYPES[:emoji]
-      metadata = emoji_file_metadata
-      return metadata if metadata.is_a?(Hash) && metadata[:success] == false
+      payload = emoji_payload
+      return payload if payload.is_a?(Hash) && payload[:success] == false
 
       @extra ||= {}
-      @extra[:md5] = metadata[:md5]
-      @extra[:total_len] = metadata[:total_len]
-      res = message_api_service.send_emoji(@chat_room.wx_id, metadata[:md5], metadata[:total_len])
+      @extra[:base64] = payload[:base64]
+      @extra[:md5] = payload[:md5]
+      @extra[:total_len] = payload[:total_len]
+      res = message_api_service.send_emoji(@chat_room.wx_id, payload[:base64], md5: payload[:md5], total_len: payload[:total_len])
     when MESSAGE_TYPES[:quote]
       reference_message = quoted_reference_message
       return { success: false, message: "引用消息不存在" } unless reference_message
@@ -53,9 +55,9 @@ class MessageSender
       return res
     end
     result = save_send_message(res)
-    save_send_image(result[:data]&.dig("id"), @extra&.dig(:base64)) if @message_type.to_i ==
+    save_send_image(result[:data]&.dig("id"), extra_value(:base64)) if @message_type.to_i ==
     MESSAGE_TYPES[:image]
-    save_send_emoji(@extra&.dig(:md5), @file) if @message_type == MESSAGE_TYPES[:emoji]
+    save_send_emoji(extra_value(:md5), extra_value(:base64)) if @message_type == MESSAGE_TYPES[:emoji]
     save_send_file(result[:data]&.dig("id"), @file) if @message_type == MESSAGE_TYPES[:file]
     result
   end
@@ -95,7 +97,7 @@ class MessageSender
     # 特殊类型字段
     wx_message_attrs[:msg_source] = msg_res["MsgSource"] if @message_type == MESSAGE_TYPES[:image]
     if @message_type == MESSAGE_TYPES[:emoji]
-      wx_message_attrs[:emoji_md5] = @extra&.dig(:md5)
+      wx_message_attrs[:emoji_md5] = extra_value(:md5)
     end
     if @message_type == MESSAGE_TYPES[:quote]
       quoted = WechatModels::SyncMessageModel.parse_refer_app_msg(@message_content)
@@ -200,18 +202,16 @@ class MessageSender
     file_path.to_s
   end
 
-  def save_send_emoji(emoji_md5, file)
+  def save_send_emoji(emoji_md5, emoji_base64)
     return if emoji_md5.blank?
-    return unless file.respond_to?(:tempfile)
+    payload = decode_base64_payload(emoji_base64)
+    return if payload[:encoded].blank?
 
     storage_dir = Rails.root.join("storage", "emojis")
     FileUtils.mkdir_p(storage_dir)
 
-    ext = File.extname(file.original_filename.to_s).presence || ".gif"
-    file_path = storage_dir.join("#{emoji_md5}#{ext}")
-    File.open(file_path, "wb") do |f|
-      IO.copy_stream(file.tempfile, f)
-    end
+    file_path = storage_dir.join("#{emoji_md5}.gif")
+    File.binwrite(file_path, Base64.strict_decode64(payload[:encoded]))
 
     file_path.to_s
   end
@@ -234,27 +234,56 @@ class MessageSender
                                       name&.split(".")&.last)
   end
 
-  def emoji_file_metadata
-    return { success: false, message: "缺少表情文件" } unless @file.respond_to?(:tempfile)
+  def emoji_payload
+    base64 = extra_value(:base64)
 
-    file_name = @file.original_filename.to_s
-    content_type = @file.content_type.to_s
-    unless content_type == "image/gif" || file_name.downcase.end_with?(".gif")
-      return { success: false, message: "仅支持 GIF 表情文件" }
+    if base64.blank?
+      return { success: false, message: "缺少表情文件" } unless @file.respond_to?(:tempfile)
+
+      file_name = @file.original_filename.to_s
+      content_type = @file.content_type.to_s
+      unless content_type == "image/gif" || file_name.downcase.end_with?(".gif")
+        return { success: false, message: "仅支持 GIF 表情文件" }
+      end
+
+      @file.tempfile.rewind
+      data = @file.tempfile.read
+      @file.tempfile.rewind
+      base64 = "data:image/gif;base64,#{Base64.strict_encode64(data)}"
     end
 
-    @file.tempfile.rewind
-    data = @file.tempfile.read
-    @file.tempfile.rewind
+    payload = decode_base64_payload(base64)
+    return { success: false, message: "缺少表情文件" } if payload[:encoded].blank?
+
+    data = Base64.strict_decode64(payload[:encoded])
+    mime_type = payload[:mime_type].presence || Marcel::MimeType.for(StringIO.new(data), name: "emoji.gif")
+    return { success: false, message: "仅支持 GIF 表情文件" } unless mime_type == "image/gif"
 
     {
+      base64: base64,
       md5: Digest::MD5.hexdigest(data),
       total_len: data.bytesize
     }
+  rescue ArgumentError
+    { success: false, message: "表情文件编码无效" }
+  end
+
+  def decode_base64_payload(base64)
+    value = base64.to_s
+    match = value.match(/\Adata:(?<mime>[^;]+);base64,(?<data>.+)\z/m)
+    return { mime_type: match[:mime], encoded: match[:data] } if match
+
+    { mime_type: nil, encoded: value }
+  end
+
+  def extra_value(key)
+    return nil unless @extra.respond_to?(:dig)
+
+    @extra.dig(key) || @extra.dig(key.to_s)
   end
 
   def quoted_reference_message
-    reference_message_id = @extra&.dig(:reference_message_id)
+    reference_message_id = extra_value(:reference_message_id)
     return nil if reference_message_id.blank?
 
     Message.includes(:wx_message)

@@ -70,11 +70,12 @@ class MessageApiService
     send_app(to_wxid, 49, xml)
   end
 
-  def send_emoji(to_wxid, md5, total_len)
+  def send_emoji(to_wxid, base64, md5: nil, total_len: nil)
     path = WechatApis::Message.send_emoji
     params = WechatRequest::Message::SendEmoji.new(
       wxid: @wx_id,
       toWxid: to_wxid,
+      base64: base64,
       md5: md5,
       totalLen: total_len
     ).to_h
