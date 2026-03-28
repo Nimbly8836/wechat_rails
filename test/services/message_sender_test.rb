@@ -35,11 +35,13 @@ class MessageSenderTest < ActiveSupport::TestCase
 
     xml = sender.send(:build_quote_xml, reference_message, "回复一下")
 
+    assert_match(/\A<appmsg/, xml)
     assert_includes xml, "<type>57</type>"
     assert_includes xml, "<title>回复一下</title>"
     assert_includes xml, "<svrid>9000000000000001234</svrid>"
     assert_includes xml, "<content>原始消息内容</content>"
-    assert_includes xml, "<fromusr>wxid_target_user</fromusr>"
+    assert_includes xml, "<chatusr>wxid_target_user</chatusr>"
+    assert_includes xml, "<fromusr>#{@chat_room.wx_id}</fromusr>"
   end
 
   test "emoji_file_metadata computes gif md5 and size" do

@@ -67,7 +67,7 @@ class MessageApiService
   end
 
   def send_quote(to_wxid, xml)
-    send_app(to_wxid, 57, xml)
+    send_app(to_wxid, 49, xml)
   end
 
   def send_emoji(to_wxid, md5, total_len)
