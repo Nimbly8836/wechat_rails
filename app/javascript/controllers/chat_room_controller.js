@@ -522,6 +522,23 @@ export default class extends Controller {
     }, AUTO_REFRESH_INTERVAL_MS);
   }
 
+  fetchJson(url, { emptyOnNotModified = null } = {}) {
+    return fetch(url, {
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json"
+      }
+    }).then((res) => {
+      if (res.status === 304) {
+        return emptyOnNotModified;
+      }
+      if (!res.ok) {
+        throw new Error(`请求失败: ${res.status}`);
+      }
+      return res.json();
+    });
+  }
+
   fetchMessages({ beforeId = null, afterId = null } = {}) {
     const params = new URLSearchParams();
     if (beforeId != null) {
@@ -535,7 +552,7 @@ export default class extends Controller {
     const url = query ? `/chat_room/${this.idValue}/messages?${query}`
       : `/chat_room/${this.idValue}/messages`;
 
-    return fetch(url).then(res => res.json());
+    return this.fetchJson(url, { emptyOnNotModified: [] });
   }
 
   toggleSearchPanel(event = null) {
@@ -618,15 +635,8 @@ export default class extends Controller {
       limit: "40"
     });
 
-    return fetch(`/chat_room/${this.idValue}/messages?${params.toString()}`, {
-      headers: {
-        "Accept": "application/json"
-      }
-    }).then((res) => {
-      if (!res.ok) {
-        throw new Error(`搜索消息失败: ${res.status}`);
-      }
-      return res.json();
+    return this.fetchJson(`/chat_room/${this.idValue}/messages?${params.toString()}`, {
+      emptyOnNotModified: []
     });
   }
 
@@ -3844,8 +3854,16 @@ export default class extends Controller {
   }
 
   fetchMessageById(messageId) {
-    return fetch(`/chat_room/${this.idValue}/messages/${messageId}`)
+    return fetch(`/chat_room/${this.idValue}/messages/${messageId}`, {
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json"
+      }
+    })
       .then((res) => {
+        if (res.status === 304) {
+          return null;
+        }
         if (!res.ok) {
           return null;
         }
@@ -3876,8 +3894,16 @@ export default class extends Controller {
       encodeURIComponent(normalizedReferId)
     }`;
 
-    return fetch(url)
+    return fetch(url, {
+      cache: "no-store",
+      headers: {
+        "Accept": "application/json"
+      }
+    })
       .then((res) => {
+        if (res.status === 304) {
+          return null;
+        }
         if (!res.ok) {
           return null;
         }

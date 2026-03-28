@@ -1,6 +1,7 @@
 # app/jobs/save_chat_room_message_job.rb
 class SaveChatRoomMessageJob < ApplicationJob
   queue_as :save_chat_room_message
+  retry_on StandardError, wait: 5.seconds, attempts: 3
 
   def perform(wx_messages, owner_wxid)
     return if wx_messages.blank?
@@ -58,6 +59,7 @@ class SaveChatRoomMessageJob < ApplicationJob
     end
   rescue StandardError => e
     Rails.logger.error "Failed to save messages: #{e.message}\n#{e.backtrace.join("\n")}"
+    raise
   end
 
   private

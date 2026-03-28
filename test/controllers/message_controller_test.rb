@@ -135,6 +135,19 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     assert_equal [target.id], payload.map { |item| item["id"] }
   end
 
+  test "index disables http caching for message polling" do
+    create_message!(
+      new_msg_id: 9_000_000_000_000_001_400,
+      content: "缓存测试"
+    )
+
+    get chat_room_messages_path(@chat_room), params: { after_id: 0 }
+
+    assert_response :success
+    assert_equal "no-store", response.headers["Cache-Control"]
+    assert_equal "no-cache", response.headers["Pragma"]
+  end
+
   test "callback resolves owner wxid before parsing group system messages" do
     ActiveJob::Base.queue_adapter = :test
     group_wxid = @chat_room.wx_id
