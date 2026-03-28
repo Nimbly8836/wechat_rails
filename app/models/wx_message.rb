@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class WxMessage < ApplicationRecord
-  has_many :messages, -> { order(message_time: :desc) }
+  has_many :messages, -> { order(message_time: :desc) }, foreign_key: :wx_messages_id, inverse_of: :wx_message
 
   scope :keyword_search, ->(query) {
     pgroonga_search(
