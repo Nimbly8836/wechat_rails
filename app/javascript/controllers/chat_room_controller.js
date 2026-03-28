@@ -34,7 +34,7 @@ export default class extends Controller {
     ownerWxid: String,
     id: Number,
     name: String,
-    members: Array
+    members: String
   };
 
   connect() {
@@ -83,8 +83,10 @@ export default class extends Controller {
     this.autoScrollPinnedToBottom = true;
     const cachedMembers = this.readCachedChatMembers();
     this.chatMembers = cachedMembers;
-    if (!this.chatMembers.length && Array.isArray(this.membersValue)) {
-      this.chatMembers = this.membersValue;
+    const initialMembers = this.normalizeChatMembersData(this.membersValue);
+    if (!this.chatMembers.length && initialMembers.length) {
+      this.chatMembers = initialMembers;
+      this.persistChatMembers();
     }
     this.boundChatNotify = (e) => {
       const payload = e.detail || {};
@@ -159,12 +161,47 @@ export default class extends Controller {
   readCachedChatMembers() {
     const [namespace, identifier] = chatStorageKeys.chatRoomMembers(this.idValue);
     const cached = readCache(namespace, identifier, []);
-    return Array.isArray(cached) ? cached : [];
+    return this.normalizeChatMembersData(cached);
   }
 
   persistChatMembers() {
     const [namespace, identifier] = chatStorageKeys.chatRoomMembers(this.idValue);
     writeCache(namespace, identifier, this.chatMembers || []);
+  }
+
+  normalizeChatMembersData(value) {
+    let current = value;
+
+    for (let depth = 0; depth < 3; depth += 1) {
+      if (Array.isArray(current)) {
+        return current;
+      }
+
+      if (current && typeof current === "object") {
+        if (Array.isArray(current.members)) {
+          return current.members;
+        }
+        break;
+      }
+
+      if (typeof current !== "string") {
+        break;
+      }
+
+      const trimmed = current.trim();
+      if (!trimmed) {
+        return [];
+      }
+
+      try {
+        current = JSON.parse(trimmed);
+      } catch (error) {
+        console.warn("群成员数据解析失败", error);
+        return [];
+      }
+    }
+
+    return Array.isArray(current) ? current : [];
   }
 
   loadChatMembers({ force = false } = {}) {
@@ -179,7 +216,7 @@ export default class extends Controller {
     return fetch(`/chat_room/${this.idValue}/chat_members`)
       .then(res => res.json())
       .then(data => {
-        this.chatMembers = Array.isArray(data) ? data : [];
+        this.chatMembers = this.normalizeChatMembersData(data);
         this.persistChatMembers();
         this.renderMessages();
         return this.chatMembers;
@@ -1159,14 +1196,15 @@ export default class extends Controller {
         quoted.classList.remove("cursor-not-allowed", "opacity-60");
         if (referenced.id) {
           quoted.classList.add("cursor-pointer");
-          quoted.dataset.referMessageId = referenced.id;
-          quoted.addEventListener("click", (event) => {
+          quoted.dataset.referMessageId = String(referenced.id);
+          quoted.onclick = (event) => {
             event.stopPropagation();
             this.focusMessageById(referenced.id);
-          });
+          };
         } else {
           quoted.classList.remove("cursor-pointer");
           delete quoted.dataset.referMessageId;
+          quoted.onclick = null;
         }
       }
 
@@ -1187,12 +1225,15 @@ export default class extends Controller {
       }
     } else {
       if (parsed.refContent) {
-        quotedContent.textContent = parsed.refContent;
+        if (quotedContent) {
+          quotedContent.textContent = parsed.refContent;
+        }
       } else {
         if (quoted) {
           quoted.classList.add("cursor-not-allowed", "opacity-60");
           quoted.classList.remove("cursor-pointer");
           delete quoted.dataset.referMessageId;
+          quoted.onclick = null;
         }
         if (quotedMeta) {
           quotedMeta.textContent = "引用的消息";
@@ -2657,7 +2698,7 @@ export default class extends Controller {
       return true;
     }
 
-    for (let attempt = 0; attempt < 10; attempt += 1) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
       const firstMsg = this.messages.at(0);
       const firstMsgId = Number(firstMsg?.id);
       if (!Number.isFinite(firstMsgId) || targetId >= firstMsgId) {
@@ -2701,9 +2742,12 @@ export default class extends Controller {
           return false;
         }
 
-        this.messages.merge(data)
+        this.messages.merge(data, { prepend: true });
         this.renderMessages({ preserveBottomOffset });
-        return true;
+        const nextFirstMsgId = Number(this.messages.at(0)?.id);
+        return Number.isFinite(nextFirstMsgId)
+          ? nextFirstMsgId < Number(firstMsgId)
+          : true;
       })
       .catch(error => {
         console.error("加载更多消息失败:", error);
@@ -2749,6 +2793,7 @@ export default class extends Controller {
 
     return this.chatMembers.find((member) => {
       const candidates = [
+        member?.UserName,
         member?.user_name,
         member?.userName,
         member?.username,
@@ -2760,13 +2805,16 @@ export default class extends Controller {
   }
 
   resolveMemberName(member, fallback = "") {
-    return member?.display_name || member?.displayName || member?.remark
-      || member?.nick_name || member?.nickName || fallback;
+    return member?.display_name || member?.displayName || member?.DisplayName
+      || member?.remark || member?.Remark || member?.nick_name
+      || member?.nickName || member?.NickName || fallback;
   }
 
   resolveMemberAvatar(member) {
     return member?.small_head_img_url || member?.smallHeadImgUrl
-      || member?.big_head_img_url || member?.bigHeadImgUrl || "";
+      || member?.SmallHeadImgUrl || member?.big_head_img_url
+      || member?.bigHeadImgUrl || member?.BigHeadImgUrl || member?.avatar
+      || member?.Avatar || "";
   }
 
   stripRoomSenderPrefix(text = "") {
