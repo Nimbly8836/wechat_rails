@@ -41,6 +41,7 @@ export default class extends Controller {
     "sidebar",
     "overlay",
     "messagesList",
+    "settingsList",
     "folderBar",
     "letterNav",
     "mobileTitle",
@@ -62,6 +63,7 @@ export default class extends Controller {
     this.chatRooms = this.cachedChatRooms()
     this.chatFolders = this.loadChatFolders()
     this.activeChatFolderId = this.loadActiveChatFolderId()
+    this.activeChatSection = this.loadActiveChatSection()
     this.collapsedContactGroups = this.loadCollapsedContactGroups()
     this.notificationSettings = this.loadNotificationSettings()
     this.currentRoomId = null
@@ -83,11 +85,13 @@ export default class extends Controller {
     this.ensureActiveFolder()
     this.syncNotificationUi()
     this.applyContactGroupVisibility()
+    this.renderFolderBar()
     this.refreshChatFolders()
 
-    const messageTab = this.sidebarTarget.querySelector('[data-tab="messages"]')
-    if (messageTab) {
-      messageTab.click()
+    const initialTab = this.sidebarTarget.querySelector(`[data-tab="${this.activeChatSection}"]`)
+      || this.sidebarTarget.querySelector('[data-tab="messages"]')
+    if (initialTab) {
+      initialTab.click()
     }
 
     this.applySidebarState()
@@ -154,6 +158,16 @@ export default class extends Controller {
     writeCache(namespace, identifier, this.activeChatFolderId)
   }
 
+  loadActiveChatSection() {
+    const [namespace, identifier] = chatStorageKeys.activeChatSection()
+    return readCache(namespace, identifier, "messages") || "messages"
+  }
+
+  persistActiveChatSection() {
+    const [namespace, identifier] = chatStorageKeys.activeChatSection()
+    writeCache(namespace, identifier, this.activeChatSection)
+  }
+
   loadCollapsedContactGroups() {
     const [namespace, identifier] = chatStorageKeys.collapsedContactGroups()
     const cached = readCache(namespace, identifier, {})
@@ -196,6 +210,7 @@ export default class extends Controller {
 
     this.chatFolders = folders.map((folder) => this.normalizeFolder(folder))
     this.ensureActiveFolder()
+    this.renderFolderBar()
     if (this.hasMessagesListTarget && !this.messagesListTarget.classList.contains("hidden")) {
       this.renderChatRoomList(this.chatRooms)
     }
@@ -425,8 +440,52 @@ export default class extends Controller {
 
   setSidebarTitle(title) {
     if (this.hasSidebarTitleTarget) {
-      this.sidebarTitleTarget.textContent = title || "Chats"
+      this.sidebarTitleTarget.textContent = title || "消息"
     }
+  }
+
+  syncSectionTabs() {
+    this.sidebarTarget.querySelectorAll("[data-chat-section-tab]").forEach((tab) => {
+      tab.dataset.active = String(tab.dataset.tab === this.activeChatSection)
+    })
+  }
+
+  activateSection(section) {
+    this.activeChatSection = section
+    this.persistActiveChatSection()
+    this.syncSectionTabs()
+
+    const showMessages = section === "messages"
+    const showContacts = section === "contacts"
+    const showSettings = section === "settings"
+
+    this.messagesListTarget.classList.toggle("hidden", !showMessages)
+    this.contactsListTarget.classList.toggle("hidden", !showContacts)
+    if (this.hasSettingsListTarget) {
+      this.settingsListTarget.classList.toggle("hidden", !showSettings)
+    }
+    this.letterNavTarget.hidden = !showContacts
+
+    if (showMessages) {
+      this.setMobileTitle("消息")
+      this.setSidebarTitle(this.currentChatFolder()?.name || "消息")
+      this.refreshChatFolders()
+      this.loadChatRooms()
+      return
+    }
+
+    if (showContacts) {
+      this.setMobileTitle("通讯录")
+      this.setSidebarTitle("联系人")
+      this.applyContactGroupVisibility({
+        searching: !!document.getElementById("sidebar-search")?.value?.trim()
+      })
+      return
+    }
+
+    this.setMobileTitle("设置")
+    this.setSidebarTitle("设置")
+    this.syncNotificationUi()
   }
 
   toggleNotificationPanel(event) {
@@ -808,6 +867,7 @@ export default class extends Controller {
     }
 
     this.cacheChatRooms(nextRooms)
+    this.renderFolderBar()
 
     if (!payload?.chat_room_name || existingIndex < 0
       || (existingIndex >= 0 && nextRooms[0]
@@ -913,27 +973,7 @@ export default class extends Controller {
 
   switchTab(event) {
     const clicked = event.currentTarget
-    clicked.parentNode.querySelectorAll("[data-active]").forEach((tab) => {
-      tab.dataset.active = "false"
-    })
-    clicked.dataset.active = "true"
-
-    if (clicked.dataset.tab === "messages") {
-      this.messagesListTarget.classList.remove("hidden")
-      this.contactsListTarget.classList.add("hidden")
-      this.letterNavTarget.hidden = true
-      this.setMobileTitle("消息")
-      this.setSidebarTitle("Chats")
-      this.refreshChatFolders()
-      this.loadChatRooms()
-    } else {
-      this.messagesListTarget.classList.add("hidden")
-      this.contactsListTarget.classList.remove("hidden")
-      this.letterNavTarget.hidden = false
-      this.setMobileTitle("通讯录")
-      this.setSidebarTitle("Contacts")
-      this.applyContactGroupVisibility()
-    }
+    this.activateSection(clicked.dataset.tab)
   }
 
   scrollToGroup(event) {
@@ -1001,9 +1041,9 @@ export default class extends Controller {
 
   search(event) {
     const value = event.target.value.trim().toLowerCase()
-    const contactsVisible = this.messagesListTarget.classList.contains("hidden")
+    const section = this.activeChatSection
 
-    if (!contactsVisible) {
+    if (section === "messages") {
       const chatRooms = document.querySelectorAll("[data-chat-room-id]")
       chatRooms.forEach((chatRoom) => {
         const matched = chatRoom.textContent.toLowerCase().includes(value)
@@ -1013,6 +1053,10 @@ export default class extends Controller {
         const hasVisibleRoom = section.querySelector('[data-chat-room-row]:not(.hidden)')
         section.classList.toggle("hidden", !hasVisibleRoom)
       })
+      return
+    }
+
+    if (section !== "contacts") {
       return
     }
 
@@ -1030,9 +1074,7 @@ export default class extends Controller {
 
     this.applyContactGroupVisibility({ searching: value.length > 0 })
 
-    if (this.messagesListTarget.classList.contains("hidden")) {
-      this.letterNavTarget.hidden = value.length > 0 || visibleContacts.length === 0
-    }
+    this.letterNavTarget.hidden = value.length > 0 || visibleContacts.length === 0
   }
 
   toggleContactGroup(event) {
@@ -1061,6 +1103,7 @@ export default class extends Controller {
 
     this.activeChatFolderId = folderId
     this.persistActiveChatFolderId()
+    this.activateSection("messages")
     this.renderChatRoomList(this.chatRooms)
   }
 
@@ -1086,6 +1129,7 @@ export default class extends Controller {
       if (createdId) {
         this.activeChatFolderId = String(createdId)
         this.persistActiveChatFolderId()
+        this.activateSection("messages")
         this.renderChatRoomList(this.chatRooms)
       }
     })
@@ -1110,6 +1154,7 @@ export default class extends Controller {
     }).then(() => {
       this.activeChatFolderId = DEFAULT_CHAT_FOLDERS[0].id
       this.persistActiveChatFolderId()
+      this.activateSection("messages")
       this.renderChatRoomList(this.chatRooms)
     })
   }
@@ -1156,14 +1201,16 @@ export default class extends Controller {
       const active = folder.id === currentFolder?.id
       const count = this.visibleRoomsForFolder(folder).length
       const activeClass = active ? "is-active" : ""
+      const icon = this.folderRailIcon(folder)
 
       return `
         <button type="button"
-                class="tg-folder-chip ${activeClass}"
+                class="tg-folder-rail-item ${activeClass}"
                 data-action="click->chat#selectChatFolder"
                 data-chat-folder-id-param="${this.escapeHtml(folder.id)}">
-          <span>${this.escapeHtml(folder.name)}</span>
-          <span class="tg-folder-chip-count">${count}</span>
+          <span class="tg-folder-rail-icon" aria-hidden="true">${icon}</span>
+          <span class="tg-folder-rail-label">${this.escapeHtml(folder.name)}</span>
+          ${count > 0 ? `<span class="tg-folder-rail-count">${count}</span>` : ""}
         </button>
       `
     }).join("")
@@ -1171,22 +1218,55 @@ export default class extends Controller {
     const deleteButton = currentFolder && !currentFolder.builtIn
       ? `
         <button type="button"
-                class="tg-folder-action is-danger"
+                class="tg-folder-rail-action is-danger"
                 data-action="click->chat#deleteActiveChatFolder">
-          删除分组
+          删除
         </button>
       `
       : ""
 
     this.folderBarTarget.innerHTML = `
-      <div class="tg-folder-chip-group">${folderButtons}</div>
-      <button type="button"
-              class="tg-folder-action"
-              data-action="click->chat#createChatFolder">
-        + 新建分组
-      </button>
-      ${deleteButton}
+      <div class="flex h-full min-h-0 flex-col">
+        <div class="tg-folder-rail-scroll">${folderButtons}</div>
+        <div class="tg-folder-rail-actions">
+          <button type="button"
+                  class="tg-folder-rail-action"
+                  data-action="click->chat#createChatFolder">
+            新建
+          </button>
+          ${deleteButton}
+        </div>
+      </div>
     `
+  }
+
+  folderRailIcon(folder) {
+    switch (folder?.kind) {
+      case "groups":
+        return `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-5 w-5">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 20a4 4 0 0 0-8 0m11 0a3 3 0 0 0-4-2.83M5 20a3 3 0 0 1 4-2.83M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM8 10a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z"/>
+          </svg>
+        `
+      case "contacts":
+        return `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-5 w-5">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M18 20a6 6 0 0 0-12 0m10-9a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/>
+          </svg>
+        `
+      case "official_accounts":
+        return `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-5 w-5">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 19.25h14M7.75 16.5h8.5M9 13.25h6M6.75 4.75h10.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.5 1.5 0 0 1-1.5 1.5H6.75a1.5 1.5 0 0 1-1.5-1.5v-4.5a1.5 1.5 0 0 1 1.5-1.5Z"/>
+          </svg>
+        `
+      default:
+        return `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-5 w-5">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3.75 7.5A2.25 2.25 0 0 1 6 5.25h3l1.5 1.5H18A2.25 2.25 0 0 1 20.25 9v8.25A2.25 2.25 0 0 1 18 19.5H6a2.25 2.25 0 0 1-2.25-2.25V7.5Z"/>
+          </svg>
+        `
+    }
   }
 
   renderChatRoomRow(room, folder) {
