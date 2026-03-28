@@ -3,6 +3,10 @@ import { Controller } from "@hotwired/stimulus"
 const DISMISS_KEY = "wechat-rails-pwa-install-dismissed"
 
 export default class extends Controller {
+  static values = {
+    serviceWorkerUrl: String
+  }
+
   static targets = ["banner"]
 
   connect() {
@@ -29,7 +33,8 @@ export default class extends Controller {
       return
     }
 
-    navigator.serviceWorker.register("/service-worker.js", { scope: "/" })
+    const serviceWorkerUrl = this.serviceWorkerUrlValue || "/service-worker.js"
+    navigator.serviceWorker.register(serviceWorkerUrl, { scope: "/" })
       .catch((error) => {
         console.error("service worker register failed", error)
       })

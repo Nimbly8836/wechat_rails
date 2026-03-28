@@ -4,6 +4,35 @@ export default class extends Controller {
 
   connect() {
     console.log("connect login controller")
+    this.bootstrapOnlineSessions()
+  }
+
+  bootstrapOnlineSessions(force = false) {
+    const storageKey = "wechat-rails-session-bootstrap-at";
+    const minIntervalMs = force ? 5000 : 15000;
+    const lastRunAt = Number(window.sessionStorage?.getItem(storageKey) || "0");
+    if (!force && lastRunAt && Date.now() - lastRunAt < minIntervalMs) {
+      return;
+    }
+
+    fetch("/login/bootstrap_online_sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRF-Token": document.querySelector(
+          'meta[name="csrf-token"]').content
+      },
+      body: JSON.stringify({ force })
+    }).then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      window.sessionStorage?.setItem(storageKey, String(Date.now()));
+      return response.json();
+    }).catch((error) => {
+      console.error("在线会话启动补偿失败:", error);
+    });
   }
 
   // 重新登录

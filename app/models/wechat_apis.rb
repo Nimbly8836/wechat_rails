@@ -17,6 +17,14 @@ module WechatApis
       "/Login/AutoHeartBeat"
     end
 
+    def self.heart_beat
+      "/Login/HeartBeat"
+    end
+
+    def self.heart_beat_long
+      "/Login/HeartBeatLong"
+    end
+
     # 二次登录
     def self.re_login(wxid)
       "/Login/LoginTwiceAutoAuth?wxid=#{wxid}"

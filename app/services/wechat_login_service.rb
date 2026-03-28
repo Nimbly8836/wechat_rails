@@ -62,6 +62,26 @@ class WechatLoginService
     end
   end
 
+  def heart_beat(wxid)
+    path = WechatApis::Base.heart_beat
+    response = @api_service.post(path, { wxid: wxid })
+    if response[:error]
+      @api_service.handle_error("心跳失败", body: response)
+    else
+      response
+    end
+  end
+
+  def heart_beat_long(wxid)
+    path = WechatApis::Base.heart_beat_long
+    response = @api_service.post(path, { wxid: wxid })
+    if response[:error]
+      @api_service.handle_error("长心跳失败", body: response)
+    else
+      response
+    end
+  end
+
   def re_login(wxid)
     path = WechatApis::Base.re_login(wxid)
     response = @api_service.post(path)
@@ -70,6 +90,27 @@ class WechatLoginService
     else
       response
     end
+  end
+
+  def ensure_session(wxid, include_relogin: true)
+    set_wx_id(wxid)
+
+    results = {}
+    results[:re_login] = invoke_step("二次登录", wxid) { re_login(wxid) } if include_relogin
+    results[:auto_heart_beat] = invoke_step("自动心跳", wxid) { auto_heart_beat(wxid) }
+    results[:heart_beat] = invoke_step("心跳", wxid) { heart_beat(wxid) }
+    results[:heart_beat_long] = invoke_step("长心跳", wxid) { heart_beat_long(wxid) }
+    results
+  end
+
+  private
+
+  def invoke_step(step_name, wxid)
+    response = yield
+    { success: true, response: response }
+  rescue => e
+    Rails.logger.error("#{step_name}失败 wxid=#{wxid}: #{e.class} #{e.message}")
+    { success: false, message: e.message }
   end
 
 end
