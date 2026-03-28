@@ -30,6 +30,9 @@ export default class extends Controller {
         return response.json();
       })
           .then(data => {
+            if (data.status !== "success") {
+              throw new Error(data.message || "二次登录失败");
+            }
             console.log("Login status check result:", data);
             // 登录成功后跳转到聊天界面
             setTimeout(() => {
@@ -37,7 +40,8 @@ export default class extends Controller {
             }, 1500);
           })
           .catch(error => {
-
+            console.error("二次登录失败:", error);
+            window.alert(error.message || "二次登录失败");
           });
     }
 
