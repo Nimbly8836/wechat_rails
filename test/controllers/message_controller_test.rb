@@ -135,6 +135,42 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     assert_equal [target.id], payload.map { |item| item["id"] }
   end
 
+  test "callback resolves owner wxid before parsing group system messages" do
+    ActiveJob::Base.queue_adapter = :test
+    group_wxid = @chat_room.wx_id
+    owner_wxid = @contact.own_wxid
+
+    post "/message/callback/#{group_wxid}", params: {
+      Success: true,
+      Data: {
+        AddMsgs: [
+          {
+            "MsgId" => 370_519_749,
+            "NewMsgId" => 296_196_776_536_405_682,
+            "CreateTime" => Time.current.to_i,
+            "MsgType" => 10_000,
+            "MsgSeq" => 1,
+            "Status" => 3,
+            "ImgStatus" => 1,
+            "PushContent" => "群消息通知",
+            "MsgSource" => "",
+            "Content" => { "string" => 'Note: "幸福像花儿一样" is not friends with anyone else in this group chat.' },
+            "FromUserName" => { "string" => group_wxid },
+            "ToUserName" => { "string" => owner_wxid }
+          }
+        ]
+      }
+    }
+
+    assert_response :success
+    assert_equal false, WxMessage.order(:id).last.self_send
+    save_job = ActiveJob::Base.queue_adapter.enqueued_jobs.find do |job|
+      job[:job] == SaveChatRoomMessageJob
+    end
+    assert_not_nil save_job
+    assert_equal owner_wxid, save_job[:args][1]
+  end
+
   private
 
   def create_message!(new_msg_id:, content:, msg_id: nil, msg_type: :text, real_msg_type: :text,
