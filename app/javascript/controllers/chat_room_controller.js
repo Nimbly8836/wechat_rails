@@ -15,6 +15,7 @@ import {
 
 const MESSAGE_CACHE_LIMIT = 80;
 const MESSAGE_CACHE_FALLBACK_LIMITS = [80, 40, 20, 10];
+const AUTO_REFRESH_INTERVAL_MS = 5000;
 const LEGACY_DEFAULT_THEME = {
   backgroundColor: "var(--color-gray-100)",
   backgroundImage: "",
@@ -82,6 +83,7 @@ export default class extends Controller {
     }
 
     this.pendingNotifyRefreshTimer = null;
+    this.autoRefreshTimer = null;
     this.voiceBlobUrls = new Map();
     this.currentVoicePlayback = null;
     this.voicePlaybackRates = new Map();
@@ -124,6 +126,8 @@ export default class extends Controller {
     } else {
       this.loadMessages();
     }
+
+    this.startAutoRefreshTimer();
 
     this.applyTheme({ refreshBubbles: false });
     this.syncThemeInputs();
@@ -351,6 +355,11 @@ export default class extends Controller {
       this.pendingNotifyRefreshTimer = null;
     }
 
+    if (this.autoRefreshTimer) {
+      clearInterval(this.autoRefreshTimer);
+      this.autoRefreshTimer = null;
+    }
+
     if (typeof this.cleanupEmojiPreview === "function") {
       this.cleanupEmojiPreview();
     }
@@ -436,6 +445,20 @@ export default class extends Controller {
         console.error("加载消息失败:", error);
         return 0;
       });
+  }
+
+  startAutoRefreshTimer() {
+    if (this.autoRefreshTimer) {
+      clearInterval(this.autoRefreshTimer);
+    }
+
+    this.autoRefreshTimer = setInterval(() => {
+      if (!this.element?.isConnected || document.visibilityState === "hidden") {
+        return;
+      }
+
+      this.loadNewMessages();
+    }, AUTO_REFRESH_INTERVAL_MS);
   }
 
   fetchMessages({ beforeId = null, afterId = null } = {}) {
@@ -2308,7 +2331,7 @@ export default class extends Controller {
       if (!this.element?.isConnected) {
         return;
       }
-      const expectedMessageId = payload?.wx_messages_id;
+      const expectedMessageId = payload?.message_id;
 
       this.loadNewMessages(payload)
         .then((loadedCount) => {
