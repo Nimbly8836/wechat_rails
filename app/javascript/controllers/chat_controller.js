@@ -317,6 +317,10 @@ export default class extends Controller {
     return typeof window !== "undefined" && "Notification" in window
   }
 
+  secureNotificationContext() {
+    return typeof window !== "undefined" && !!window.isSecureContext
+  }
+
   isContactGroupCollapsed(groupKey) {
     return !!this.collapsedContactGroups?.[String(groupKey)]
   }
@@ -349,6 +353,10 @@ export default class extends Controller {
   notificationPermissionLabel() {
     if (!this.notificationsSupported()) {
       return "当前浏览器不支持桌面通知"
+    }
+
+    if (!this.secureNotificationContext()) {
+      return "通知需要 HTTPS 或 localhost"
     }
 
     switch (Notification.permission) {
@@ -634,6 +642,14 @@ export default class extends Controller {
       return
     }
 
+    if (!this.secureNotificationContext()) {
+      this.syncNotificationUi()
+      if (typeof window.showErrorToast === "function") {
+        window.showErrorToast("桌面通知需要 HTTPS 或 localhost，当前页面无法申请权限")
+      }
+      return
+    }
+
     try {
       await Notification.requestPermission()
       this.syncNotificationUi()
@@ -646,6 +662,13 @@ export default class extends Controller {
     event?.stopPropagation()
 
     if (!this.notificationsSupported()) {
+      return
+    }
+
+    if (!this.secureNotificationContext()) {
+      if (typeof window.showErrorToast === "function") {
+        window.showErrorToast("桌面通知需要 HTTPS 或 localhost，当前页面无法发送测试通知")
+      }
       return
     }
 

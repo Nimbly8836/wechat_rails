@@ -19,8 +19,9 @@ class ChatController < ApplicationController
       return
     end
 
-    rooms = ChatRoom.keyword_search(query)
-                    .includes(:contact, messages: :wx_message)
+    matched_room_ids = ChatRoom.keyword_search(query).select(:id)
+    rooms = ChatRoom.where(id: matched_room_ids)
+                    .preload(:contact, messages: :wx_message)
                     .order_by_latest_message
                     .limit(limit_param(40))
     contacts = Contact.keyword_search(query)
