@@ -4012,6 +4012,12 @@ export default class extends Controller {
     };
     const stringType = stringAliases[rawStringType] || rawStringType;
     if (typeof stringType === "string" && stringType.length > 0) {
+      if (/^\d+$/.test(stringType)) {
+        const mappedNumericType = Number(stringType);
+        if (Number.isFinite(mappedNumericType)) {
+          msg = { ...msg, real_msg_type: mappedNumericType };
+        }
+      } else {
       if (["sys", "sys_notice", "function_message"].includes(stringType)) {
         return "system_notice";
       }
@@ -4023,6 +4029,7 @@ export default class extends Controller {
         }
       }
       return stringType;
+      }
     }
 
     const numericType = Number(msg?.real_msg_type ?? msg?.msg_type);

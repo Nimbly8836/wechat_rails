@@ -36,12 +36,13 @@ class ChatRoomController < ApplicationController
   end
 
   def list
-    chat_rooms = ChatRoom.includes(:contact, messages: :wx_message)
     chat_rooms = if params[:q].present?
-                   chat_rooms.merge(ChatRoom.keyword_search(params[:q]))
+                   matched_room_ids = ChatRoom.keyword_search(params[:q]).select(:id)
+                   ChatRoom.where(id: matched_room_ids)
                  else
-                   chat_rooms
+                   ChatRoom.all
                  end
+    chat_rooms = chat_rooms.preload(:contact, messages: :wx_message)
     chat_rooms = chat_rooms.order_by_latest_message
     render json: chat_rooms.as_json(only: [ :id, :name, :contact_id ],
                                     methods: [ :avatar_base64, :official_account, :group_chat ],
