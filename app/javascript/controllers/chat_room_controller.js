@@ -858,6 +858,10 @@ export default class extends Controller {
       msg._sending = wrapper.sending;
       msg.extra = wrapper.extra;
 
+      if (this.isSystemNoticeMessage(msg)) {
+        msg.self_send = false;
+      }
+
       const senderInfo = this.lookupSenderInfo(msg, msg.content);
       msg.sender_name = senderInfo?.name;
       msg.sender_avatar = senderInfo?.avatar;

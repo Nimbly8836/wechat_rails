@@ -77,39 +77,41 @@ class MessagesController < ApplicationController
   end
 
   def callback
-    wxid = params[:wxid]
-    return head :bad_request if wxid.blank?
+    requested_wxid = params[:wxid]
+    return head :bad_request if requested_wxid.blank?
+
+    sync_wxid = resolve_sync_wxid(requested_wxid)
 
     payload = params.to_unsafe_h
     source_payload = payload
     if message_batch_present?(source_payload)
       unless success_response?(source_payload)
-        Rails.logger.warn { "message callback ignored: AddMsgs present but success flag is false for wxid=#{wxid}" }
+        Rails.logger.warn { "message callback ignored: AddMsgs present but success flag is false for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
         return head :ok
       end
     else
       if explicit_failure_response?(source_payload)
-        Rails.logger.warn { "message callback ignored: explicit failure for wxid=#{wxid}" }
+        Rails.logger.warn { "message callback ignored: explicit failure for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
         return head :ok
       end
 
-      Rails.logger.info { "message callback missing AddMsgs, triggering one sync for wxid=#{wxid}" }
-      sync_payload = MessageApiService.new(wxid).sync_messages(wxid)
+      Rails.logger.info { "message callback missing AddMsgs, triggering one sync for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
+      sync_payload = MessageApiService.new(sync_wxid).sync_messages(sync_wxid)
       source_payload = sync_payload if sync_payload.is_a?(Hash)
     end
 
     unless success_response?(source_payload)
-      Rails.logger.warn { "message callback sync failed or success flag missing for wxid=#{wxid}" }
+      Rails.logger.warn { "message callback sync failed or success flag missing for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
       return head :ok
     end
 
     unless message_batch_present?(source_payload)
-      Rails.logger.info { "message callback produced no messages after sync for wxid=#{wxid}" }
-      BackfillMissingMessagesJob.perform_later(wxid)
+      Rails.logger.info { "message callback produced no messages after sync for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
+      BackfillMissingMessagesJob.perform_later(sync_wxid)
       return head :ok
     end
 
-    process_synced_payload(source_payload, wxid, full_backfill: true)
+    process_synced_payload(source_payload, sync_wxid, full_backfill: true)
     head :ok
   end
 
