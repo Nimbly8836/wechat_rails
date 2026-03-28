@@ -22,7 +22,9 @@
   <%= javascript_importmap_tags %>
 </head>
 
-<body data-controller="pwa-install" class="bg-slate-100 text-slate-900">
+<body data-controller="pwa-install"
+      data-pwa-install-service-worker-url-value="<%= pwa_service_worker_path(format: :js) %>"
+      class="bg-slate-100 text-slate-900">
 <%= yield %>
 
 <div data-pwa-install-target="banner"

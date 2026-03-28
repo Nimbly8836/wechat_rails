@@ -72,9 +72,7 @@ class LoginController < ApplicationController
        response&.dig("Data", "acctSectResp", "userName")
       # 获取并设置微信ID
       wx_id = response&.dig("Data", "acctSectResp", "userName")
-      @api_service.set_wx_id(wx_id)
-      # 自动心跳
-      @api_service.auto_heart_beat(wx_id)
+      activate_session(wx_id, include_relogin: false)
       # 保存当前登录用户
       save_current_login_user(response&.dig("Data", "acctSectResp"))
       # 异步获取联系人列表
@@ -103,19 +101,15 @@ class LoginController < ApplicationController
       return
     end
 
-    # 使用API服务重新连接用户
-    @api_service = WechatLoginService.new(nil)
-    re_login_response = @api_service.re_login(login_info.user_name)
-    unless re_login_response.is_a?(Hash) && re_login_response["Success"]
+    activation_results = activate_session(login_info.user_name, include_relogin: true)
+    unless activation_results.dig(:re_login, :success)
       render json: {
         status: "error",
-        message: re_login_response&.dig("Message") || "二次登录失败"
+        message: activation_results.dig(:re_login, :message) || "二次登录失败"
       }, status: :bad_gateway
       return
     end
 
-    @api_service.auto_heart_beat(login_info.user_name)
-    @api_service.set_wx_id(login_info.user_name)
     # 异步获取联系人列表
     fetch_contacts_in_background(user_name)
 
@@ -129,6 +123,16 @@ class LoginController < ApplicationController
         user_name: login_info.user_name,
         nick_name: login_info.nick_name
       }
+    }
+  end
+
+  def bootstrap_online_sessions
+    started = WechatSessionBootstrapService.run_async(force: ActiveModel::Type::Boolean.new.cast(params[:force]))
+
+    render json: {
+      success: true,
+      started: started,
+      online_count: LoginInfo.where(online: true).count
     }
   end
 
@@ -187,6 +191,14 @@ class LoginController < ApplicationController
       false
     end
 
+  end
+
+  def activate_session(wx_id, include_relogin:)
+    @api_service = WechatLoginService.new(nil)
+    results = @api_service.ensure_session(wx_id, include_relogin: include_relogin)
+    failed_steps = results.select { |_step, result| !result[:success] }
+    Rails.logger.warn("会话激活存在失败步骤 wxid=#{wx_id}: #{failed_steps.inspect}") if failed_steps.any?
+    results
   end
 
 end

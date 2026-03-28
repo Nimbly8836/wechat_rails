@@ -59,6 +59,8 @@ export default class extends Controller {
     this.reconnectTimer = null
     this.eventSourceUrl = "/notion/message"
     this.eventSourceRetryDelay = 1500
+    this.sessionBootstrapUrl = "/login/bootstrap_online_sessions"
+    this.notificationServiceWorkerTimeoutMs = 1200
     this.chatRoomNames = {}
     this.chatRooms = this.cachedChatRooms()
     this.chatFolders = this.loadChatFolders()
@@ -96,6 +98,7 @@ export default class extends Controller {
 
     this.applySidebarState()
     this.establishEventSource()
+    this.bootstrapOnlineSessions()
 
     this.element.addEventListener("chat:open", this.boundHandleOpenChat)
     this.element.addEventListener("chat:sidebar:open", this.boundOpenSidebar)
@@ -587,6 +590,7 @@ export default class extends Controller {
     source.onmessage = (event) => this.handleEventSourceMessage(event)
     source.addEventListener("ping", () => {})
     source.onerror = () => {
+      this.bootstrapOnlineSessions({ force: true })
       this.scheduleReconnect()
     }
   }
@@ -637,23 +641,30 @@ export default class extends Controller {
       }
     }
 
-    try {
-      if ("serviceWorker" in navigator) {
-        const registration = await navigator.serviceWorker.ready
-        if (registration?.showNotification) {
-          await registration.showNotification(title, options)
-          return
-        }
-      }
-    } catch (error) {
-      console.error("service worker notification failed", error)
+    const browserOptions = {
+      body: options.body,
+      icon: options.icon,
+      tag: options.tag,
+      data: options.data
     }
 
-    try {
-      new Notification(title, options)
-    } catch (error) {
-      console.error("notification failed", error)
+    if (this.prefersWindowNotification()) {
+      if (this.showWindowNotification(title, browserOptions)) {
+        return
+      }
     }
+
+    const registration = await this.notificationServiceWorkerRegistration()
+    if (registration?.showNotification) {
+      try {
+        await registration.showNotification(title, options)
+        return
+      } catch (error) {
+        console.error("service worker notification failed", error)
+      }
+    }
+
+    this.showWindowNotification(title, browserOptions)
   }
 
   scheduleReconnect() {
@@ -681,6 +692,98 @@ export default class extends Controller {
         // ignore close errors
       }
       this.eventSource = null
+    }
+  }
+
+  bootstrapOnlineSessions({ force = false } = {}) {
+    const storageKey = "wechat-rails-session-bootstrap-at"
+    const minIntervalMs = force ? 5000 : 15000
+    const lastRunAt = Number(window.sessionStorage?.getItem(storageKey) || "0")
+    if (lastRunAt && Date.now() - lastRunAt < minIntervalMs) {
+      return Promise.resolve(null)
+    }
+
+    return fetch(this.sessionBootstrapUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRF-Token": this.csrfToken()
+      },
+      body: JSON.stringify({ force })
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`启动补偿失败: ${response.status}`)
+        }
+        window.sessionStorage?.setItem(storageKey, String(Date.now()))
+        return response.json()
+      })
+      .catch((error) => {
+        console.error("在线会话启动补偿失败", error)
+        return null
+      })
+  }
+
+  prefersWindowNotification() {
+    return /firefox/i.test(window.navigator?.userAgent || "")
+  }
+
+  serviceWorkerUrl() {
+    return document.body?.dataset?.pwaInstallServiceWorkerUrlValue || "/service-worker.js"
+  }
+
+  async notificationServiceWorkerRegistration() {
+    if (!("serviceWorker" in navigator)) {
+      return null
+    }
+
+    try {
+      const readyPromise = navigator.serviceWorker.ready
+        .then((registration) => registration?.showNotification ? registration : null)
+        .catch(() => null)
+      const timeoutPromise = new Promise((resolve) => {
+        window.setTimeout(() => resolve(null), this.notificationServiceWorkerTimeoutMs)
+      })
+      const registration = await Promise.race([readyPromise, timeoutPromise])
+      if (registration) {
+        return registration
+      }
+    } catch (error) {
+      console.error("service worker ready failed", error)
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.getRegistration()
+      if (registration?.showNotification) {
+        return registration
+      }
+    } catch (error) {
+      console.error("service worker lookup failed", error)
+    }
+
+    return null
+  }
+
+  showWindowNotification(title, options) {
+    try {
+      const notification = new Notification(title, options)
+      notification.onclick = () => {
+        try {
+          notification.close()
+        } catch (_) {
+          // ignore
+        }
+        window.focus()
+        const targetUrl = options?.data?.url
+        if (targetUrl) {
+          window.location.href = targetUrl
+        }
+      }
+      return true
+    } catch (error) {
+      console.error("notification failed", error)
+      return false
     }
   }
 

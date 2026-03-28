@@ -64,15 +64,69 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     assert_equal referenced_new_msg_id.to_s, payload.dig("wx_message", "new_msg_id")
   end
 
+  test "resolve_reference returns earliest message when new_msg_id is duplicated" do
+    duplicated_new_msg_id = 296_196_776_536_405_682
+    older = create_message!(
+      new_msg_id: duplicated_new_msg_id,
+      content: "较早的原消息",
+      message_time: Time.at(1_700_000_000)
+    )
+    create_message!(
+      new_msg_id: duplicated_new_msg_id,
+      content: "较晚的重复消息",
+      message_time: Time.at(1_700_000_100)
+    )
+
+    get resolve_reference_chat_room_messages_path(@chat_room),
+      params: { new_msg_id: duplicated_new_msg_id.to_s }
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal older.id, payload["id"]
+    assert_equal "较早的原消息", payload.dig("wx_message", "content")
+  end
+
+  test "index uses earliest referenced message when new_msg_id is duplicated" do
+    duplicated_new_msg_id = 296_196_776_536_405_682
+    older = create_message!(
+      new_msg_id: duplicated_new_msg_id,
+      content: "较早的原消息",
+      message_time: Time.at(1_700_000_000)
+    )
+    create_message!(
+      new_msg_id: duplicated_new_msg_id,
+      content: "较晚的重复消息",
+      message_time: Time.at(1_700_000_100)
+    )
+    quoted = create_message!(
+      new_msg_id: duplicated_new_msg_id + 1,
+      refer_new_msg_id: duplicated_new_msg_id,
+      refer_title: "引用标题",
+      msg_type: :refer,
+      real_msg_type: :quote,
+      content: quoted_message_xml(duplicated_new_msg_id),
+      message_time: Time.at(1_700_000_200)
+    )
+
+    get chat_room_messages_path(@chat_room)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    quote_payload = payload.find { |item| item["id"] == quoted.id }
+    assert_equal older.id, quote_payload.dig("referenced_message", "id")
+    assert_equal "较早的原消息",
+      quote_payload.dig("referenced_message", "wx_message", "content")
+  end
+
   private
 
   def create_message!(new_msg_id:, content:, msg_id: nil, msg_type: :text, real_msg_type: :text,
-    refer_new_msg_id: nil, refer_title: nil)
+    refer_new_msg_id: nil, refer_title: nil, message_time: Time.current)
     wx_message = WxMessage.create!(
       msg_id: msg_id || new_msg_id - 100,
       new_msg_id: new_msg_id,
       msg_seq: new_msg_id % 1000,
-      msg_create_time: Time.current,
+      msg_create_time: message_time,
       msg_type: msg_type,
       real_msg_type: real_msg_type,
       from_user_name: "wxid_sender",
@@ -88,7 +142,7 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
       [ {
         chat_room_id: @chat_room.id,
         wx_messages_id: wx_message.id,
-        message_time: timestamp,
+        message_time: message_time,
         created_at: timestamp,
         updated_at: timestamp
       } ],

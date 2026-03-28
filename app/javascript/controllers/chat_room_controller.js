@@ -1457,6 +1457,9 @@ export default class extends Controller {
 
     const parsed = this.parseWxXmlMessage(msg.content || "");
     const title = (msg.refer_title || parsed.title || "引用的消息").trim();
+    const referNewMsgId = this.normalizeReferenceId(msg.refer_new_msg_id)
+      || this.normalizeReferenceId(parsed.refServerId)
+      || this.normalizeReferenceId(msg.referenced_message?.wx_message?.new_msg_id);
     if (body) {
       body.textContent = title;
     }
@@ -1470,9 +1473,21 @@ export default class extends Controller {
 
       if (quoted) {
         quoted.classList.remove("cursor-not-allowed", "opacity-60");
-        if (referenced.id) {
+        if (referNewMsgId) {
+          quoted.classList.add("cursor-pointer");
+          quoted.dataset.referNewMsgId = String(referNewMsgId);
+          delete quoted.dataset.referMessageId;
+          quoted.onclick = async (event) => {
+            event.stopPropagation();
+            const resolvedId = await this.resolveReferencedMessageId(referNewMsgId);
+            if (resolvedId) {
+              this.focusMessageById(resolvedId);
+            }
+          };
+        } else if (referenced.id) {
           quoted.classList.add("cursor-pointer");
           quoted.dataset.referMessageId = String(referenced.id);
+          delete quoted.dataset.referNewMsgId;
           quoted.onclick = (event) => {
             event.stopPropagation();
             this.focusMessageById(referenced.id);
@@ -1480,6 +1495,7 @@ export default class extends Controller {
         } else {
           quoted.classList.remove("cursor-pointer");
           delete quoted.dataset.referMessageId;
+          delete quoted.dataset.referNewMsgId;
           quoted.onclick = null;
         }
       }
@@ -1500,8 +1516,6 @@ export default class extends Controller {
         }
       }
     } else {
-      const referNewMsgId = this.normalizeReferenceId(msg.refer_new_msg_id)
-        || this.normalizeReferenceId(parsed.refServerId);
       if (quoted && referNewMsgId) {
         quoted.classList.remove("cursor-not-allowed", "opacity-60");
         quoted.classList.add("cursor-pointer");
@@ -3482,14 +3496,6 @@ export default class extends Controller {
     const normalizedReferId = this.normalizeReferenceId(referNewMsgId);
     if (!normalizedReferId) {
       return Promise.resolve(null);
-    }
-
-    const existing = this.messages.all.find((wrapper) =>
-      this.normalizeReferenceId(wrapper?.wx_message?.new_msg_id)
-        === normalizedReferId);
-
-    if (existing?.id != null) {
-      return Promise.resolve(existing.id);
     }
 
     const url = `/chat_room/${this.idValue}/messages/resolve_reference?new_msg_id=${

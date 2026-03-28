@@ -43,7 +43,9 @@ class MessagesController < ApplicationController
 
     message = messages_scope(chat_room_id)
               .joins(:wx_message)
-              .find_by(wx_messages: { new_msg_id: new_msg_id })
+              .where(wx_messages: { new_msg_id: new_msg_id })
+              .order(message_time: :asc, id: :asc)
+              .first
 
     if message.blank?
       render json: { success: false, message: "引用消息不存在" }, status: :not_found
@@ -422,7 +424,13 @@ class MessagesController < ApplicationController
            .where(chat_room_id: chat_room_id)
            .joins(:wx_message)
            .where(wx_messages: { new_msg_id: refer_ids })
-           .index_by { |msg| msg.wx_message&.new_msg_id }
+           .order(message_time: :asc, id: :asc)
+           .each_with_object({}) do |msg, result|
+             new_msg_id = msg.wx_message&.new_msg_id
+             next if new_msg_id.blank? || result.key?(new_msg_id)
+
+             result[new_msg_id] = msg
+           end
   end
 
   def serialize_message(message, referenced = nil)
