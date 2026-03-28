@@ -14,7 +14,7 @@ class ChatRoom < ApplicationRecord
     keyword = pgroonga_query(query)
     return none if keyword.blank?
 
-    joins(:contact)
+    matching_ids = joins(:contact)
       .left_joins(messages: :wx_message)
       .where(
         [
@@ -30,7 +30,10 @@ class ChatRoom < ApplicationRecord
         ].join(" OR "),
         keyword: keyword
       )
+      .select(:id)
       .distinct
+
+    where(id: matching_ids)
   }
 
   def avatar_base64
