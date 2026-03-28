@@ -541,7 +541,8 @@ class MessagesController < ApplicationController
 
   def message_batch_present?(payload)
     add_msgs = payload.dig("Data", "AddMsgs") || payload.dig(:Data, :AddMsgs)
-    add_msgs.is_a?(Array) && add_msgs.any?
+    messages = payload.dig("Data", "Messages") || payload.dig(:Data, :Messages)
+    (add_msgs.is_a?(Array) && add_msgs.any?) || (messages.is_a?(Array) && messages.any?)
   end
 
   def try_cdn_image_download(api_service, image_meta)
