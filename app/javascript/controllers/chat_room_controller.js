@@ -488,19 +488,8 @@ export default class extends Controller {
     }
 
     let lastSenderKey = null;
-
-    // Convert Set to array and sort by message_time to maintain order
-    // 这里在干嘛？
-    // const sortedMessages = [...this.messages].sort((a, b) => {
-    //   const timeA = a.message_time || a.created_at || a.wx_message?.message_time
-    //     || 0;
-    //   const timeB = b.message_time || b.created_at || b.wx_message?.message_time
-    //     || 0;
-    //   return new Date(timeA) - new Date(timeB);
-    // });
-
     const sortedMessages = this.sortedMessageWrappers();
-    sortedMessages.forEach((wrapper) => {
+    sortedMessages.forEach((wrapper, index) => {
       const msg = wrapper.wx_message;
       msg.id = wrapper.id;
       msg._messageId = wrapper.id;
@@ -518,14 +507,26 @@ export default class extends Controller {
 
       const senderKey = msg.sender_key || (msg.self_send
         ? `self:${msg.to_user_name || 'me'}` : msg.from_user_name || "");
-      const isNewGroup = lastSenderKey === null || lastSenderKey !== senderKey;
+      const startsGroup = lastSenderKey === null || lastSenderKey !== senderKey;
+      const nextWrapper = sortedMessages[index + 1];
+      const nextMsg = nextWrapper?.wx_message;
+      const nextSenderInfo = nextMsg
+        ? this.lookupSenderInfo(nextMsg, nextMsg.content)
+        : null;
+      const nextSenderKey = nextSenderInfo?.key || (nextMsg?.self_send
+        ? `self:${nextMsg?.to_user_name || 'me'}`
+        : nextMsg?.from_user_name || "");
+      const endsGroup = !nextMsg || nextSenderKey !== senderKey;
+
+      msg._startsGroup = startsGroup;
+      msg._endsGroup = endsGroup;
       lastSenderKey = senderKey;
 
       if (msg.real_msg_type == "file_transfer_start") {
         return
       }
-      const row = this.buildRow(isNewGroup, msg, senderInfo);
-      const bubble = this.renderMessageBubble(msg, isNewGroup, senderInfo,
+      const row = this.buildRow(startsGroup, msg, senderInfo);
+      const bubble = this.renderMessageBubble(msg, startsGroup, senderInfo,
         sortedMessages[0] === wrapper);
       row.appendChild(bubble);
       container.appendChild(row);
@@ -571,6 +572,7 @@ export default class extends Controller {
     const row = document.createElement("div");
     row.className = `w-full flex ${msg.self_send ? "justify-end"
       : "justify-start"} items-end`;
+    row.style.marginTop = msg._startsGroup ? "8px" : "2px";
     if (msg.id) {
       row.dataset.messageId = msg.id;
     }
@@ -591,7 +593,7 @@ export default class extends Controller {
         delete row.dataset.senderAvatar;
       }
 
-      if (isNewGroup) {
+      if (msg._endsGroup) {
         const avatar = document.createElement("div");
         avatar.className = "w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
         if (!senderAvatar) {
@@ -1324,9 +1326,9 @@ export default class extends Controller {
     bubble.classList.add("relative", "inline-block", "rounded-2xl", "shadow-sm",
       "message-bubble");
 
-    bubble.style.marginTop = isNewGroup ? "6px" : "";
+    bubble.style.marginTop = "";
     bubble.style.paddingBottom = "";
-    bubble.dataset.tail = isNewGroup ? "true" : "false";
+    bubble.dataset.tail = msg._endsGroup ? "true" : "false";
 
     bubble.classList.remove("bg-blue-500", "text-white", "rounded-bl-2xl",
       "rounded-tr-2xl", "rounded-br-md", "bg-white", "text-gray-900",
@@ -1377,7 +1379,7 @@ export default class extends Controller {
       existingName.remove();
     }
 
-    if (!msg.self_send && this.isRoom() && isNewGroup) {
+    if (!msg.self_send && this.isRoom() && msg._startsGroup) {
       const name = senderInfo?.name || msg.sender_name || "";
       if (name) {
         const nameTag = document.createElement("div");
