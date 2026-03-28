@@ -37,7 +37,7 @@ module WechatRequest
 
     # 发送表情
     class SendEmoji < Base
-      params { [ :toWxid, :content ] }
+      params { [ :toWxid, :md5, :totalLen ] }
     end
 
     # 发送视频

@@ -173,6 +173,13 @@
       <span>图片</span>
     </button>
     <button type="button"
+            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 focus:outline-none"
+            data-action="click->chat-room#openFilePicker"
+            data-upload-type-param="emoji">
+      <span aria-hidden="true"><img class="w-5" src="icon/emoji-pleased-svgrepo-com.svg"></span>
+      <span>GIF 表情</span>
+    </button>
+    <button type="button"
             class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150  focus:outline-none"
             data-action="click->chat-room#openFilePicker"
             data-upload-type-param="voice">
@@ -231,6 +238,21 @@
 
     <!-- 输入框 -->
     <div class="telegram-composer-shell flex-1 px-2.5 py-1.5">
+      <div class="hidden mb-2 items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2"
+           data-chat-room-target="quoteComposer">
+        <div class="min-w-0 flex-1">
+          <div class="text-[11px] font-medium text-sky-700"
+               data-chat-room-target="quoteComposerMeta"></div>
+          <div class="truncate text-sm text-slate-700"
+               data-chat-room-target="quoteComposerContent"></div>
+        </div>
+        <button type="button"
+                class="rounded-full px-2 py-1 text-xs text-slate-500 transition hover:bg-white hover:text-slate-700"
+                data-action="click->chat-room#clearPendingQuote"
+                aria-label="取消引用">
+          关闭
+        </button>
+      </div>
       <label>
         <textarea
           rows="1"

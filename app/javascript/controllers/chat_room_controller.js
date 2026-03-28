@@ -39,7 +39,8 @@ export default class extends Controller {
   static targets = ["messageList", "input", "emptyMessage", "menu",
     "showMore", "themePanel", "backgroundInput", "bubbleInput",
     "backgroundImageInput", "fileInput", "uploadStatus",
-    "fontSelect", "fontCustomInput", "attachmentSelect"];
+    "fontSelect", "fontCustomInput", "attachmentSelect", "quoteComposer",
+    "quoteComposerMeta", "quoteComposerContent"];
   static values = {
     currentWxid: String,
     ownerWxid: String,
@@ -93,6 +94,15 @@ export default class extends Controller {
     this.highlightTimer = null;
     this.loadingOlderMessages = false;
     this.autoScrollPinnedToBottom = true;
+    this.mediaPreviewOverlay = null;
+    this.mediaPreviewFrame = null;
+    this.mediaPreviewImage = null;
+    this.mediaPreviewTitle = null;
+    this.mediaPreviewMeta = null;
+    this.mediaPreviewOpenLink = null;
+    this.mediaPreviewPreviousBodyOverflow = "";
+    this.boundHandleMediaPreviewKeydown = this.handleMediaPreviewKeydown.bind(this);
+    this.pendingQuote = null;
     const cachedMembers = this.readCachedChatMembers();
     this.chatMembers = cachedMembers;
     const initialMembers = this.normalizeChatMembersData(this.membersValue);
@@ -131,6 +141,8 @@ export default class extends Controller {
 
     this.applyTheme({ refreshBubbles: false });
     this.syncThemeInputs();
+    this.ensureMediaPreviewElements();
+    this.renderPendingQuote();
 
     this.inputTarget.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -143,7 +155,7 @@ export default class extends Controller {
           if (this.inputTarget.value.trim() === '') {
             this.inputTarget.placeholder = "发送消息不能为空";
           } else {
-            this.sendMessage("text");
+            this.sendMessage(this.pendingQuote ? "quote" : "text");
             this.autoResize();
           }
         }
@@ -365,6 +377,21 @@ export default class extends Controller {
     }
 
     document.removeEventListener("click", this._boundHideAttachmentSelect);
+    document.removeEventListener("keydown", this.boundHandleMediaPreviewKeydown);
+
+    if (this.mediaPreviewOverlay) {
+      this.mediaPreviewOverlay.remove();
+      this.mediaPreviewOverlay = null;
+      this.mediaPreviewFrame = null;
+      this.mediaPreviewImage = null;
+      this.mediaPreviewTitle = null;
+      this.mediaPreviewMeta = null;
+      this.mediaPreviewOpenLink = null;
+    }
+
+    if (document.body.style.overflow === "hidden") {
+      document.body.style.overflow = this.mediaPreviewPreviousBodyOverflow || "";
+    }
 
 
   }
@@ -559,7 +586,14 @@ export default class extends Controller {
       const row = this.buildRow(msg, senderInfo);
       const bubble = this.renderMessageBubble(msg, startsGroup, senderInfo,
         sortedMessages[0] === wrapper);
+      const actionButton = this.buildQuoteActionButton(wrapper, msg, senderInfo);
+      if (msg.self_send && actionButton) {
+        row.appendChild(actionButton);
+      }
       row.appendChild(bubble);
+      if (!msg.self_send && actionButton) {
+        row.appendChild(actionButton);
+      }
       currentGroup.stack.appendChild(row);
 
       this.renderStatus(wrapper, bubble, msg);
@@ -661,8 +695,8 @@ export default class extends Controller {
 
   buildRow(msg, senderInfo) {
     const row = document.createElement("div");
-    row.className = `w-full flex ${msg.self_send ? "justify-end"
-      : "justify-start"} items-end`;
+    row.className = `group w-full flex ${msg.self_send ? "justify-end"
+      : "justify-start"} items-end gap-2`;
     if (msg.id) {
       row.dataset.messageId = msg.id;
     }
@@ -686,6 +720,23 @@ export default class extends Controller {
     return row;
   }
 
+  buildQuoteActionButton(wrapper, msg, senderInfo) {
+    if (!wrapper?.id || String(wrapper.id).startsWith("temp-") || msg?._sending) {
+      return null;
+    }
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pointer-events-none opacity-0 transition rounded-full border border-slate-200 bg-white/95 px-2 py-1 text-[11px] text-slate-500 shadow-sm group-hover:pointer-events-auto group-hover:opacity-100 hover:border-sky-200 hover:text-sky-700";
+    button.textContent = "引用";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.startQuoteMessage(wrapper, msg, senderInfo);
+    });
+    return button;
+  }
+
   renderMessageBubble(msg, isNewGroup, senderInfo, isFirstMessage) {
     const bubble = document.createElement("div");
     const type = this.getMessageType(msg);
@@ -701,6 +752,9 @@ export default class extends Controller {
           isFirstMessage);
       case "video_account":
         return this.renderVideoAccountMessage(bubble, msg, isNewGroup,
+          senderInfo, isFirstMessage);
+      case "chat_history":
+        return this.renderChatHistoryMessage(bubble, msg, isNewGroup,
           senderInfo, isFirstMessage);
       case "card":
         return this.renderCardMessage(bubble, msg, isNewGroup, senderInfo,
@@ -855,6 +909,58 @@ export default class extends Controller {
       isFirstMessage);
   }
 
+  renderChatHistoryMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-chat-history");
+    const historyBubble = template || bubble;
+    const title = historyBubble.querySelector("[data-role='history-title']");
+    const desc = historyBubble.querySelector("[data-role='history-desc']");
+    const items = historyBubble.querySelector("[data-role='history-items']");
+    const footer = historyBubble.querySelector("[data-role='history-footer']");
+    const parsed = this.parseWxChatHistoryMessage(msg.content || "");
+
+    if (title) {
+      title.textContent = parsed.title || "聊天记录";
+    }
+    if (desc) {
+      desc.textContent = parsed.desc || "";
+      desc.classList.toggle("hidden", !parsed.desc);
+    }
+    if (items) {
+      items.innerHTML = "";
+      parsed.items.slice(0, 4).forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "rounded-xl bg-slate-50 px-3 py-2";
+
+        const meta = document.createElement("div");
+        meta.className = "text-[11px] text-slate-500";
+        meta.textContent = item.senderName
+          ? `${item.senderName}${item.time ? ` · ${item.time}` : ""}`
+          : (item.time || "");
+
+        const content = document.createElement("div");
+        content.className = "mt-0.5 text-sm text-slate-800 whitespace-pre-wrap break-words";
+        content.textContent = item.content || `[${this.humanizeMessageType(item.type)}]`;
+
+        if (meta.textContent) {
+          row.appendChild(meta);
+        }
+        row.appendChild(content);
+        items.appendChild(row);
+      });
+      items.classList.toggle("hidden", parsed.items.length === 0);
+    }
+    if (footer) {
+      const extraCount = parsed.count > parsed.items.length
+        ? `等 ${parsed.count} 条记录`
+        : (parsed.count > 0 ? `共 ${parsed.count} 条记录` : "");
+      footer.textContent = extraCount;
+      footer.classList.toggle("hidden", !extraCount);
+    }
+
+    return this.applyBubbleStyle(historyBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
   renderXmlMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
     const template = this.cloneTemplate("message-template-xml");
     const xmlBubble = template || bubble;
@@ -892,7 +998,10 @@ export default class extends Controller {
         placeholder.classList.remove("hidden");
         image.classList.add("hidden");
         image.dataset.loaded = "false";
+        image.dataset.sourceUrl = "";
         wrapper.classList.remove("cursor-zoom-in");
+        wrapper.removeAttribute("role");
+        wrapper.removeAttribute("tabindex");
       };
 
       resetPlaceholder();
@@ -914,14 +1023,47 @@ export default class extends Controller {
       image.addEventListener("error", () => {
         showFallback("[图片加载失败]");
       }, { once: true });
-      let imageUrl
+
+      const openPreview = () => {
+        if (image.dataset.loaded !== "true") {
+          return;
+        }
+
+        const previewUrl = image.dataset.sourceUrl || image.currentSrc || image.src;
+        if (!previewUrl) {
+          return;
+        }
+
+        this.openMediaPreview({
+          src: previewUrl,
+          title: this.buildMediaPreviewTitle(msg, "图片预览"),
+          meta: "Esc 关闭"
+        });
+      };
+
+      wrapper.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openPreview();
+      });
+      wrapper.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+        event.preventDefault();
+        openPreview();
+      });
+
+      let imageUrl;
       if (msg.self_send && msg._sending) {
-        console.log("onSendImage Message: ", msg)
         imageUrl = msg.extra?.base64;
       } else {
         imageUrl = this.attachmentUrl("image", msg);
       }
       if (imageUrl) {
+        wrapper.classList.add("cursor-zoom-in");
+        wrapper.setAttribute("role", "button");
+        wrapper.setAttribute("tabindex", "0");
         requestAnimationFrame(() => {
           image.dataset.sourceUrl = imageUrl;
           image.src = imageUrl;
@@ -929,8 +1071,6 @@ export default class extends Controller {
       } else {
         showFallback("[暂不支持的图片]");
       }
-
-      wrapper.style.cursor = "default";
     }
 
     const applied = this.applyBubbleStyle(imageBubble, msg, isNewGroup,
@@ -1107,6 +1247,9 @@ export default class extends Controller {
       image.referrerPolicy = "no-referrer";
       image.className = "max-w-[208px] max-h-[208px] object-contain select-none";
       image.style.userSelect = "none";
+      image.style.cursor = "zoom-in";
+      image.setAttribute("role", "button");
+      image.setAttribute("tabindex", "0");
       image.classList.add("hidden");
       content.appendChild(image);
 
@@ -1124,11 +1267,36 @@ export default class extends Controller {
       image.addEventListener("error", () => {
         showFallback("[表情加载失败]");
       });
+      image.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const previewUrl = image.currentSrc || image.src;
+        if (!previewUrl) {
+          return;
+        }
 
+        this.openMediaPreview({
+          src: previewUrl,
+          title: this.buildMediaPreviewTitle(msg, "表情预览"),
+          meta: "Esc 关闭"
+        });
+      });
+      image.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+        event.preventDefault();
+        image.click();
+      });
+
+      const previewUrl = msg._sending ? msg.extra?.preview_url : "";
       const messageId = msg._messageId || msg.id;
       const cacheKey = msg._cacheKey;
 
-      if (messageId) {
+      if (previewUrl) {
+        requestAnimationFrame(() => {
+          image.src = previewUrl;
+        });
+      } else if (messageId) {
         const url = cacheKey
           ? `/message/emoji/${messageId}?t=${encodeURIComponent(cacheKey)}`
           : `/message/emoji/${messageId}`;
@@ -1332,7 +1500,8 @@ export default class extends Controller {
         }
       }
     } else {
-      const referNewMsgId = msg.refer_new_msg_id;
+      const referNewMsgId = this.normalizeReferenceId(msg.refer_new_msg_id)
+        || this.normalizeReferenceId(parsed.refServerId);
       if (quoted && referNewMsgId) {
         quoted.classList.remove("cursor-not-allowed", "opacity-60");
         quoted.classList.add("cursor-pointer");
@@ -1559,8 +1728,12 @@ export default class extends Controller {
     switch (type) {
       case "text":
         return tempMsg?.wx_message?.content || "新消息"
+      case "quote":
+        return tempMsg?.wx_message?.refer_title || "[引用消息]"
       case "image":
         return "[图片]"
+      case "emoji":
+        return "[表情]"
       case "file":
         return "[文件]"
       case "voice":
@@ -1608,11 +1781,31 @@ export default class extends Controller {
       tempMsg.msg_type = 1;
       this.inputTarget.value = "";
     }
+    if (type === "quote") {
+      const pendingQuote = message?.pendingQuote || this.pendingQuote;
+      const content = this.inputTarget.value.trim();
+      tempMsg.msg_type = 49;
+      tempMsg.wx_message.real_msg_type = "quote";
+      tempMsg.wx_message.content = content;
+      tempMsg.wx_message.refer_title = content;
+      tempMsg.wx_message.refer_new_msg_id = pendingQuote?.newMsgId;
+      tempMsg.referenced_message = pendingQuote?.wrapper || null;
+      tempMsg.extra = {
+        reference_message_id: pendingQuote?.messageId
+      };
+      this.inputTarget.value = "";
+    }
     if (type === "image") {
       tempMsg.msg_type = 3;
       tempMsg.extra = {
         base64: message.extra?.base64,
       }
+    }
+    if (type === "emoji") {
+      tempMsg.msg_type = 47;
+      tempMsg.extra = {
+        preview_url: message?.extra?.preview_url || "",
+      };
     }
     if (type === "file") {
       tempMsg.msg_type = 6;
@@ -1626,19 +1819,26 @@ export default class extends Controller {
   }
 
   sendMessage(type, message) {
-    const msg = this.createSendMessage(type, message);
+    const pendingQuote = type === "quote" ? this.pendingQuote : null;
+    const msg = this.createSendMessage(type, {
+      ...(message || {}),
+      pendingQuote
+    });
     if (type == "text") {
       hideAllEmojiPreviews();
     }
-    console.log("log send message", type, msg)
+    if (type === "quote") {
+      this.pendingQuote = null;
+      this.renderPendingQuote();
+    }
     let body;
     let headers;
-    if (type === "file") {
+    const usesFormData = type === "file" || type === "emoji";
+    if (usesFormData) {
       const formData = new FormData();
       formData.append("chat_room_id", this.idValue);
       formData.append("msg_type", msg.msg_type);
       formData.append("content", msg.wx_message.content || "");
-      formData.append("extra", JSON.stringify(msg.wx_message.extra || {}));
       formData.append("file", message.file);
       body = formData
 
@@ -1702,6 +1902,8 @@ export default class extends Controller {
         || xml.querySelector("type")?.textContent || 0);
       const refContent = xml.querySelector("refermsg")?.querySelector(
         "content")?.textContent?.trim() || "";
+      const refServerId = xml.querySelector("refermsg")?.querySelector(
+        "svrid")?.textContent?.trim() || "";
 
       const finderFeed = xml.querySelector("finderFeed");
       if (finderFeed) {
@@ -1728,6 +1930,7 @@ export default class extends Controller {
           mediaUrl,
           msgType,
           refContent,
+          refServerId,
           durationSeconds: Math.round(
             Number(media?.querySelector("videoPlayDuration")?.textContent || 0)
           )
@@ -1743,7 +1946,8 @@ export default class extends Controller {
         cover,
         source,
         msgType,
-        refContent
+        refContent,
+        refServerId
       };
     } catch (e) {
       console.error("XML parse error:", e);
@@ -1796,9 +2000,10 @@ export default class extends Controller {
         durationLabel = this.formatVoipDuration(durationSeconds);
       }
 
+      const localizedStatus = this.localizeVoipStatus(rawMsg);
       const title = roomType === "1" ? "微信通话" : "微信语音通话";
       const summary = durationLabel ? `通话时长 ${durationLabel}`
-        : rawMsg || voipNode?.getAttribute("type") || "通话消息";
+        : localizedStatus || voipNode?.getAttribute("type") || "通话消息";
 
       return {
         title,
@@ -1809,6 +2014,139 @@ export default class extends Controller {
       console.error("VoIP XML parse error:", error);
       return { title: "微信通话", summary: "通话消息" };
     }
+  }
+
+  localizeVoipStatus(rawMsg = "") {
+    const normalized = String(rawMsg || "").trim();
+    if (!normalized) {
+      return "";
+    }
+
+    const exactMapping = {
+      "Declined on other device": "已在其他设备拒绝",
+      "Canceled": "已取消",
+      "Rejected": "已拒绝",
+      "No response": "未接听",
+      "Busy": "忙线中",
+      "Missed call": "未接听",
+      "Connected": "已接通"
+    };
+    if (exactMapping[normalized]) {
+      return exactMapping[normalized];
+    }
+
+    if (/declined/i.test(normalized)) {
+      return "已拒绝";
+    }
+    if (/missed|no response/i.test(normalized)) {
+      return "未接听";
+    }
+    if (/canceled/i.test(normalized)) {
+      return "已取消";
+    }
+    if (/busy/i.test(normalized)) {
+      return "忙线中";
+    }
+
+    return normalized;
+  }
+
+  parseWxChatHistoryMessage(xmlString) {
+    const fallback = {
+      title: "聊天记录",
+      desc: "",
+      count: 0,
+      items: []
+    };
+
+    try {
+      const xml = this.parseXmlDocument(xmlString);
+      if (!xml) {
+        return fallback;
+      }
+
+      const appmsg = xml.querySelector("appmsg");
+      const title = appmsg?.querySelector("title")?.textContent?.trim()
+        || fallback.title;
+      const desc = appmsg?.querySelector("des")?.textContent?.trim() || "";
+      const recordRaw = appmsg?.querySelector("recorditem")?.textContent?.trim()
+        || "";
+      if (!recordRaw) {
+        return {
+          title,
+          desc,
+          count: desc ? desc.split(/\n+/).filter(Boolean).length : 0,
+          items: []
+        };
+      }
+
+      const recordXml = this.parseXmlDocument(recordRaw);
+      if (!recordXml) {
+        return {
+          title,
+          desc,
+          count: desc ? desc.split(/\n+/).filter(Boolean).length : 0,
+          items: []
+        };
+      }
+
+      const recordInfo = recordXml.querySelector("recordinfo");
+      const itemNodes = Array.from(recordInfo?.querySelectorAll("datalist > dataitem")
+        || []);
+      const descLines = desc.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+      const items = itemNodes.map((itemNode, index) =>
+        this.parseWxChatHistoryItem(itemNode, descLines[index] || ""));
+
+      return {
+        title,
+        desc,
+        count: Number(recordInfo?.querySelector("datalist")?.getAttribute("count")
+          || items.length || 0),
+        items
+      };
+    } catch (error) {
+      console.error("Chat history XML parse error:", error);
+      return fallback;
+    }
+  }
+
+  parseWxChatHistoryItem(itemNode, fallbackLine = "") {
+    const dataType = Number(itemNode?.getAttribute("datatype") || 1);
+    const rawContent = itemNode?.querySelector("datadesc")?.textContent?.trim()
+      || "";
+    const senderName = itemNode?.querySelector("sourcename")?.textContent?.trim()
+      || "";
+    const time = itemNode?.querySelector("sourcetime")?.textContent?.trim() || "";
+    const fallbackContent = fallbackLine.includes(":")
+      ? fallbackLine.split(":").slice(1).join(":").trim()
+      : fallbackLine;
+    const content = rawContent.includes("�") && fallbackContent
+      ? fallbackContent
+      : (rawContent || fallbackContent || this.chatHistoryTypeLabel(dataType));
+
+    return {
+      type: this.chatHistoryItemType(dataType),
+      senderName,
+      time,
+      content
+    };
+  }
+
+  chatHistoryItemType(dataType) {
+    switch (Number(dataType)) {
+      case 2:
+        return "image";
+      case 4:
+        return "video";
+      case 6:
+        return "file_message";
+      default:
+        return "text";
+    }
+  }
+
+  chatHistoryTypeLabel(dataType) {
+    return `[${this.humanizeMessageType(this.chatHistoryItemType(dataType))}]`;
   }
 
   formatVoipDuration(totalSeconds) {
@@ -1924,6 +2262,182 @@ export default class extends Controller {
     const resolvedKey = cacheKey === undefined ? msg._cacheKey : cacheKey;
     const base = `/message/${type}/${messageId}`;
     return resolvedKey ? `${base}?t=${encodeURIComponent(resolvedKey)}` : base;
+  }
+
+  startQuoteMessage(wrapper, msg, senderInfo = null) {
+    if (!wrapper?.id || !msg) {
+      return;
+    }
+
+    const preview = this.buildMessagePreview(msg);
+    const info = senderInfo || this.lookupSenderInfo(msg, msg.content);
+    this.pendingQuote = {
+      messageId: wrapper.id,
+      newMsgId: this.normalizeReferenceId(msg.new_msg_id),
+      senderName: info?.name || (msg.self_send ? "我" : "消息"),
+      typeLabel: this.humanizeMessageType(preview.type),
+      content: preview.content,
+      wrapper
+    };
+    this.renderPendingQuote();
+    this.inputTarget.focus();
+  }
+
+  clearPendingQuote(event = null) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.pendingQuote = null;
+    this.renderPendingQuote();
+    this.inputTarget.focus();
+  }
+
+  renderPendingQuote() {
+    if (!this.hasQuoteComposerTarget || !this.hasQuoteComposerMetaTarget
+      || !this.hasQuoteComposerContentTarget) {
+      return;
+    }
+
+    const pending = this.pendingQuote;
+    if (!pending) {
+      this.quoteComposerTarget.classList.add("hidden");
+      this.quoteComposerTarget.classList.remove("flex");
+      this.quoteComposerMetaTarget.textContent = "";
+      this.quoteComposerContentTarget.textContent = "";
+      return;
+    }
+
+    this.quoteComposerMetaTarget.textContent = `引用 ${pending.senderName} · ${pending.typeLabel}`;
+    this.quoteComposerContentTarget.textContent = pending.content || "[消息]";
+    this.quoteComposerTarget.classList.remove("hidden");
+    this.quoteComposerTarget.classList.add("flex");
+  }
+
+  normalizeReferenceId(value) {
+    if (value == null) {
+      return null;
+    }
+
+    const normalized = String(value).trim();
+    if (!normalized || normalized === "0" || normalized === "null"
+      || normalized === "undefined") {
+      return null;
+    }
+
+    return normalized;
+  }
+
+  buildMediaPreviewTitle(msg, fallback = "媒体预览") {
+    const senderName = msg?.self_send ? "我" : (msg?.sender_name
+      || this.lookupSenderInfo(msg, msg?.content)?.name || "");
+    return senderName ? `${senderName} · ${fallback}` : fallback;
+  }
+
+  ensureMediaPreviewElements() {
+    if (this.mediaPreviewOverlay?.isConnected) {
+      return;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "fixed inset-0 z-[120] hidden items-center justify-center bg-slate-950/90 px-4 py-5";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.innerHTML = `
+      <div class="absolute inset-0 backdrop-blur-sm" data-role="media-preview-backdrop"></div>
+      <div class="relative z-10 flex max-h-full w-full max-w-6xl flex-col gap-3">
+        <div class="flex items-center justify-between gap-3 text-slate-100">
+          <div class="min-w-0">
+            <div class="truncate text-sm font-medium" data-role="media-preview-title">图片预览</div>
+            <div class="truncate text-xs text-slate-400" data-role="media-preview-meta"></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <a class="rounded-full border border-white/15 px-3 py-1.5 text-xs text-slate-100 transition hover:border-white/30 hover:bg-white/10"
+               data-role="media-preview-open"
+               target="_blank"
+               rel="noopener noreferrer">新窗口打开</a>
+            <button type="button"
+                    class="rounded-full border border-white/15 px-3 py-1.5 text-xs text-slate-100 transition hover:border-white/30 hover:bg-white/10"
+                    data-role="media-preview-close">关闭</button>
+          </div>
+        </div>
+        <div class="relative flex max-h-[calc(100vh-7rem)] w-full items-center justify-center overflow-auto rounded-[28px] bg-black/30 p-3"
+             data-role="media-preview-frame">
+          <img data-role="media-preview-image"
+               alt="媒体预览"
+               class="max-h-[calc(100vh-9rem)] max-w-full object-contain select-none">
+        </div>
+      </div>
+    `;
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target.closest("[data-role='media-preview-backdrop']")
+        || event.target.closest("[data-role='media-preview-close']")) {
+        event.preventDefault();
+        this.closeMediaPreview();
+      }
+    });
+
+    document.body.appendChild(overlay);
+    this.mediaPreviewOverlay = overlay;
+    this.mediaPreviewFrame = overlay.querySelector(
+      "[data-role='media-preview-frame']");
+    this.mediaPreviewImage = overlay.querySelector(
+      "[data-role='media-preview-image']");
+    this.mediaPreviewTitle = overlay.querySelector(
+      "[data-role='media-preview-title']");
+    this.mediaPreviewMeta = overlay.querySelector(
+      "[data-role='media-preview-meta']");
+    this.mediaPreviewOpenLink = overlay.querySelector(
+      "[data-role='media-preview-open']");
+  }
+
+  openMediaPreview({ src, title = "图片预览", meta = "" } = {}) {
+    if (!src) {
+      return;
+    }
+
+    this.ensureMediaPreviewElements();
+    if (!this.mediaPreviewOverlay || !this.mediaPreviewImage) {
+      return;
+    }
+
+    if (this.mediaPreviewTitle) {
+      this.mediaPreviewTitle.textContent = title;
+    }
+    if (this.mediaPreviewMeta) {
+      this.mediaPreviewMeta.textContent = meta;
+      this.mediaPreviewMeta.classList.toggle("hidden", !meta);
+    }
+    if (this.mediaPreviewOpenLink) {
+      this.mediaPreviewOpenLink.href = src;
+    }
+
+    this.mediaPreviewImage.src = src;
+    this.mediaPreviewOverlay.classList.remove("hidden");
+    this.mediaPreviewOverlay.classList.add("flex");
+    this.mediaPreviewPreviousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", this.boundHandleMediaPreviewKeydown);
+  }
+
+  closeMediaPreview() {
+    if (!this.mediaPreviewOverlay) {
+      return;
+    }
+
+    this.mediaPreviewOverlay.classList.add("hidden");
+    this.mediaPreviewOverlay.classList.remove("flex");
+    if (this.mediaPreviewImage) {
+      this.mediaPreviewImage.removeAttribute("src");
+    }
+
+    document.body.style.overflow = this.mediaPreviewPreviousBodyOverflow || "";
+    document.removeEventListener("keydown", this.boundHandleMediaPreviewKeydown);
+  }
+
+  handleMediaPreviewKeydown(event) {
+    if (event.key === "Escape") {
+      this.closeMediaPreview();
+    }
   }
 
   toggleMenu(event) {
@@ -2960,19 +3474,21 @@ export default class extends Controller {
   }
 
   resolveReferencedMessageId(referNewMsgId) {
-    if (!referNewMsgId) {
+    const normalizedReferId = this.normalizeReferenceId(referNewMsgId);
+    if (!normalizedReferId) {
       return Promise.resolve(null);
     }
 
     const existing = this.messages.all.find((wrapper) =>
-      String(wrapper?.wx_message?.new_msg_id) === String(referNewMsgId));
+      this.normalizeReferenceId(wrapper?.wx_message?.new_msg_id)
+        === normalizedReferId);
 
     if (existing?.id != null) {
       return Promise.resolve(existing.id);
     }
 
     const url = `/chat_room/${this.idValue}/messages/resolve_reference?new_msg_id=${
-      encodeURIComponent(referNewMsgId)
+      encodeURIComponent(normalizedReferId)
     }`;
 
     return fetch(url)
@@ -3007,6 +3523,7 @@ export default class extends Controller {
       refer: "引用",
       text: "文本",
       image: "图片",
+      chat_history: "聊天记录",
       voice: "语音",
       voip: "通话",
       video: "视频",
@@ -3183,6 +3700,14 @@ export default class extends Controller {
           asLinkedText: false
         };
       }
+      case "chat_history": {
+        const parsed = this.parseWxChatHistoryMessage(msg?.content || "");
+        return {
+          type,
+          content: parsed.desc || parsed.title || "[聊天记录]",
+          asLinkedText: false
+        };
+      }
       case "file_message": {
         const fileInfo = this.parseWxFileAttachment(msg?.content || "") || {};
         return {
@@ -3272,18 +3797,19 @@ export default class extends Controller {
 
   openFilePicker(event) {
     const uploadType = event.currentTarget.dataset.uploadTypeParam; // 获取按钮上的参数
-    console.debug("openFilePicker:", event.currentTarget, uploadType);
     this.currentUploadType = uploadType;
     let acceptTypes;
 
     // 根据 uploadType 设置文件类型
     if (uploadType === "image") {
       acceptTypes = "image/*";
-    } else if (uploadType === "document") {
-      acceptTypes = "application/pdf,application/msword";
+    } else if (uploadType === "emoji") {
+      acceptTypes = ".gif,image/gif";
+    } else if (uploadType === "file") {
+      acceptTypes = "*/*";
     }
 
-    this.fileInputTarget.accept = acceptTypes;
+    this.fileInputTarget.accept = acceptTypes || "";
     this.fileInputTarget.click();
   }
 
@@ -3295,12 +3821,23 @@ export default class extends Controller {
       if (uploadType === "image") {
         sendMsg.extra.base64 = await get_file_base64(file);
       }
+      if (uploadType === "emoji") {
+        const isGif = file.type === "image/gif"
+          || file.name.toLowerCase().endsWith(".gif");
+        if (!isGif) {
+          alert("请选择 GIF 表情文件");
+          event.target.value = "";
+          return;
+        }
+        sendMsg.file = file;
+        sendMsg.extra.preview_url = URL.createObjectURL(file);
+      }
       if (uploadType === "file") {
         sendMsg.file = file
       }
-      console.debug("handleFileSelect", uploadType, sendMsg)
       this.sendMessage(uploadType, sendMsg)
     }
+    event.target.value = "";
 
   }
 
