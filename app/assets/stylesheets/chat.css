@@ -231,6 +231,21 @@
   backdrop-filter: blur(1px);
 }
 
+.tg-message-group-stack {
+  gap: 2px;
+}
+
+.tg-message-avatar-lane {
+  align-self: stretch;
+}
+
+.tg-message-avatar-sticky {
+  position: sticky;
+  bottom: 8px;
+  align-self: flex-end;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
 .message-bubble[data-sender-type="self"],
 .message-bubble[data-sender-type="other"] {
   position: relative;

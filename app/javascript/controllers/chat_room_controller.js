@@ -511,6 +511,8 @@ export default class extends Controller {
     }
 
     let lastSenderKey = null;
+    let currentGroupKey = null;
+    let currentGroup = null;
     const sortedMessages = this.sortedMessageWrappers();
     sortedMessages.forEach((wrapper, index) => {
       const msg = wrapper.wx_message;
@@ -548,11 +550,17 @@ export default class extends Controller {
       if (msg.real_msg_type == "file_transfer_start") {
         return
       }
-      const row = this.buildRow(startsGroup, msg, senderInfo);
+      if (startsGroup || currentGroupKey !== senderKey || !currentGroup) {
+        currentGroupKey = senderKey;
+        currentGroup = this.buildMessageGroup(msg, senderInfo);
+        container.appendChild(currentGroup.group);
+      }
+
+      const row = this.buildRow(msg, senderInfo);
       const bubble = this.renderMessageBubble(msg, startsGroup, senderInfo,
         sortedMessages[0] === wrapper);
       row.appendChild(bubble);
-      container.appendChild(row);
+      currentGroup.stack.appendChild(row);
 
       this.renderStatus(wrapper, bubble, msg);
       this.addTimestamp(bubble, wrapper, msg);
@@ -591,53 +599,75 @@ export default class extends Controller {
     }
   }
 
-  buildRow(isNewGroup, msg, senderInfo) {
+  buildMessageGroup(msg, senderInfo) {
+    const group = document.createElement("div");
+    group.className = `tg-message-group w-full flex ${msg.self_send
+      ? "justify-end"
+      : "justify-start"} items-end`;
+    group.style.marginTop = msg._startsGroup ? "8px" : "2px";
+
+    const stack = document.createElement("div");
+    stack.className = "tg-message-group-stack flex min-w-0 flex-col";
+
+    if (!msg.self_send && this.isRoom()) {
+      const avatarLane = document.createElement("div");
+      avatarLane.className = "tg-message-avatar-lane mr-2 flex justify-center";
+      avatarLane.style.width = "3rem";
+
+      const senderName = senderInfo?.name || msg.sender_name || "";
+      const senderAvatar = senderInfo?.avatar || msg.sender_avatar || "";
+      group.dataset.senderName = senderName;
+      if (senderAvatar) {
+        group.dataset.senderAvatar = senderAvatar;
+      } else {
+        delete group.dataset.senderAvatar;
+      }
+
+      const avatar = document.createElement("div");
+      avatar.className = "tg-message-avatar-sticky w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
+
+      if (!senderAvatar) {
+        const initial = senderInfo?.initial || msg.sender_initial || "?";
+        avatar.textContent = initial;
+        avatar.classList.add("text-gray-600", "font-semibold");
+      } else {
+        const img = document.createElement("img");
+        img.src = senderAvatar;
+        img.alt = senderName;
+        img.className = "w-full h-full object-cover";
+        avatar.appendChild(img);
+      }
+
+      avatarLane.appendChild(avatar);
+      group.appendChild(avatarLane);
+      group.appendChild(stack);
+      return { group, stack };
+    }
+
+    const senderName = senderInfo?.name || msg.sender_name || (msg.self_send ? "我" : "");
+    const senderAvatar = senderInfo?.avatar || msg.sender_avatar || "";
+    if (senderName) {
+      group.dataset.senderName = senderName;
+    }
+    if (senderAvatar) {
+      group.dataset.senderAvatar = senderAvatar;
+    } else {
+      delete group.dataset.senderAvatar;
+    }
+
+    group.appendChild(stack);
+    return { group, stack };
+  }
+
+  buildRow(msg, senderInfo) {
     const row = document.createElement("div");
     row.className = `w-full flex ${msg.self_send ? "justify-end"
       : "justify-start"} items-end`;
-    row.style.marginTop = msg._startsGroup ? "8px" : "2px";
     if (msg.id) {
       row.dataset.messageId = msg.id;
     }
 
-    if (!msg.self_send && this.isRoom()) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "mr-2 flex justify-center items-start";
-      wrapper.style.width = "3rem";
-
-      const senderName = senderInfo?.name || msg.sender_name || "";
-      const senderAvatar = senderInfo?.avatar || msg.sender_avatar || "";
-      if (senderName) {
-        row.dataset.senderName = senderName;
-      }
-      if (senderAvatar) {
-        row.dataset.senderAvatar = senderAvatar;
-      } else {
-        delete row.dataset.senderAvatar;
-      }
-
-      if (msg._endsGroup) {
-        const avatar = document.createElement("div");
-        avatar.className = "w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
-        if (!senderAvatar) {
-          const initial = senderInfo?.initial || msg.sender_initial || "?";
-          avatar.textContent = initial;
-          avatar.classList.add("text-gray-600", "font-semibold");
-        } else {
-          const img = document.createElement("img");
-          img.src = senderAvatar;
-          img.alt = senderName;
-          img.className = "w-full h-full object-cover";
-          avatar.appendChild(img);
-        }
-        wrapper.appendChild(avatar);
-      } else {
-        wrapper.style.visibility = "hidden";
-        wrapper.style.opacity = "0";
-      }
-
-      row.appendChild(wrapper);
-    } else if (!msg.self_send) {
+    if (!msg.self_send) {
       const senderName = senderInfo?.name || msg.sender_name || "";
       const senderAvatar = senderInfo?.avatar || msg.sender_avatar || "";
       if (senderName) {
