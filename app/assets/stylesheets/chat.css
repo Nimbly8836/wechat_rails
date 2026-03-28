@@ -219,6 +219,48 @@
   color: #b45309;
 }
 
+.telegram-message-list {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.52), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(191, 219, 254, 0.35), transparent 20%),
+    linear-gradient(180deg, rgba(223, 232, 241, 0.95) 0%, rgba(213, 226, 239, 0.98) 100%);
+}
+
+.message-bubble {
+  max-width: min(75%, 42rem);
+  backdrop-filter: blur(1px);
+}
+
+.message-bubble[data-sender-type="self"],
+.message-bubble[data-sender-type="other"] {
+  position: relative;
+  overflow: visible;
+}
+
+.message-bubble[data-tail="true"][data-sender-type="self"]::after,
+.message-bubble[data-tail="true"][data-sender-type="other"]::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  width: 12px;
+  height: 12px;
+  background: var(--tg-bubble-bg);
+}
+
+.message-bubble[data-tail="true"][data-sender-type="self"]::after {
+  right: -6px;
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+  border-right: 1px solid var(--tg-bubble-border-color);
+  border-bottom: 1px solid var(--tg-bubble-border-color);
+}
+
+.message-bubble[data-tail="true"][data-sender-type="other"]::after {
+  left: -6px;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  border-left: 1px solid var(--tg-bubble-border-color);
+  border-bottom: 1px solid var(--tg-bubble-border-color);
+}
+
 .tg-room-badge.is-group {
   background: #dbeafe;
   color: #1d4ed8;

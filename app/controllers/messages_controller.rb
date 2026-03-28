@@ -10,56 +10,26 @@ class MessagesController < ApplicationController
     before_id = params[:before_id] # 可选，用于加载更多消息
     after_id = params[:after_id]
 
-    messages = Message.includes(:wx_message)
-                      .where(chat_room_id: chat_room_id)
+    messages = messages_scope(chat_room_id)
 
     # 如果前端传了 before_id，就取更早的消息
     messages = messages.where("id < ?", before_id) if before_id.present?
     messages = messages.where("id > ?", after_id) if after_id.present?
 
     messages = messages.order(id: :desc).limit(100).to_a
-    refer_ids = messages.filter_map { |msg| msg.wx_message&.refer_new_msg_id }.presence || []
-    refer_ids = refer_ids.uniq if refer_ids.present?
+    render json: serialize_messages(messages.reverse, chat_room_id)
+  end
 
-    referenced_messages = if refer_ids.present?
-                            Message.includes(:wx_message)
-                                   .where(chat_room_id: chat_room_id)
-                                   .joins(:wx_message)
-                                   .where(wx_messages: { new_msg_id: refer_ids })
-                                   .to_a
-    else
-                           []
+  def show
+    chat_room_id = params[:chat_room_id]
+    message = messages_scope(chat_room_id).find_by(id: params[:id])
+
+    if message.blank?
+      render json: { success: false, message: "消息不存在" }, status: :not_found
+      return
     end
 
-    referenced_by_new_msg_id = referenced_messages.index_by { |msg| msg.wx_message&.new_msg_id }
-
-    message_json = messages.reverse.map do |message|
-      wx_message = message.wx_message
-      referenced = wx_message && referenced_by_new_msg_id[wx_message.refer_new_msg_id]
-
-      base = message.as_json(
-        include: {
-          wx_message: {
-            only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                   :new_msg_id, :refer_new_msg_id, :refer_title, :self_send, :real_msg_type ]
-          }
-        }
-      )
-
-      base.merge(
-        "referenced_message" => referenced&.as_json(
-          only: [ :id, :chat_room_id, :created_at, :message_time ],
-          include: {
-            wx_message: {
-              only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                     :new_msg_id, :self_send, :real_msg_type ]
-            }
-          }
-        )
-      )
-    end
-
-    render json: message_json
+    render json: serialize_messages([ message ], chat_room_id).first
   end
 
   def create
@@ -408,6 +378,54 @@ class MessagesController < ApplicationController
   end
 
   private
+
+  def messages_scope(chat_room_id)
+    Message.includes(:wx_message).where(chat_room_id: chat_room_id)
+  end
+
+  def serialize_messages(messages, chat_room_id)
+    refer_ids = messages.filter_map { |msg| msg.wx_message&.refer_new_msg_id }.uniq
+    referenced_by_new_msg_id = referenced_messages_by_new_msg_id(chat_room_id, refer_ids)
+
+    messages.map do |message|
+      wx_message = message.wx_message
+      referenced = wx_message && referenced_by_new_msg_id[wx_message.refer_new_msg_id]
+      serialize_message(message, referenced)
+    end
+  end
+
+  def referenced_messages_by_new_msg_id(chat_room_id, refer_ids)
+    return {} if refer_ids.blank?
+
+    Message.includes(:wx_message)
+           .where(chat_room_id: chat_room_id)
+           .joins(:wx_message)
+           .where(wx_messages: { new_msg_id: refer_ids })
+           .index_by { |msg| msg.wx_message&.new_msg_id }
+  end
+
+  def serialize_message(message, referenced = nil)
+    base = message.as_json(
+      include: {
+        wx_message: {
+          only: [ :msg_type, :content, :from_user_name, :to_user_name,
+                 :new_msg_id, :refer_new_msg_id, :refer_title, :self_send, :real_msg_type ]
+        }
+      }
+    )
+
+    base.merge(
+      "referenced_message" => referenced&.as_json(
+        only: [ :id, :chat_room_id, :created_at, :message_time ],
+        include: {
+          wx_message: {
+            only: [ :msg_type, :content, :from_user_name, :to_user_name,
+                   :new_msg_id, :self_send, :real_msg_type ]
+          }
+        }
+      )
+    )
+  end
 
   def process_synced_payload(payload, wxid, full_backfill: false)
     saves = WechatModels::SyncMessageModel.parse_saves(payload, wxid)

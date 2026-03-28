@@ -14,13 +14,23 @@ import {
 } from "utils/chat_storage";
 
 const MESSAGE_CACHE_LIMIT = 80;
-const DEFAULT_THEME = {
+const MESSAGE_CACHE_FALLBACK_LIMITS = [80, 40, 20, 10];
+const LEGACY_DEFAULT_THEME = {
   backgroundColor: "var(--color-gray-100)",
   backgroundImage: "",
   selfBubbleColor: "#6387f2",
   selfBubbleTextColor: "#ffffff",
   otherBubbleColor: "rgba(255,255,255,0.92)",
   otherBubbleBorderColor: "rgba(148,163,184,0.45)",
+  fontFamily: "inherit"
+};
+const DEFAULT_THEME = {
+  backgroundColor: "#d7e3ef",
+  backgroundImage: "",
+  selfBubbleColor: "#d9fdd3",
+  selfBubbleTextColor: "#1f2937",
+  otherBubbleColor: "#ffffff",
+  otherBubbleBorderColor: "rgba(15,23,42,0.08)",
   fontFamily: "inherit"
 };
 
@@ -41,7 +51,7 @@ export default class extends Controller {
     hideAllEmojiPreviews();
     this.theme = {
       ...DEFAULT_THEME,
-      ...this.readChatRoomTheme(),
+      ...this.normalizeThemeConfig(this.readChatRoomTheme()),
       ...(this.theme || {})
     };
 
@@ -153,6 +163,29 @@ export default class extends Controller {
     return readCache(namespace, identifier, {}) || {};
   }
 
+  normalizeThemeConfig(rawTheme) {
+    const theme = rawTheme && typeof rawTheme === "object" ? { ...rawTheme } : {};
+    const migratePairs = [
+      "backgroundColor",
+      "selfBubbleColor",
+      "selfBubbleTextColor",
+      "otherBubbleColor",
+      "otherBubbleBorderColor"
+    ];
+
+    migratePairs.forEach((key) => {
+      if (!theme[key] || theme[key] === LEGACY_DEFAULT_THEME[key]) {
+        theme[key] = DEFAULT_THEME[key];
+      }
+    });
+
+    if (!theme.fontFamily) {
+      theme.fontFamily = DEFAULT_THEME.fontFamily;
+    }
+
+    return theme;
+  }
+
   persistTheme() {
     const [namespace, identifier] = chatStorageKeys.chatRoomTheme(this.idValue);
     writeCache(namespace, identifier, this.theme);
@@ -240,6 +273,9 @@ export default class extends Controller {
       if (cloned.wx_message?.extra?.base64) {
         delete cloned.wx_message.extra.base64;
       }
+      if (cloned.referenced_message) {
+        delete cloned.referenced_message;
+      }
       return cloned;
     } catch (error) {
       console.warn("消息缓存序列化失败", error);
@@ -251,10 +287,23 @@ export default class extends Controller {
     const [namespace, identifier] = chatStorageKeys.chatRoomMessages(this.idValue);
     const cacheableMessages = this.messages.all
       .map((wrapper) => this.sanitizeMessageForCache(wrapper))
-      .filter(Boolean)
-      .slice(-MESSAGE_CACHE_LIMIT);
+      .filter(Boolean);
 
-    writeCache(namespace, identifier, cacheableMessages);
+    let wrote = false;
+    for (const limit of MESSAGE_CACHE_FALLBACK_LIMITS) {
+      const slice = cacheableMessages.slice(-Math.min(limit, MESSAGE_CACHE_LIMIT));
+      if (!slice.length) {
+        continue;
+      }
+      wrote = writeCache(namespace, identifier, slice);
+      if (wrote) {
+        break;
+      }
+    }
+
+    if (!wrote) {
+      removeCache(namespace, identifier);
+    }
   }
 
   restoreCachedMessages() {
@@ -449,7 +498,7 @@ export default class extends Controller {
     //   return new Date(timeA) - new Date(timeB);
     // });
 
-    const sortedMessages = this.messages.all
+    const sortedMessages = this.sortedMessageWrappers();
     sortedMessages.forEach((wrapper) => {
       const msg = wrapper.wx_message;
       msg.id = wrapper.id;
@@ -831,6 +880,7 @@ export default class extends Controller {
     const applied = this.applyBubbleStyle(imageBubble, msg, isNewGroup,
       senderInfo, isFirstMessage);
     applied.dataset.bubbleType = "image";
+    applied.dataset.tail = "false";
     applied.style.background = "transparent";
     applied.style.border = "none";
     applied.style.boxShadow = "none";
@@ -940,6 +990,7 @@ export default class extends Controller {
     const applied = this.applyBubbleStyle(videoBubble, msg, isNewGroup,
       senderInfo, isFirstMessage);
     applied.dataset.bubbleType = "video";
+    applied.dataset.tail = "false";
     applied.style.background = "transparent";
     applied.style.border = "none";
     applied.style.boxShadow = "none";
@@ -1036,6 +1087,7 @@ export default class extends Controller {
     const applied = this.applyBubbleStyle(emojiBubble, msg, isNewGroup,
       senderInfo, isFirstMessage);
     applied.dataset.bubbleType = "emoji";
+    applied.dataset.tail = "false";
     applied.style.background = "transparent";
     applied.style.border = "none";
     applied.style.boxShadow = "none";
@@ -1259,6 +1311,7 @@ export default class extends Controller {
 
     bubble.style.marginTop = isNewGroup ? "6px" : "";
     bubble.style.paddingBottom = "";
+    bubble.dataset.tail = isNewGroup ? "true" : "false";
 
     bubble.classList.remove("bg-blue-500", "text-white", "rounded-bl-2xl",
       "rounded-tr-2xl", "rounded-br-md", "bg-white", "text-gray-900",
@@ -1269,6 +1322,9 @@ export default class extends Controller {
     bubble.style.color = "";
     bubble.style.border = "";
     bubble.style.boxShadow = "";
+    bubble.style.borderRadius = "";
+    bubble.style.setProperty("--tg-bubble-bg", "");
+    bubble.style.setProperty("--tg-bubble-border-color", "");
     delete bubble.dataset.senderType;
 
     if (msg.self_send) {
@@ -1279,8 +1335,12 @@ export default class extends Controller {
         "rounded-bl-md");
       bubble.style.background = this.theme.selfBubbleColor;
       bubble.style.color = this.theme.selfBubbleTextColor;
-      bubble.style.border = "none";
-      bubble.style.boxShadow = "0 14px 32px -20px rgba(99,102,241,0.65)";
+      bubble.style.border = "1px solid rgba(181, 214, 173, 0.92)";
+      bubble.style.boxShadow = "0 1px 1px rgba(15,23,42,0.05)";
+      bubble.style.borderRadius = "18px 18px 6px 18px";
+      bubble.style.setProperty("--tg-bubble-bg", this.theme.selfBubbleColor);
+      bubble.style.setProperty("--tg-bubble-border-color",
+        "rgba(181, 214, 173, 0.92)");
     } else {
       bubble.dataset.senderType = "other";
       bubble.classList.add("text-gray-900", "border", "rounded-br-2xl",
@@ -1290,7 +1350,11 @@ export default class extends Controller {
       bubble.style.background = this.theme.otherBubbleColor;
       bubble.style.color = "#111827";
       bubble.style.border = `1px solid ${this.theme.otherBubbleBorderColor}`;
-      bubble.style.boxShadow = "0 12px 28px -22px rgba(2,6,23,0.45)";
+      bubble.style.boxShadow = "0 1px 1px rgba(15,23,42,0.06)";
+      bubble.style.borderRadius = "18px 18px 18px 6px";
+      bubble.style.setProperty("--tg-bubble-bg", this.theme.otherBubbleColor);
+      bubble.style.setProperty("--tg-bubble-border-color",
+        this.theme.otherBubbleBorderColor);
     }
 
     const existingName = bubble.querySelector('[data-role="sender-name"]');
@@ -1303,7 +1367,7 @@ export default class extends Controller {
       if (name) {
         const nameTag = document.createElement("div");
         nameTag.dataset.role = "sender-name";
-        nameTag.className = "px-3 pt-1 text-xs font-semibold text-blue-500/80";
+        nameTag.className = "px-3 pt-1 text-[11px] font-semibold text-sky-600/90";
         nameTag.textContent = name;
         bubble.insertBefore(nameTag, bubble.firstChild);
       }
@@ -1340,11 +1404,21 @@ export default class extends Controller {
 
   addTimestamp(bubble, wrapper, msg = null) {
     const time = document.createElement("span");
-    time.className = "absolute bottom-2 right-3 text-[10px] leading-none tracking-wide";
     const ts = wrapper.message_time || wrapper.created_at
       || wrapper.wx_message?.message_time;
     time.textContent = ts ? this.formatTimestamp(ts) : "";
 
+    const isSelf = msg?.self_send;
+    const inlineTarget = this.inlineTimestampTargetForBubble(bubble, msg);
+    if (inlineTarget) {
+      time.className = "float-right ml-2 mt-1 text-[10px] leading-none tracking-wide select-none";
+      time.style.color = isSelf ? "rgba(255,255,255,0.72)"
+        : "rgba(100,116,139,0.92)";
+      inlineTarget.appendChild(time);
+      return;
+    }
+
+    time.className = "absolute bottom-2 right-3 text-[10px] leading-none tracking-wide";
     if (!bubble.dataset.timestampPrepared) {
       bubble.style.minWidth = bubble.style.minWidth || "140px";
       bubble.style.minHeight = bubble.style.minHeight || "52px";
@@ -1352,7 +1426,6 @@ export default class extends Controller {
       bubble.dataset.timestampPrepared = "true";
     }
 
-    const isSelf = msg?.self_send;
     time.style.padding = "3px 8px";
     time.style.borderRadius = "9999px";
     time.style.background = isSelf ? "rgba(255,255,255,0.18)"
@@ -1363,6 +1436,18 @@ export default class extends Controller {
       : "0 4px 10px -8px rgba(15,23,42,0.25)";
 
     bubble.appendChild(time);
+  }
+
+  inlineTimestampTargetForBubble(bubble, msg = null) {
+    const type = this.normalizeMessageType(msg);
+    const inlineTypes = ["text", "quote", "refer", "xml_unparsed"];
+    if (!inlineTypes.includes(type)) {
+      return null;
+    }
+
+    return bubble.querySelector("[data-role='content']")
+      || bubble.querySelector("[data-role='refer-body']")
+      || bubble.querySelector("[data-role='xml-content']");
   }
 
   formatTimestamp(value) {
@@ -2179,14 +2264,20 @@ export default class extends Controller {
   }
 
   latestServerMessageId() {
-    for (let index = this.messages.all.length - 1; index >= 0; index -= 1) {
-      const candidateId = this.messages.all[index]?.id;
-      if (candidateId != null && !String(candidateId).startsWith("temp-")) {
-        return candidateId;
-      }
-    }
+    let latest = null;
 
-    return null;
+    this.messages.all.forEach((wrapper) => {
+      const candidateId = Number(wrapper?.id);
+      if (!Number.isFinite(candidateId)) {
+        return;
+      }
+
+      if (latest == null || candidateId > latest) {
+        latest = candidateId;
+      }
+    });
+
+    return latest;
   }
 
   refreshRoomFromNotification(payload, attempt = 0) {
@@ -2647,8 +2738,8 @@ export default class extends Controller {
       return;
     }
 
-    this.ensureMessageLoaded(messageId).then((isLoaded) => {
-      if (!isLoaded) {
+    this.ensureMessageVisible(messageId).then((isVisible) => {
+      if (!isVisible) {
         return;
       }
 
@@ -2663,7 +2754,10 @@ export default class extends Controller {
           "ring-offset-2", "ring-offset-gray-100");
       }
 
-      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      const container = this.messageListTarget;
+      const targetTop = Math.max(
+        row.offsetTop - (container.clientHeight - row.offsetHeight) / 2, 0);
+      container.scrollTo({ top: targetTop, behavior: "smooth" });
       row.classList.add("ring-2", "ring-blue-400", "ring-offset-2",
         "ring-offset-gray-100");
       this.highlightedRow = row;
@@ -2679,6 +2773,22 @@ export default class extends Controller {
         }
       }, 2000);
     });
+  }
+
+  async ensureMessageVisible(messageId) {
+    const loaded = await this.ensureMessageLoaded(messageId);
+    if (loaded) {
+      return true;
+    }
+
+    const fetched = await this.fetchMessageById(messageId);
+    if (!fetched) {
+      return false;
+    }
+
+    this.renderMessages();
+    return Boolean(this.messageListTarget.querySelector(
+      `[data-message-id="${messageId}"]`));
   }
 
   async ensureMessageLoaded(messageId) {
@@ -2699,8 +2809,7 @@ export default class extends Controller {
     }
 
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const firstMsg = this.messages.at(0);
-      const firstMsgId = Number(firstMsg?.id);
+      const firstMsgId = Number(this.oldestServerMessageId());
       if (!Number.isFinite(firstMsgId) || targetId >= firstMsgId) {
         break;
       }
@@ -2726,8 +2835,7 @@ export default class extends Controller {
       return Promise.resolve(false);
     }
 
-    const firstMsg = this.messages.at(0);
-    const firstMsgId = firstMsg?.id;
+    const firstMsgId = this.oldestServerMessageId();
     if (!firstMsgId) {
       return Promise.resolve(false);
     }
@@ -2755,6 +2863,29 @@ export default class extends Controller {
       })
       .finally(() => {
         this.loadingOlderMessages = false;
+      });
+  }
+
+  fetchMessageById(messageId) {
+    return fetch(`/chat_room/${this.idValue}/messages/${messageId}`)
+      .then((res) => {
+        if (!res.ok) {
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!data || data.id == null || this.hasMessage(data.id)) {
+          return Boolean(data);
+        }
+
+        this.messages.add(data);
+        this.persistMessages();
+        return true;
+      })
+      .catch((error) => {
+        console.error("按消息 id 加载失败:", error);
+        return false;
       });
   }
 
@@ -2819,6 +2950,48 @@ export default class extends Controller {
 
   stripRoomSenderPrefix(text = "") {
     return text.replace(/^[^:\n]+:\n/, "");
+  }
+
+  sortedMessageWrappers() {
+    return [...this.messages.all].sort((left, right) => {
+      const timeDiff = this.messageTimestampSortValue(left)
+        - this.messageTimestampSortValue(right);
+      if (timeDiff !== 0) {
+        return timeDiff;
+      }
+
+      return this.messageNumericIdSortValue(left)
+        - this.messageNumericIdSortValue(right);
+    });
+  }
+
+  messageTimestampSortValue(wrapper) {
+    const value = wrapper?.message_time || wrapper?.created_at
+      || wrapper?.wx_message?.message_time;
+    const time = value ? new Date(value).getTime() : NaN;
+    return Number.isFinite(time) ? time : this.messageNumericIdSortValue(wrapper);
+  }
+
+  messageNumericIdSortValue(wrapper) {
+    const numericId = Number(wrapper?.id);
+    return Number.isFinite(numericId) ? numericId : Number.MAX_SAFE_INTEGER;
+  }
+
+  oldestServerMessageId() {
+    let oldest = null;
+
+    this.messages.all.forEach((wrapper) => {
+      const candidateId = Number(wrapper?.id);
+      if (!Number.isFinite(candidateId)) {
+        return;
+      }
+
+      if (oldest == null || candidateId < oldest) {
+        oldest = candidateId;
+      }
+    });
+
+    return oldest;
   }
 
   normalizeMessageType(msg) {

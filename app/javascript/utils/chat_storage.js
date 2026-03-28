@@ -1,6 +1,12 @@
 const STORAGE_PREFIX = "wechat-rails"
 const STORAGE_VERSION = "v2"
 
+function quotaExceeded(error) {
+  return error?.name === "QuotaExceededError"
+    || error?.name === "NS_ERROR_DOM_QUOTA_REACHED"
+    || String(error?.message || "").toLowerCase().includes("quota")
+}
+
 function storageKey(namespace, identifier = "") {
   return `${STORAGE_PREFIX}:${STORAGE_VERSION}:${namespace}${identifier ? `:${identifier}` : ""}`
 }
@@ -37,12 +43,21 @@ export function writeCache(namespace, identifier = "", data) {
   }
 
   try {
-    window.localStorage.setItem(storageKey(namespace, identifier), JSON.stringify({
+    const key = storageKey(namespace, identifier)
+    window.localStorage.setItem(key, JSON.stringify({
       updatedAt: new Date().toISOString(),
       data
     }))
     return true
   } catch (error) {
+    if (quotaExceeded(error)) {
+      try {
+        window.localStorage.removeItem(storageKey(namespace, identifier))
+      } catch (_) {
+        // ignore storage errors
+      }
+      return false
+    }
     console.warn(`cache write failed for ${namespace}:${identifier}`, error)
     return false
   }

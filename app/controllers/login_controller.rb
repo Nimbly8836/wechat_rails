@@ -105,11 +105,16 @@ class LoginController < ApplicationController
 
     # 使用API服务重新连接用户
     @api_service = WechatLoginService.new(nil)
+    re_login_response = @api_service.re_login(login_info.user_name)
+    unless re_login_response.is_a?(Hash) && re_login_response["Success"]
+      render json: {
+        status: "error",
+        message: re_login_response&.dig("Message") || "二次登录失败"
+      }, status: :bad_gateway
+      return
+    end
+
     @api_service.auto_heart_beat(login_info.user_name)
-    # re_login_response = @api_service.re_login(user_name)
-    # unless re_login_response["Success"]
-    #   raise StandardError, "API 重新登录失败: #{re_login_response["Message"] || '未知错误'}"
-    # end
     @api_service.set_wx_id(login_info.user_name)
     # 异步获取联系人列表
     fetch_contacts_in_background(user_name)
