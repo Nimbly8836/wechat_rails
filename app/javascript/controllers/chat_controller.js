@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { chatStorageKeys, readCache, writeCache } from "utils/chat_storage"
+import { DEFAULT_BADGE_LABELS, badgeLabelFor, loadBadgeLabels } from "utils/chat_badges"
 
 const DEFAULT_NOTIFICATION_SETTINGS = {
   enabled: true,
@@ -51,7 +52,9 @@ export default class extends Controller {
     "notificationButton",
     "notificationStatus",
     "notificationToggle",
-    "notificationHiddenOnly"
+    "notificationHiddenOnly",
+    "groupBadgeInput",
+    "officialBadgeInput"
   ]
 
   connect() {
@@ -68,7 +71,13 @@ export default class extends Controller {
     this.activeChatSection = this.loadActiveChatSection()
     this.collapsedContactGroups = this.loadCollapsedContactGroups()
     this.notificationSettings = this.loadNotificationSettings()
+    this.badgeLabels = loadBadgeLabels()
     this.currentRoomId = null
+    this.sidebarSearchTimer = null
+    this.sidebarSearchRequestId = 0
+    this.originalContactsMarkup = this.hasContactsListTarget
+      ? this.contactsListTarget.innerHTML
+      : ""
     this.isSidebarOpen = !this.isMobileViewport()
     this.startX = 0
     this.startWidth = 0
@@ -86,9 +95,11 @@ export default class extends Controller {
     this.applyChatRoomNames(this.chatRooms)
     this.ensureActiveFolder()
     this.syncNotificationUi()
+    this.syncBadgeLabelUi()
     this.applyContactGroupVisibility()
     this.renderFolderBar()
     this.refreshChatFolders()
+    this.applyConfiguredBadgeLabels(this.element)
 
     const initialTab = this.sidebarTarget.querySelector(`[data-tab="${this.activeChatSection}"]`)
       || this.sidebarTarget.querySelector('[data-tab="messages"]')
@@ -116,6 +127,10 @@ export default class extends Controller {
   }
 
   disconnect() {
+    if (this.sidebarSearchTimer) {
+      clearTimeout(this.sidebarSearchTimer)
+      this.sidebarSearchTimer = null
+    }
     this.teardownEventSource()
     this.element.removeEventListener("chat:open", this.boundHandleOpenChat)
     this.element.removeEventListener("chat:sidebar:open", this.boundOpenSidebar)
@@ -140,6 +155,11 @@ export default class extends Controller {
   persistNotificationSettings() {
     const [namespace, identifier] = chatStorageKeys.notificationSettings()
     writeCache(namespace, identifier, this.notificationSettings)
+  }
+
+  persistBadgeLabels() {
+    const [namespace, identifier] = chatStorageKeys.badgeLabels()
+    writeCache(namespace, identifier, this.badgeLabels)
   }
 
   loadChatFolders() {
@@ -367,6 +387,74 @@ export default class extends Controller {
     }
   }
 
+  syncBadgeLabelUi() {
+    if (this.hasGroupBadgeInputTarget) {
+      this.groupBadgeInputTarget.value = badgeLabelFor("group", this.badgeLabels)
+    }
+
+    if (this.hasOfficialBadgeInputTarget) {
+      this.officialBadgeInputTarget.value = badgeLabelFor("official", this.badgeLabels)
+    }
+  }
+
+  updateGroupBadgeLabel(event) {
+    this.updateBadgeLabel("group", event?.target?.value)
+  }
+
+  updateOfficialBadgeLabel(event) {
+    this.updateBadgeLabel("official", event?.target?.value)
+  }
+
+  resetBadgeLabels() {
+    this.badgeLabels = { ...DEFAULT_BADGE_LABELS }
+    this.persistBadgeLabels()
+    this.syncBadgeLabelUi()
+    this.refreshBadgeLabels()
+  }
+
+  updateBadgeLabel(kind, value) {
+    this.badgeLabels = {
+      ...this.badgeLabels,
+      [kind]: String(value || "").trim() || DEFAULT_BADGE_LABELS[kind]
+    }
+    this.persistBadgeLabels()
+    this.refreshBadgeLabels()
+  }
+
+  refreshBadgeLabels() {
+    this.applyConfiguredBadgeLabels(this.element)
+
+    if (this.activeChatSection === "messages") {
+      this.renderChatRoomList(this.chatRooms)
+    }
+  }
+
+  applyConfiguredBadgeLabels(root) {
+    if (!root) {
+      return
+    }
+
+    root.querySelectorAll("[data-badge-kind]").forEach((element) => {
+      const label = badgeLabelFor(element.dataset.badgeKind, this.badgeLabels)
+      if (label) {
+        element.textContent = label
+      }
+    })
+  }
+
+  typeBadgeLabel(kind) {
+    return badgeLabelFor(kind, this.badgeLabels)
+  }
+
+  typeBadgeMarkup(kind, { large = false } = {}) {
+    if (!kind) {
+      return ""
+    }
+
+    const sizeClass = large ? " is-large" : ""
+    return `<span class="tg-room-badge is-${this.escapeHtml(kind)}${sizeClass}" data-badge-kind="${this.escapeHtml(kind)}">${this.escapeHtml(this.typeBadgeLabel(kind))}</span>`
+  }
+
   isMobileViewport() {
     return window.innerWidth < 640
   }
@@ -489,6 +577,7 @@ export default class extends Controller {
     this.setMobileTitle("设置")
     this.setSidebarTitle("设置")
     this.syncNotificationUi()
+    this.syncBadgeLabelUi()
   }
 
   toggleNotificationPanel(event) {
@@ -1143,19 +1232,24 @@ export default class extends Controller {
   }
 
   search(event) {
-    const value = event.target.value.trim().toLowerCase()
+    const rawValue = event.target.value.trim()
+    const value = rawValue.toLowerCase()
     const section = this.activeChatSection
 
+    if (this.sidebarSearchTimer) {
+      clearTimeout(this.sidebarSearchTimer)
+      this.sidebarSearchTimer = null
+    }
+
     if (section === "messages") {
-      const chatRooms = document.querySelectorAll("[data-chat-room-id]")
-      chatRooms.forEach((chatRoom) => {
-        const matched = chatRoom.textContent.toLowerCase().includes(value)
-        chatRoom.closest("[data-chat-room-row]")?.classList.toggle("hidden", !matched)
-      })
-      document.querySelectorAll("[data-chat-room-section]").forEach((section) => {
-        const hasVisibleRoom = section.querySelector('[data-chat-room-row]:not(.hidden)')
-        section.classList.toggle("hidden", !hasVisibleRoom)
-      })
+      if (!rawValue) {
+        this.renderChatRoomList(this.chatRooms)
+        return
+      }
+
+      this.sidebarSearchTimer = setTimeout(() => {
+        this.searchSidebarRemotely(rawValue, "messages")
+      }, 180)
       return
     }
 
@@ -1163,21 +1257,123 @@ export default class extends Controller {
       return
     }
 
-    const visibleContacts = this.contactTargets.filter((contact) => {
-      const text = contact.textContent.toLowerCase()
-      const matched = text.includes(value)
-      contact.classList.toggle("hidden", !matched)
-      return matched
+    if (!rawValue) {
+      this.restoreContactsMarkup()
+      this.applyContactGroupVisibility({ searching: false })
+      this.letterNavTarget.hidden = false
+      return
+    }
+
+    this.sidebarSearchTimer = setTimeout(() => {
+      this.searchSidebarRemotely(rawValue, "contacts")
+    }, 180)
+  }
+
+  searchSidebarRemotely(query, section) {
+    const requestId = ++this.sidebarSearchRequestId
+    const params = new URLSearchParams({
+      q: query,
+      limit: section === "messages" ? "60" : "100"
     })
 
-    this.groupTargets.forEach((group) => {
-      const hasVisibleContact = group.querySelector('[data-chat-target="contact"]:not(.hidden)')
-      group.classList.toggle("hidden", !hasVisibleContact && value.length > 0)
+    fetch(`/chat/search?${params.toString()}`, {
+      headers: {
+        "Accept": "application/json"
+      }
     })
+      .then((resp) => {
+        if (!resp.ok) {
+          throw new Error(`搜索失败: ${resp.status}`)
+        }
+        return resp.json()
+      })
+      .then((payload) => {
+        if (requestId !== this.sidebarSearchRequestId) {
+          return
+        }
 
-    this.applyContactGroupVisibility({ searching: value.length > 0 })
+        if (section === "messages") {
+          this.renderChatRoomList(Array.isArray(payload?.rooms) ? payload.rooms : [])
+          return
+        }
 
-    this.letterNavTarget.hidden = value.length > 0 || visibleContacts.length === 0
+        this.renderContactSearchResults(Array.isArray(payload?.contacts) ? payload.contacts : [])
+      })
+      .catch((error) => {
+        console.error("侧边栏搜索失败", error)
+        if (section === "messages") {
+          this.renderChatRoomList(this.chatRooms)
+          return
+        }
+        this.restoreContactsMarkup()
+        this.applyContactGroupVisibility({ searching: true })
+      })
+  }
+
+  restoreContactsMarkup() {
+    if (!this.hasContactsListTarget || !this.originalContactsMarkup) {
+      return
+    }
+
+    this.contactsListTarget.innerHTML = this.originalContactsMarkup
+    this.applyConfiguredBadgeLabels(this.contactsListTarget)
+  }
+
+  renderContactSearchResults(contacts) {
+    if (!this.hasContactsListTarget) {
+      return
+    }
+
+    this.letterNavTarget.hidden = true
+    if (!contacts.length) {
+      this.contactsListTarget.innerHTML = `
+        <div class="px-6 py-10 text-center text-sm text-slate-400">
+          没有匹配的联系人或群聊
+        </div>
+      `
+      return
+    }
+
+    this.contactsListTarget.innerHTML = `
+      <div class="space-y-2 px-1">
+        ${contacts.map((contact) => this.renderContactSearchRow(contact)).join("")}
+      </div>
+    `
+
+    contacts.forEach((contact) => {
+      const row = this.contactsListTarget.querySelector(`[data-contact-id="${contact.id}"]`)
+      if (row) {
+        row.addEventListener("click", (event) => this.selectContact(event))
+      }
+    })
+  }
+
+  renderContactSearchRow(contact) {
+    const avatar = contact?.avatar_url
+      ? `<img src="${this.escapeHtml(contact.avatar_url)}" class="w-full h-full object-cover" alt="${this.escapeHtml(contact.display_name || contact.user_name || "联系人")}">`
+      : this.escapeHtml((contact?.display_name || contact?.user_name || "?").slice(0, 1))
+    const badge = contact?.group_chat
+      ? this.typeBadgeMarkup("group")
+      : (contact?.official_account
+        ? this.typeBadgeMarkup("official")
+        : "")
+
+    return `
+      <div class="tg-contact-row flex cursor-pointer items-center px-4 py-3 transition hover:bg-slate-50"
+           data-contact-id="${this.escapeHtml(String(contact.id))}"
+           data-chat-target="contact">
+        <div class="mr-3 flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-[1rem] bg-slate-200 text-sm font-medium text-slate-600">
+          ${avatar}
+        </div>
+        <div class="flex-1 overflow-hidden">
+          <div class="flex items-center gap-2">
+            <div class="truncate font-medium text-slate-900">${this.escapeHtml(contact.display_name || contact.user_name || "联系人")}</div>
+            ${badge}
+          </div>
+          <div class="truncate text-xs text-slate-400">${this.escapeHtml(contact.user_name || "")}</div>
+        </div>
+      </div>
+    `
   }
 
   toggleContactGroup(event) {
@@ -1309,10 +1505,11 @@ export default class extends Controller {
       return `
         <button type="button"
                 class="tg-folder-rail-item ${activeClass}"
+                title="${this.escapeHtml(folder.name)}"
+                aria-label="${this.escapeHtml(folder.name)}"
                 data-action="click->chat#selectChatFolder"
                 data-chat-folder-id-param="${this.escapeHtml(folder.id)}">
           <span class="tg-folder-rail-icon" aria-hidden="true">${icon}</span>
-          <span class="tg-folder-rail-label">${this.escapeHtml(folder.name)}</span>
           ${count > 0 ? `<span class="tg-folder-rail-count">${count}</span>` : ""}
         </button>
       `
@@ -1322,8 +1519,10 @@ export default class extends Controller {
       ? `
         <button type="button"
                 class="tg-folder-rail-action is-danger"
+                title="删除当前分组"
+                aria-label="删除当前分组"
                 data-action="click->chat#deleteActiveChatFolder">
-          删除
+          -
         </button>
       `
       : ""
@@ -1334,8 +1533,10 @@ export default class extends Controller {
         <div class="tg-folder-rail-actions">
           <button type="button"
                   class="tg-folder-rail-action"
+                  title="新建分组"
+                  aria-label="新建分组"
                   data-action="click->chat#createChatFolder">
-            新建
+            +
           </button>
           ${deleteButton}
         </div>
@@ -1348,27 +1549,24 @@ export default class extends Controller {
       case "groups":
         return `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-5 w-5">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 20a4 4 0 0 0-8 0m11 0a3 3 0 0 0-4-2.83M5 20a3 3 0 0 1 4-2.83M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM8 10a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 13.5c-2.2 0-4 1.46-4 3.25V18h8v-1.25c0-1.79-1.8-3.25-4-3.25Zm-5.5-.5c-1.65 0-3 1.1-3 2.45V17h3m11-4c1.65 0 3 1.1 3 2.45V17h-3M12 6.25a2.25 2.25 0 1 1 0 4.5 2.25 2.25 0 0 1 0-4.5Zm-5 1a1.75 1.75 0 1 1 0 3.5 1.75 1.75 0 0 1 0-3.5Zm10 0a1.75 1.75 0 1 1 0 3.5 1.75 1.75 0 0 1 0-3.5Z"/>
           </svg>
         `
       case "contacts":
         return `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-5 w-5">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M18 20a6 6 0 0 0-12 0m10-9a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5Zm-5.5 6c0-2.35 2.46-4.25 5.5-4.25s5.5 1.9 5.5 4.25V19h-11v-.75Z"/>
           </svg>
         `
       case "official_accounts":
         return `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-5 w-5">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 19.25h14M7.75 16.5h8.5M9 13.25h6M6.75 4.75h10.5a1.5 1.5 0 0 1 1.5 1.5v4.5a1.5 1.5 0 0 1-1.5 1.5H6.75a1.5 1.5 0 0 1-1.5-1.5v-4.5a1.5 1.5 0 0 1 1.5-1.5Z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6.25 8.25A2.25 2.25 0 0 1 8.5 6h7A2.25 2.25 0 0 1 17.75 8.25v4.5A2.25 2.25 0 0 1 15.5 15h-2.25l-2.75 3V15H8.5a2.25 2.25 0 0 1-2.25-2.25v-4.5Z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.25 9.75h5.5M9.25 12.25h3.25"/>
           </svg>
         `
       default:
-        return `
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="h-5 w-5">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3.75 7.5A2.25 2.25 0 0 1 6 5.25h3l1.5 1.5H18A2.25 2.25 0 0 1 20.25 9v8.25A2.25 2.25 0 0 1 18 19.5H6a2.25 2.25 0 0 1-2.25-2.25V7.5Z"/>
-          </svg>
-        `
+        return this.escapeHtml(String(folder?.name || "分组").slice(0, 1))
     }
   }
 
@@ -1377,9 +1575,9 @@ export default class extends Controller {
     const activeClass = roomId === String(this.currentRoomId) ? "is-active" : ""
     const pinned = this.isRoomPinnedInFolder(roomId, folder)
     const typeBadge = room.official_account
-      ? '<span class="tg-room-badge is-official">公众号</span>'
+      ? this.typeBadgeMarkup("official")
       : room.group_chat
-        ? '<span class="tg-room-badge is-group">群聊</span>'
+        ? this.typeBadgeMarkup("group")
         : ""
     const preview = room.latest_wx_message?.preview_content || ""
     const timeLabel = this.formatRoomTimestamp(room.latest_wx_message?.message_time)

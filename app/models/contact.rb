@@ -47,4 +47,18 @@ class Contact < ApplicationRecord
     ("A".."Z").include?(first_char) ? first_char : "#"
   end
 
+  scope :keyword_search, ->(query) {
+    pgroonga_search(
+      %w[
+        contacts.user_name
+        contacts.nick_name
+        contacts.remark
+        contacts.alias
+        contacts.py_initial
+        contacts.quan_pin
+      ],
+      query
+    )
+  }
+
 end

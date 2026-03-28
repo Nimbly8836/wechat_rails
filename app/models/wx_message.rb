@@ -3,6 +3,19 @@
 class WxMessage < ApplicationRecord
   has_many :messages, -> { order(message_time: :desc) }
 
+  scope :keyword_search, ->(query) {
+    pgroonga_search(
+      %w[
+        wx_messages.content
+        wx_messages.refer_title
+        wx_messages.push_content
+        wx_messages.from_user_name
+        wx_messages.to_user_name
+      ],
+      query
+    )
+  }
+
   enum :msg_type, {
     self_send: 0, # 我发送的
     text: 1, # 文本消息 (M_DATA_TEXT)

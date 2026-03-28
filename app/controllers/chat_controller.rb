@@ -11,5 +11,54 @@ class ChatController < ApplicationController
     @chat_rooms = ChatRoom.all.order_by_latest_message
   end
 
+  def search
+    query = params[:q].to_s.strip
+
+    if query.blank?
+      render json: { rooms: [], contacts: [] }
+      return
+    end
+
+    rooms = ChatRoom.keyword_search(query)
+                    .includes(:contact, messages: :wx_message)
+                    .order_by_latest_message
+                    .limit(limit_param(40))
+    contacts = Contact.keyword_search(query)
+                      .order(:remark, :nick_name, :user_name)
+                      .limit(limit_param(60))
+
+    render json: {
+      rooms: serialize_chat_rooms(rooms),
+      contacts: serialize_contacts(contacts)
+    }
+  end
+
   private
+
+  def limit_param(default)
+    value = params[:limit].to_i
+    return default if value <= 0
+
+    [ value, 100 ].min
+  end
+
+  def serialize_chat_rooms(chat_rooms)
+    chat_rooms.as_json(
+      only: [ :id, :name, :contact_id ],
+      methods: [ :avatar_base64, :official_account, :group_chat ],
+      include: {
+        latest_wx_message: {
+          only: [ :id, :real_msg_type, :message_time ],
+          methods: [ :preview_content ]
+        }
+      }
+    )
+  end
+
+  def serialize_contacts(contacts)
+    contacts.as_json(
+      only: [ :id, :user_name, :nick_name, :remark, :alias ],
+      methods: [ :display_name, :avatar_url, :official_account, :group_chat ]
+    )
+  end
 end
