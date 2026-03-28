@@ -4010,7 +4010,13 @@ export default class extends Controller {
   }
 
   normalizeMessageType(msg) {
-    const rawStringType = msg?.real_msg_type || msg?.msg_type;
+    const rawStringType = (() => {
+      const realType = msg?.real_msg_type;
+      if (realType && realType !== "unknown") {
+        return realType;
+      }
+      return msg?.msg_type ?? realType;
+    })();
     const stringAliases = {
       voip_msg: "voip"
     };
