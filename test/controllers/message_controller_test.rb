@@ -66,10 +66,10 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
 
   private
 
-  def create_message!(new_msg_id:, content:, msg_type: :text, real_msg_type: :text,
+  def create_message!(new_msg_id:, content:, msg_id: nil, msg_type: :text, real_msg_type: :text,
     refer_new_msg_id: nil, refer_title: nil)
     wx_message = WxMessage.create!(
-      msg_id: new_msg_id - 100,
+      msg_id: msg_id || new_msg_id - 100,
       new_msg_id: new_msg_id,
       msg_seq: new_msg_id % 1000,
       msg_create_time: Time.current,

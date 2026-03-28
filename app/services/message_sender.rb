@@ -267,29 +267,49 @@ class MessageSender
 
     title = CGI.escapeHTML(reply_content.to_s)
     reference_content = CGI.escapeHTML(quote_preview_content(wx_message))
-    reference_type = quote_reference_type(wx_message)
-    from_user = CGI.escapeHTML(wx_message.from_user_name.to_s)
-    display_name = CGI.escapeHTML(quote_reference_display_name(wx_message))
+    reference_sender = CGI.escapeHTML(wx_message.from_user_name.to_s)
     server_id = wx_message.new_msg_id.to_s
-    create_time = wx_message.msg_create_time.to_i
 
     <<~XML.gsub(/\n\s*/, "").strip
-      <msg>
-        <appmsg appid="" sdkver="0">
-          <title>#{title}</title>
-          <des></des>
-          <type>57</type>
-          <refermsg>
-            <type>#{reference_type}</type>
-            <svrid>#{server_id}</svrid>
-            <fromusr>#{from_user}</fromusr>
-            <chatusr>#{CGI.escapeHTML(@chat_room.wx_id.to_s)}</chatusr>
-            <displayname>#{display_name}</displayname>
-            <content>#{reference_content}</content>
-            <createtime>#{create_time}</createtime>
-          </refermsg>
-        </appmsg>
-      </msg>
+      <appmsg appid="" sdkver="0">
+        <title>#{title}</title>
+        <des />
+        <action />
+        <type>57</type>
+        <showtype>0</showtype>
+        <soundtype>0</soundtype>
+        <mediatagname />
+        <messageext />
+        <messageaction />
+        <content />
+        <contentattr>0</contentattr>
+        <url />
+        <lowurl />
+        <dataurl />
+        <lowdataurl />
+        <songalbumurl />
+        <songlyric />
+        <appattach>
+          <totallen>0</totallen>
+          <attachid />
+          <emoticonmd5 />
+          <fileext />
+          <aeskey />
+        </appattach>
+        <extinfo />
+        <sourceusername />
+        <sourcedisplayname />
+        <thumburl />
+        <md5 />
+        <statextstr />
+        <refermsg>
+          <content>#{reference_content}</content>
+          <type>1</type>
+          <svrid>#{server_id}</svrid>
+          <chatusr>#{reference_sender}</chatusr>
+          <fromusr>#{CGI.escapeHTML(@chat_room.wx_id.to_s)}</fromusr>
+        </refermsg>
+      </appmsg>
     XML
   end
 
@@ -312,28 +332,6 @@ class MessageSender
     else
       wx_message.preview_content.to_s.presence || "[消息]"
     end
-  end
-
-  def quote_reference_type(wx_message)
-    type_name = wx_message.real_msg_type.presence || wx_message.msg_type
-    return type_name if type_name.is_a?(Integer)
-
-    WxMessage.real_msg_types[type_name.to_s] ||
-      WxMessage.msg_types[type_name.to_s] ||
-      wx_message.msg_type_before_type_cast
-  end
-
-  def quote_reference_display_name(wx_message)
-    return "我" if wx_message.self_send?
-
-    if @chat_room.group_chat?
-      member = @chat_room.chat_room_members.find_by(user_name: wx_message.from_user_name)
-      return member&.remark.presence || member&.nick_name.presence || wx_message.from_user_name.to_s
-    end
-
-    @chat_room.name.presence ||
-      @chat_room.contact&.display_name ||
-      wx_message.from_user_name.to_s
   end
 
   def persisted_message_type
