@@ -77,6 +77,7 @@ export function removeCache(namespace, identifier = "") {
 
 export const chatStorageKeys = {
   notificationSettings: () => ["notification-settings", ""],
+  badgeLabels: () => ["badge-labels", ""],
   chatRoomList: () => ["chat-room-list", ""],
   activeChatFolder: () => ["active-chat-folder", ""],
   activeChatSection: () => ["active-chat-section", ""],

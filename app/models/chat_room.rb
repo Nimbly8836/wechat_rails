@@ -10,6 +10,29 @@ class ChatRoom < ApplicationRecord
       .order(Arel.sql("MAX(messages.message_time) DESC NULLS LAST"))
   }
 
+  scope :keyword_search, ->(query) {
+    keyword = pgroonga_query(query)
+    return none if keyword.blank?
+
+    joins(:contact)
+      .left_joins(messages: :wx_message)
+      .where(
+        [
+          "chat_rooms.name &@~ :keyword",
+          "chat_rooms.wx_id &@~ :keyword",
+          "contacts.user_name &@~ :keyword",
+          "contacts.nick_name &@~ :keyword",
+          "contacts.remark &@~ :keyword",
+          "contacts.alias &@~ :keyword",
+          "wx_messages.content &@~ :keyword",
+          "wx_messages.refer_title &@~ :keyword",
+          "wx_messages.push_content &@~ :keyword"
+        ].join(" OR "),
+        keyword: keyword
+      )
+      .distinct
+  }
+
   def avatar_base64
     if self.avatar.present?
       Base64.strict_encode64(self.avatar)

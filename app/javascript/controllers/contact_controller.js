@@ -1,9 +1,14 @@
 import { Controller } from "@hotwired/stimulus"
+import { badgeLabelFor, loadBadgeLabels } from "utils/chat_badges"
 
 export default class extends Controller {
   static targets = ["details"]
   static values = {
     contact: Object,
+  }
+
+  connect() {
+    this.applyBadgeLabels()
   }
 
   toggleDetails(event) {
@@ -69,5 +74,16 @@ export default class extends Controller {
     if (!inChatShell) {
       window.location.href = `/chat_room/${chatRoomId}`
     }
+  }
+
+  applyBadgeLabels() {
+    const badgeLabels = loadBadgeLabels()
+
+    this.element.querySelectorAll("[data-badge-kind]").forEach((element) => {
+      const label = badgeLabelFor(element.dataset.badgeKind, badgeLabels)
+      if (label) {
+        element.textContent = label
+      }
+    })
   }
 }

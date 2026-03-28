@@ -7,8 +7,15 @@ class MessagesController < ApplicationController
 
   def index
     chat_room_id = params[:chat_room_id]
+    query = params[:q].to_s.strip
     before_id = params[:before_id] # 可选，用于加载更多消息
     after_id = params[:after_id]
+
+    if query.present?
+      messages = search_messages_scope(chat_room_id, query)
+      render json: serialize_messages(messages, chat_room_id)
+      return
+    end
 
     messages = messages_scope(chat_room_id)
 
@@ -404,6 +411,22 @@ class MessagesController < ApplicationController
 
   def messages_scope(chat_room_id)
     Message.includes(:wx_message).where(chat_room_id: chat_room_id)
+  end
+
+  def search_messages_scope(chat_room_id, query)
+    messages_scope(chat_room_id)
+      .joins(:wx_message)
+      .merge(WxMessage.keyword_search(query))
+      .order(message_time: :desc, id: :desc)
+      .limit(search_limit)
+      .to_a
+  end
+
+  def search_limit
+    value = params[:limit].to_i
+    return 40 if value <= 0
+
+    [ value, 100 ].min
   end
 
   def serialize_messages(messages, chat_room_id)

@@ -40,7 +40,9 @@ export default class extends Controller {
     "showMore", "themePanel", "backgroundInput", "bubbleInput",
     "backgroundImageInput", "fileInput", "uploadStatus",
     "fontSelect", "fontCustomInput", "attachmentSelect", "quoteComposer",
-    "quoteComposerMeta", "quoteComposerContent"];
+    "quoteComposerMeta", "quoteComposerContent", "searchPanel",
+    "searchInput", "searchResults", "searchEmpty", "membersPanel",
+    "memberSearchInput", "memberResults", "memberEmpty"];
   static values = {
     currentWxid: String,
     ownerWxid: String,
@@ -60,9 +62,13 @@ export default class extends Controller {
     this.boundCloseMenu = this.closeMenu.bind(this);
     this.boundCloseThemePanel = this.closeThemePanel.bind(this);
     this.boundCloseAttachmentSelect = this.mouseleaveAttachment.bind(this);
+    this.boundCloseSearchPanel = this.closeSearchPanel.bind(this);
+    this.boundCloseMembersPanel = this.closeMembersPanel.bind(this);
     this.boundPreventMenuHide = (event) => event.stopPropagation();
     this.boundPreventThemeHide = (event) => event.stopPropagation();
     this.boundCloseAttachmentSelectHide = (event) => event.stopPropagation();
+    this.boundPreventSearchHide = (event) => event.stopPropagation();
+    this.boundPreventMembersHide = (event) => event.stopPropagation();
 
     if (this.hasMenuTarget) {
       this.menuTarget.addEventListener("click", this.boundPreventMenuHide);
@@ -76,6 +82,12 @@ export default class extends Controller {
     if (this.hasAttachmentSelectTarget) {
       this.attachmentSelectTarget.addEventListener("mouseleave",
         this.boundCloseAttachmentSelect);
+    }
+    if (this.hasSearchPanelTarget) {
+      this.searchPanelTarget.addEventListener("click", this.boundPreventSearchHide);
+    }
+    if (this.hasMembersPanelTarget) {
+      this.membersPanelTarget.addEventListener("click", this.boundPreventMembersHide);
     }
 
     // 防止重复绑定
@@ -103,6 +115,10 @@ export default class extends Controller {
     this.mediaPreviewPreviousBodyOverflow = "";
     this.boundHandleMediaPreviewKeydown = this.handleMediaPreviewKeydown.bind(this);
     this.pendingQuote = null;
+    this.messageSearchTimer = null;
+    this.memberSearchTimer = null;
+    this.messageSearchRequestId = 0;
+    this.memberSearchRequestId = 0;
     const cachedMembers = this.readCachedChatMembers();
     this.chatMembers = cachedMembers;
     const initialMembers = this.normalizeChatMembersData(this.membersValue);
@@ -143,6 +159,7 @@ export default class extends Controller {
     this.syncThemeInputs();
     this.ensureMediaPreviewElements();
     this.renderPendingQuote();
+    this.renderMembersPanel(this.chatMembers);
 
     this.inputTarget.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -269,6 +286,7 @@ export default class extends Controller {
         this.chatMembers = this.normalizeChatMembersData(data);
         this.persistChatMembers();
         this.renderMessages();
+        this.renderMembersPanel(this.chatMembers);
         return this.chatMembers;
       })
       .catch(error => {
@@ -335,6 +353,14 @@ export default class extends Controller {
   }
 
   disconnect() {
+    if (this.messageSearchTimer) {
+      clearTimeout(this.messageSearchTimer);
+      this.messageSearchTimer = null;
+    }
+    if (this.memberSearchTimer) {
+      clearTimeout(this.memberSearchTimer);
+      this.memberSearchTimer = null;
+    }
 
     if (this.highlightTimer) {
       clearTimeout(this.highlightTimer);
@@ -357,6 +383,12 @@ export default class extends Controller {
       this.attachmentSelectTarget.removeEventListener("mouseleave",
         this.boundCloseAttachmentSelect);
     }
+    if (this.hasSearchPanelTarget) {
+      this.searchPanelTarget.removeEventListener("click", this.boundPreventSearchHide);
+    }
+    if (this.hasMembersPanelTarget) {
+      this.membersPanelTarget.removeEventListener("click", this.boundPreventMembersHide);
+    }
 
     if (this.boundChatNotify) {
       window.removeEventListener("chat:notify", this.boundChatNotify);
@@ -377,6 +409,8 @@ export default class extends Controller {
     }
 
     document.removeEventListener("click", this._boundHideAttachmentSelect);
+    document.removeEventListener("click", this.boundCloseSearchPanel);
+    document.removeEventListener("click", this.boundCloseMembersPanel);
     document.removeEventListener("keydown", this.boundHandleMediaPreviewKeydown);
 
     if (this.mediaPreviewOverlay) {
@@ -502,6 +536,279 @@ export default class extends Controller {
       : `/chat_room/${this.idValue}/messages`;
 
     return fetch(url).then(res => res.json());
+  }
+
+  toggleSearchPanel(event = null) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!this.hasSearchPanelTarget) {
+      return;
+    }
+
+    const shouldOpen = this.searchPanelTarget.classList.contains("hidden");
+    if (shouldOpen) {
+      this.openSearchPanel();
+    } else {
+      this.closeSearchPanel();
+    }
+  }
+
+  openSearchPanel() {
+    if (!this.hasSearchPanelTarget) {
+      return;
+    }
+
+    this.closeMembersPanel();
+    this.searchPanelTarget.classList.remove("hidden");
+    document.addEventListener("click", this.boundCloseSearchPanel);
+    if (this.hasSearchInputTarget) {
+      this.searchInputTarget.focus();
+      this.searchInputTarget.select?.();
+    }
+  }
+
+  closeSearchPanel(event = null) {
+    if (!this.hasSearchPanelTarget) {
+      return;
+    }
+
+    if (event?.currentTarget === document && this.searchPanelTarget.contains(event.target)) {
+      return;
+    }
+
+    this.searchPanelTarget.classList.add("hidden");
+    document.removeEventListener("click", this.boundCloseSearchPanel);
+  }
+
+  searchMessages(event) {
+    const query = event?.target?.value?.trim() || "";
+    if (!this.hasSearchResultsTarget) {
+      return;
+    }
+
+    if (this.messageSearchTimer) {
+      clearTimeout(this.messageSearchTimer);
+      this.messageSearchTimer = null;
+    }
+
+    if (!query) {
+      this.renderMessageSearchResults([]);
+      return;
+    }
+
+    this.messageSearchTimer = setTimeout(() => {
+      const requestId = ++this.messageSearchRequestId;
+      this.fetchMessageSearchResults(query)
+        .then((messages) => {
+          if (requestId !== this.messageSearchRequestId) {
+            return;
+          }
+          this.renderMessageSearchResults(messages);
+        })
+        .catch((error) => {
+          console.error("搜索消息失败", error);
+          this.renderMessageSearchResults([]);
+        });
+    }, 180);
+  }
+
+  fetchMessageSearchResults(query) {
+    const params = new URLSearchParams({
+      q: query,
+      limit: "40"
+    });
+
+    return fetch(`/chat_room/${this.idValue}/messages?${params.toString()}`, {
+      headers: {
+        "Accept": "application/json"
+      }
+    }).then((res) => {
+      if (!res.ok) {
+        throw new Error(`搜索消息失败: ${res.status}`);
+      }
+      return res.json();
+    });
+  }
+
+  renderMessageSearchResults(messages) {
+    if (!this.hasSearchResultsTarget) {
+      return;
+    }
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      this.searchResultsTarget.innerHTML = `
+        <div class="px-4 py-8 text-center text-sm text-slate-400">
+          没有匹配的聊天记录
+        </div>
+      `;
+      return;
+    }
+
+    this.searchResultsTarget.innerHTML = messages.map((wrapper) => {
+      const msg = wrapper?.wx_message || {};
+      const sender = this.lookupSenderInfo(msg, msg.content);
+      const preview = this.buildMessagePreview(msg);
+      const timestamp = wrapper?.message_time || wrapper?.created_at || "";
+      return `
+        <button type="button"
+                class="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                data-message-search-result-id="${this.escapeHtml(String(wrapper.id))}">
+          <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
+            ${this.escapeHtml((sender?.name || "消息").slice(0, 1))}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <div class="truncate text-sm font-medium text-slate-900">${this.escapeHtml(sender?.name || (msg.self_send ? "我" : "消息"))}</div>
+              <div class="shrink-0 text-[11px] text-slate-400">${this.escapeHtml(this.humanizeMessageType(preview.type))}</div>
+            </div>
+            <div class="mt-1 line-clamp-2 text-sm text-slate-600">${this.escapeHtml(preview.content || "[消息]")}</div>
+            <div class="mt-1 text-[11px] text-slate-400">${this.escapeHtml(timestamp ? this.formatTimestamp(timestamp) : "")}</div>
+          </div>
+        </button>
+      `;
+    }).join("");
+
+    messages.forEach((wrapper) => {
+      const button = this.searchResultsTarget.querySelector(`[data-message-search-result-id="${wrapper.id}"]`);
+      if (!button) {
+        return;
+      }
+      button.addEventListener("click", async () => {
+        this.closeSearchPanel();
+        await this.focusMessageById(wrapper.id);
+      });
+    });
+  }
+
+  toggleMembersPanel(event = null) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!this.hasMembersPanelTarget) {
+      return;
+    }
+
+    const shouldOpen = this.membersPanelTarget.classList.contains("hidden");
+    if (shouldOpen) {
+      this.openMembersPanel();
+    } else {
+      this.closeMembersPanel();
+    }
+  }
+
+  openMembersPanel() {
+    if (!this.hasMembersPanelTarget) {
+      return;
+    }
+
+    this.closeSearchPanel();
+    this.membersPanelTarget.classList.remove("hidden");
+    document.addEventListener("click", this.boundCloseMembersPanel);
+    if (this.hasMemberSearchInputTarget) {
+      this.memberSearchInputTarget.value = "";
+    }
+    this.renderMembersPanel(this.chatMembers);
+    this.loadChatMembers({ force: this.chatMembers.length === 0 });
+    this.memberSearchInputTarget?.focus();
+  }
+
+  closeMembersPanel(event = null) {
+    if (!this.hasMembersPanelTarget) {
+      return;
+    }
+
+    if (event?.currentTarget === document && this.membersPanelTarget.contains(event.target)) {
+      return;
+    }
+
+    this.membersPanelTarget.classList.add("hidden");
+    document.removeEventListener("click", this.boundCloseMembersPanel);
+  }
+
+  searchMembers(event) {
+    const query = event?.target?.value?.trim() || "";
+    if (!this.hasMemberResultsTarget) {
+      return;
+    }
+
+    if (this.memberSearchTimer) {
+      clearTimeout(this.memberSearchTimer);
+      this.memberSearchTimer = null;
+    }
+
+    if (!query) {
+      this.renderMembersPanel(this.chatMembers);
+      return;
+    }
+
+    this.memberSearchTimer = setTimeout(() => {
+      const requestId = ++this.memberSearchRequestId;
+      this.fetchMemberSearchResults(query)
+        .then((members) => {
+          if (requestId !== this.memberSearchRequestId) {
+            return;
+          }
+          this.renderMembersPanel(members);
+        })
+        .catch((error) => {
+          console.error("搜索群成员失败", error);
+          this.renderMembersPanel([]);
+        });
+    }, 180);
+  }
+
+  fetchMemberSearchResults(query) {
+    const params = new URLSearchParams({
+      q: query,
+      limit: "200"
+    });
+
+    return fetch(`/chat_room/${this.idValue}/chat_members?${params.toString()}`, {
+      headers: {
+        "Accept": "application/json"
+      }
+    }).then((res) => {
+      if (!res.ok) {
+        throw new Error(`搜索群成员失败: ${res.status}`);
+      }
+      return res.json();
+    });
+  }
+
+  renderMembersPanel(members = []) {
+    if (!this.hasMemberResultsTarget) {
+      return;
+    }
+
+    if (!Array.isArray(members) || members.length === 0) {
+      this.memberResultsTarget.innerHTML = `
+        <div class="px-4 py-8 text-center text-sm text-slate-400">
+          暂无匹配的群成员
+        </div>
+      `;
+      return;
+    }
+
+    this.memberResultsTarget.innerHTML = members.map((member) => {
+      const name = member?.display_name || member?.remark || member?.nick_name || member?.user_name || "群成员";
+      const avatar = member?.small_head_img_url || member?.big_head_img_url || "";
+      const avatarHtml = avatar
+        ? `<img src="${this.escapeHtml(avatar)}" class="h-full w-full object-cover" alt="${this.escapeHtml(name)}">`
+        : this.escapeHtml(String(name).slice(0, 1).toUpperCase());
+      const meta = [member?.remark, member?.nick_name, member?.user_name]
+        .filter(Boolean)
+        .join(" · ");
+      return `
+        <div class="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-slate-50">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-sm font-semibold text-slate-500">
+            ${avatarHtml}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm font-medium text-slate-900">${this.escapeHtml(name)}</div>
+            <div class="truncate text-xs text-slate-400">${this.escapeHtml(meta)}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
   }
 
   getMessageType(msg) {
@@ -635,6 +942,16 @@ export default class extends Controller {
 
   buildMessageGroup(msg, senderInfo) {
     const group = document.createElement("div");
+    if (this.isSystemNoticeMessage(msg)) {
+      group.className = "tg-message-group w-full flex justify-center";
+      group.style.marginTop = "10px";
+
+      const stack = document.createElement("div");
+      stack.className = "tg-message-group-stack flex w-full min-w-0 flex-col items-center";
+      group.appendChild(stack);
+      return { group, stack };
+    }
+
     group.className = `tg-message-group w-full flex ${msg.self_send
       ? "justify-end"
       : "justify-start"} items-end`;
@@ -695,6 +1012,16 @@ export default class extends Controller {
 
   buildRow(msg, senderInfo) {
     const row = document.createElement("div");
+    if (this.isSystemNoticeMessage(msg)) {
+      row.className = "group w-full flex justify-center";
+      if (msg.id) {
+        row.dataset.messageId = msg.id;
+      }
+      row.dataset.senderName = "系统通知";
+      delete row.dataset.senderAvatar;
+      return row;
+    }
+
     row.className = `group w-full flex ${msg.self_send ? "justify-end"
       : "justify-start"} items-end gap-2`;
     if (msg.id) {
@@ -721,7 +1048,8 @@ export default class extends Controller {
   }
 
   buildQuoteActionButton(wrapper, msg, senderInfo) {
-    if (!wrapper?.id || String(wrapper.id).startsWith("temp-") || msg?._sending) {
+    if (!wrapper?.id || String(wrapper.id).startsWith("temp-") || msg?._sending
+      || this.isSystemNoticeMessage(msg)) {
       return null;
     }
 
@@ -786,6 +1114,9 @@ export default class extends Controller {
       case "quote":
         return this.renderReferMessage(bubble, msg, isNewGroup, senderInfo,
           isFirstMessage);
+      case "system_notice":
+        return this.renderSystemNoticeMessage(bubble, msg, isNewGroup,
+          senderInfo, isFirstMessage);
       case "text":
       default:
         return this.renderTextMessage(bubble, msg, isNewGroup, senderInfo,
@@ -1553,6 +1884,22 @@ export default class extends Controller {
       isFirstMessage);
   }
 
+  renderSystemNoticeMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-system-notice");
+    const noticeBubble = template || bubble;
+    const content = noticeBubble.querySelector("[data-role='system-notice-content']");
+    const preview = this.buildSystemNoticeContent(msg);
+
+    if (content) {
+      content.textContent = preview;
+    } else {
+      noticeBubble.textContent = preview;
+    }
+
+    return this.applyBubbleStyle(noticeBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
   applyBubbleStyle(bubble, msg, isNewGroup = true, senderInfo = null,
     isFirstMessage = false) {
     if (!bubble) {
@@ -1579,6 +1926,23 @@ export default class extends Controller {
     bubble.style.setProperty("--tg-bubble-bg", "");
     bubble.style.setProperty("--tg-bubble-border-color", "");
     delete bubble.dataset.senderType;
+
+    if (this.isSystemNoticeMessage(msg)) {
+      bubble.dataset.senderType = "system";
+      bubble.classList.remove("rounded-bl-2xl", "rounded-tr-2xl",
+        "rounded-br-md", "rounded-br-2xl", "rounded-tl-2xl",
+        "rounded-bl-md", "border");
+      bubble.classList.add("mx-auto");
+      bubble.style.background = "rgba(255,255,255,0.92)";
+      bubble.style.color = "#475569";
+      bubble.style.border = "1px solid rgba(203,213,225,0.9)";
+      bubble.style.boxShadow = "0 8px 30px -20px rgba(15,23,42,0.35)";
+      bubble.style.borderRadius = "9999px";
+      bubble.style.setProperty("--tg-bubble-bg", "rgba(255,255,255,0.92)");
+      bubble.style.setProperty("--tg-bubble-border-color",
+        "rgba(203,213,225,0.9)");
+      return bubble;
+    }
 
     if (msg.self_send) {
       bubble.dataset.senderType = "self";
@@ -3338,18 +3702,18 @@ export default class extends Controller {
 
   focusMessageById(messageId) {
     if (!messageId || !this.hasMessageListTarget) {
-      return;
+      return Promise.resolve(false);
     }
 
-    this.ensureMessageVisible(messageId).then((isVisible) => {
+    return this.ensureMessageVisible(messageId).then((isVisible) => {
       if (!isVisible) {
-        return;
+        return false;
       }
 
       const row = this.messageListTarget.querySelector(
         `[data-message-id="${messageId}"]`);
       if (!row) {
-        return;
+        return false;
       }
 
       if (this.highlightedRow && this.highlightedRow !== row) {
@@ -3358,8 +3722,13 @@ export default class extends Controller {
       }
 
       const container = this.messageListTarget;
+      const containerRect = container.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
       const targetTop = Math.max(
-        row.offsetTop - (container.clientHeight - row.offsetHeight) / 2, 0);
+        container.scrollTop + (rowRect.top - containerRect.top)
+          - (container.clientHeight - rowRect.height) / 2,
+        0
+      );
       container.scrollTo({ top: targetTop, behavior: "smooth" });
       row.classList.add("ring-2", "ring-blue-400", "ring-offset-2",
         "ring-offset-gray-100");
@@ -3375,6 +3744,7 @@ export default class extends Controller {
           this.highlightedRow = null;
         }
       }, 2000);
+      return true;
     });
   }
 
@@ -3532,6 +3902,7 @@ export default class extends Controller {
     const mapping = {
       quote: "引用",
       refer: "引用",
+      system_notice: "通知",
       text: "文本",
       image: "图片",
       chat_history: "聊天记录",
@@ -3641,6 +4012,9 @@ export default class extends Controller {
     };
     const stringType = stringAliases[rawStringType] || rawStringType;
     if (typeof stringType === "string" && stringType.length > 0) {
+      if (["sys", "sys_notice", "function_message"].includes(stringType)) {
+        return "system_notice";
+      }
       if ((stringType === "refer" || stringType === "unknown")
         && msg?.content) {
         const parsed = this.parseWxXmlMessage(msg.content);
@@ -3670,7 +4044,9 @@ export default class extends Controller {
       47: "emoji",
       49: "refer",
       57: "quote",
-      62: "micro_video"
+      62: "micro_video",
+      9999: "system_notice",
+      10000: "system_notice"
     };
     return mapping[numericType] || "unknown";
   }
@@ -3745,6 +4121,12 @@ export default class extends Controller {
           content: `[${this.humanizeMessageType(type)}]`,
           asLinkedText: false
         };
+      case "system_notice":
+        return {
+          type,
+          content: this.buildSystemNoticeContent(msg),
+          asLinkedText: false
+        };
       default: {
         const parsed = this.parseWxXmlMessage(msg?.content || "");
         return {
@@ -3755,6 +4137,27 @@ export default class extends Controller {
         };
       }
     }
+  }
+
+  isSystemNoticeMessage(msg) {
+    return this.normalizeMessageType(msg) === "system_notice";
+  }
+
+  buildSystemNoticeContent(msg) {
+    const content = this.stripRoomSenderPrefix(msg?.content || "").trim();
+    if (!content) {
+      return "群消息通知";
+    }
+
+    const xmlPayload = this.extractXmlPayload(content);
+    if (xmlPayload.startsWith("<")) {
+      const parsed = this.parseWxXmlMessage(content);
+      if (parsed?.title || parsed?.desc) {
+        return [parsed.title, parsed.desc].filter(Boolean).join(" ");
+      }
+    }
+
+    return content;
   }
 
   lookupSenderInfo(msg, rawContent = "") {

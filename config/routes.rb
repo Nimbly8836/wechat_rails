@@ -18,6 +18,7 @@ Rails.application.routes.draw do
   post "check_login_status" => "login#check_login_status"
   post "re-login" => "login#reconnect_user"
   post "login/bootstrap_online_sessions" => "login#bootstrap_online_sessions"
+  get "chat/search" => "chat#search"
 
   # chat
   get "chat" => "chat#index"

@@ -118,6 +118,23 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
       quote_payload.dig("referenced_message", "wx_message", "content")
   end
 
+  test "index supports keyword search for wx_messages content" do
+    target = create_message!(
+      new_msg_id: 9_000_000_000_000_001_300,
+      content: "这是一个中文搜索测试"
+    )
+    create_message!(
+      new_msg_id: 9_000_000_000_000_001_301,
+      content: "完全不相关"
+    )
+
+    get chat_room_messages_path(@chat_room), params: { q: "中文搜索" }
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal [target.id], payload.map { |item| item["id"] }
+  end
+
   private
 
   def create_message!(new_msg_id:, content:, msg_id: nil, msg_type: :text, real_msg_type: :text,

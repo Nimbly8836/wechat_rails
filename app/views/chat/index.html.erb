@@ -9,25 +9,12 @@
        class="fixed inset-y-0 left-0 z-40 flex w-[min(28rem,calc(100vw-1.25rem))] max-w-[560px] -translate-x-full overflow-hidden rounded-r-[2rem] shadow-2xl transition-transform duration-200 ease-out sm:static sm:z-auto sm:min-w-[360px] sm:translate-x-0 sm:rounded-none sm:shadow-none"
        data-chat-target="sidebar">
     <div class="tg-folder-rail">
-      <div class="tg-folder-rail-brand">微</div>
       <div class="min-h-0 flex-1 overflow-hidden" data-chat-target="folderBar"></div>
     </div>
 
     <div class="tg-sidebar-panel flex min-w-0 flex-1 flex-col">
-      <div class="tg-sidebar-header">
-        <div class="text-2xl font-semibold tracking-tight text-slate-900" data-chat-target="sidebarTitle">消息</div>
-        <button type="button"
-                class="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 sm:hidden"
-                aria-label="关闭侧边栏"
-                data-action="click->chat#closeSidebar">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18 18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-
-      <div class="px-4 pb-3">
-        <label class="tg-search-shell">
+      <div class="flex items-center gap-3 px-4 pb-3 pt-4">
+        <label class="tg-search-shell flex-1">
           <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/>
           </svg>
@@ -37,6 +24,14 @@
                  placeholder="搜索消息或者通讯录..."
                  data-action="keyup->chat#search">
         </label>
+        <button type="button"
+                class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 sm:hidden"
+                aria-label="关闭侧边栏"
+                data-action="click->chat#closeSidebar">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18 18 6M6 6l12 12"/>
+          </svg>
+        </button>
       </div>
 
       <div class="relative min-h-0 flex-1 px-2 pb-2">
@@ -63,7 +58,7 @@
                         data-chat-group-key-param="official_accounts">
                   <span class="flex items-center gap-3">
                     <span class="tg-contact-section-accent is-official"></span>
-                    <span>公众号</span>
+                    <span data-badge-kind="official">公众号</span>
                   </span>
                   <span class="flex items-center gap-2">
                     <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700"><%= @official_contacts.size %></span>
@@ -88,7 +83,7 @@
                       <div class="flex-1 overflow-hidden">
                         <div class="flex items-center gap-2">
                           <div class="truncate font-medium text-slate-900"><%= contact.display_name %></div>
-                          <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">公众号</span>
+                          <span class="tg-room-badge is-official" data-badge-kind="official">公众号</span>
                         </div>
                         <div class="truncate text-xs text-slate-400"><%= contact.user_name %></div>
                       </div>
@@ -110,7 +105,7 @@
                         data-chat-group-key-param="group_chats">
                   <span class="flex items-center gap-3">
                     <span class="tg-contact-section-accent is-group"></span>
-                    <span>群聊</span>
+                    <span data-badge-kind="group">群聊</span>
                   </span>
                   <span class="flex items-center gap-2">
                     <span class="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-700"><%= @group_chat_contacts.size %></span>
@@ -135,7 +130,7 @@
                       <div class="flex-1 overflow-hidden">
                         <div class="flex items-center gap-2">
                           <div class="truncate font-medium text-slate-900"><%= contact.display_name %></div>
-                          <span class="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700">群聊</span>
+                          <span class="tg-room-badge is-group" data-badge-kind="group">群聊</span>
                         </div>
                         <div class="truncate text-xs text-slate-400"><%= contact.user_name %></div>
                       </div>
@@ -231,6 +226,47 @@
                       data-action="click->chat#sendTestNotification">
                 测试通知
               </button>
+            </div>
+
+            <div class="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-slate-900">标签展示</div>
+                  <div class="mt-1 text-xs text-slate-500">统一群聊和公众号标签样式，文案可直接修改，留空会回到默认值。</div>
+                </div>
+                <button type="button"
+                        class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                        data-action="click->chat#resetBadgeLabels">
+                  恢复默认
+                </button>
+              </div>
+
+              <div class="mt-4 space-y-3">
+                <label class="block">
+                  <span class="mb-1.5 block text-xs font-medium text-slate-600">群聊标签</span>
+                  <input type="text"
+                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                         maxlength="12"
+                         placeholder="群聊"
+                         data-chat-target="groupBadgeInput"
+                         data-action="input->chat#updateGroupBadgeLabel">
+                </label>
+
+                <label class="block">
+                  <span class="mb-1.5 block text-xs font-medium text-slate-600">公众号标签</span>
+                  <input type="text"
+                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-100"
+                         maxlength="12"
+                         placeholder="公众号"
+                         data-chat-target="officialBadgeInput"
+                         data-action="input->chat#updateOfficialBadgeLabel">
+                </label>
+
+                <div class="flex flex-wrap items-center gap-2 pt-1">
+                  <span class="tg-room-badge is-group" data-badge-kind="group">群聊</span>
+                  <span class="tg-room-badge is-official" data-badge-kind="official">公众号</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

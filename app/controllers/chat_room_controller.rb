@@ -36,7 +36,13 @@ class ChatRoomController < ApplicationController
   end
 
   def list
-    chat_rooms = ChatRoom.includes(:contact, messages: :wx_message).order_by_latest_message
+    chat_rooms = ChatRoom.includes(:contact, messages: :wx_message)
+    chat_rooms = if params[:q].present?
+                   chat_rooms.merge(ChatRoom.keyword_search(params[:q]))
+                 else
+                   chat_rooms
+                 end
+    chat_rooms = chat_rooms.order_by_latest_message
     render json: chat_rooms.as_json(only: [ :id, :name, :contact_id ],
                                     methods: [ :avatar_base64, :official_account, :group_chat ],
                                     include: { latest_wx_message: { only: [ :id, :real_msg_type, :message_time ],
@@ -77,10 +83,19 @@ class ChatRoomController < ApplicationController
 
   def chat_members
     members = ChatRoomMember.where(chat_room_id: params[:id])
-    render json: members.as_json
+    members = members.keyword_search(params[:q]) if params[:q].present?
+    members = members.order(:remark, :nick_name, :user_name).limit(limit_param(200))
+    render json: members.as_json(methods: [ :display_name ])
   end
 
   private
+
+  def limit_param(default)
+    value = params[:limit].to_i
+    return default if value <= 0
+
+    [ value, 500 ].min
+  end
 
   def new_chat_room_params
     params.except(:contact_id, :name, :avatar_url, :wx_id)
