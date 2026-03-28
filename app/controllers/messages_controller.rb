@@ -4,6 +4,7 @@ require "stringio"
 class MessagesController < ApplicationController
   skip_before_action :verify_authenticity_token, only: :callback
   skip_before_action :require_authentication, only: :callback
+  before_action :disable_http_cache, only: [ :index, :show, :resolve_reference ]
 
   def index
     chat_room_id = params[:chat_room_id]
@@ -80,38 +81,39 @@ class MessagesController < ApplicationController
     requested_wxid = params[:wxid]
     return head :bad_request if requested_wxid.blank?
 
-    sync_wxid = resolve_sync_wxid(requested_wxid)
+    sync_service = MessageSyncService.new(requested_wxid)
+    sync_wxid = sync_service.sync_wxid
 
     payload = params.to_unsafe_h
     source_payload = payload
-    if message_batch_present?(source_payload)
-      unless success_response?(source_payload)
+    if sync_service.message_batch_present?(source_payload)
+      unless sync_service.success_response?(source_payload)
         Rails.logger.warn { "message callback ignored: AddMsgs present but success flag is false for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
         return head :ok
       end
     else
-      if explicit_failure_response?(source_payload)
+      if sync_service.explicit_failure_response?(source_payload)
         Rails.logger.warn { "message callback ignored: explicit failure for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
         return head :ok
       end
 
       Rails.logger.info { "message callback missing AddMsgs, triggering one sync for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
-      sync_payload = MessageApiService.new(sync_wxid).sync_messages(sync_wxid)
+      sync_payload = sync_service.sync_payload
       source_payload = sync_payload if sync_payload.is_a?(Hash)
     end
 
-    unless success_response?(source_payload)
+    unless sync_service.success_response?(source_payload)
       Rails.logger.warn { "message callback sync failed or success flag missing for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
       return head :ok
     end
 
-    unless message_batch_present?(source_payload)
+    unless sync_service.message_batch_present?(source_payload)
       Rails.logger.info { "message callback produced no messages after sync for requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid}" }
       BackfillMissingMessagesJob.perform_later(sync_wxid)
       return head :ok
     end
 
-    process_synced_payload(source_payload, sync_wxid, full_backfill: true)
+    sync_service.persist_payload(source_payload, full_backfill: true)
     head :ok
   end
 
@@ -119,28 +121,28 @@ class MessagesController < ApplicationController
     requested_wxid = params[:wxid]
     return render json: { success: false, message: "wxid is required" }, status: :bad_request if requested_wxid.blank?
 
-    sync_wxid = resolve_sync_wxid(requested_wxid)
-    payload = MessageApiService.new(sync_wxid).sync_messages(sync_wxid)
-    unless success_response?(payload)
+    sync_service = MessageSyncService.new(requested_wxid)
+    payload = sync_service.sync_payload
+    unless sync_service.success_response?(payload)
       Rails.logger.warn do
-        "message sync failed: requested_wxid=#{requested_wxid} sync_wxid=#{sync_wxid} payload=#{payload.inspect}"
+        "message sync failed: requested_wxid=#{requested_wxid} sync_wxid=#{sync_service.sync_wxid} payload=#{payload.inspect}"
       end
       return render json: {
         success: false,
         message: "sync failed",
         requested_wxid: requested_wxid,
-        sync_wxid: sync_wxid,
+        sync_wxid: sync_service.sync_wxid,
         payload: payload
       }, status: :bad_gateway
     end
 
-    process_synced_payload(payload, sync_wxid, full_backfill: true)
+    result = sync_service.persist_payload(payload, full_backfill: true)
 
     render json: {
       success: true,
       requested_wxid: requested_wxid,
-      sync_wxid: sync_wxid,
-      synced_count: (payload.dig("Data", "AddMsgs") || []).size
+      sync_wxid: sync_service.sync_wxid,
+      synced_count: result[:synced_count]
     }
   end
 
@@ -500,49 +502,9 @@ class MessagesController < ApplicationController
     value.to_s
   end
 
-  def process_synced_payload(payload, wxid, full_backfill: false)
-    saves = WechatModels::SyncMessageModel.parse_saves(payload, wxid)
-    if saves.blank?
-      BackfillMissingMessagesJob.perform_later(wxid) if full_backfill
-      return
-    end
-
-    synced_ids = saves.pluck(:id)
-    SaveChatRoomMessageJob.perform_later(saves.as_json, wxid)
-    SyncCreateContactsJob.perform_later(saves.as_json, wxid)
-
-    if full_backfill
-      BackfillMissingMessagesJob.perform_later(wxid, nil, synced_ids)
-    end
-  end
-
-  def success_response?(payload)
-    value = payload["Success"] || payload[:Success]
-    value == true || value.to_s.casecmp("true").zero?
-  end
-
-  def resolve_sync_wxid(requested_wxid)
-    return requested_wxid if Contact.where(own_wxid: requested_wxid).exists?
-
-    chat_room = ChatRoom.includes(:contact).find_by(wx_id: requested_wxid)
-    return chat_room.contact.own_wxid if chat_room&.contact&.own_wxid.present?
-
-    contact = Contact.find_by(user_name: requested_wxid)
-    return contact.own_wxid if contact&.own_wxid.present?
-
-    requested_wxid
-  end
-
-  def explicit_failure_response?(payload)
-    return false unless payload.key?("Success") || payload.key?(:Success)
-
-    !success_response?(payload)
-  end
-
-  def message_batch_present?(payload)
-    add_msgs = payload.dig("Data", "AddMsgs") || payload.dig(:Data, :AddMsgs)
-    messages = payload.dig("Data", "Messages") || payload.dig(:Data, :Messages)
-    (add_msgs.is_a?(Array) && add_msgs.any?) || (messages.is_a?(Array) && messages.any?)
+  def disable_http_cache
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
   end
 
   def try_cdn_image_download(api_service, image_meta)

@@ -56,9 +56,14 @@ class WechatSessionBootstrapService
   def bootstrap_user(wxid)
     results = WechatLoginService.new.ensure_session(wxid, include_relogin: true)
     failed_steps = results.select { |_step, result| !result[:success] }
-    return if failed_steps.empty?
+    if failed_steps.any?
+      Rails.logger.warn("启动补偿失败 wxid=#{wxid}: #{failed_steps.inspect}")
+      return
+    end
 
-    Rails.logger.warn("启动补偿失败 wxid=#{wxid}: #{failed_steps.inspect}")
+    MessageSyncService.new(wxid).sync_and_persist!(full_backfill: true)
+  rescue MessageSyncService::SyncError => e
+    Rails.logger.warn("启动补偿消息同步失败 wxid=#{wxid}: #{e.payload.inspect}")
   rescue => e
     Rails.logger.error("启动补偿异常 wxid=#{wxid}: #{e.class} #{e.message}")
   end
