@@ -1,8 +1,8 @@
 {
     "swagger": "2.0",
     "info": {
-        "title": "Wechat 08- 算法- 869 优化升级版 --- ws 消息回调 rabbitmq推送 五端扫码版",
-        "description": "新增长链接_短链接自动推送消息 开启后 自动心跳, 自动二次登录 , rabbitmq 自动推送一体化、文件上传、优化自动心跳/二次登录（重启不掉，不崩溃，稳的一批）、新增活号自动过滑块、死号自动强开、新增消息群发、新增小程序获取HostSign、新增云闪付支付、新增ipad设备切换可过人脸、提交验证码、优化长连接消息同步、创建群聊参数修复、新增新文件上传、新增获取朋友圈评论、朋友圈上传CDN视频、新增特殊过识别通道、拉至最新rqtx算法、新增支持mac坏境、新增自动生成提交验证地址（非自动、绕过高危操作、真实提交）",
+        "title": "Wechat 08- 算法  ---  五端扫码版（ipad、安卓pad、win、mac、car、62 iphone、a16 安卓）",
+        "description": "可开启自动心跳 - 自动二次登录 - 长连接心跳  （新上线账号尽量 ipad、安卓 pad 加好友发圈。IOS 参数比较全）",
         "contact": {}
     },
     "basePath": "/api",
@@ -336,30 +336,6 @@
                 }
             }
         },
-        "/Friend/GetFriendRelation": {
-            "post": {
-                "tags": [
-                    "Friend"
-                ],
-                "summary": "好友关系检测 判断好友关系，1 删除 4自己拉黑 5被拉黑 0正常",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "V1 V2是必填项",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/Friend.SendFriendRelation"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/Friend/SendRequest": {
             "post": {
                 "tags": [
@@ -431,6 +407,29 @@
                 }
             }
         },
+        "/FriendCircle/CdnSnsUploadVideo": {
+            "post": {
+                "tags": [
+                    "FriendCircle"
+                ],
+                "summary": "朋友圈上传CDN视频",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "true",
+                        "schema": {
+                            "$ref": "#/definitions/FriendCircle.SnsUploadVideoParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/FriendCircle/Comment": {
             "post": {
                 "tags": [
@@ -446,6 +445,41 @@
                         "schema": {
                             "$ref": "#/definitions/FriendCircle.CommentParam"
                         }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/FriendCircle/GetCommnet": {
+            "post": {
+                "tags": [
+                    "FriendCircle"
+                ],
+                "summary": "获取评论内容",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "wxid",
+                        "description": "用户的wxid",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "type": "string"
+                    },
+                    {
+                        "in": "body",
+                        "name": "xmlData",
+                        "description": "包含id和username的XML数据",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "type": "string"
                     }
                 ],
                 "responses": {
@@ -493,30 +527,6 @@
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/FriendCircle.GetIdDetailParam"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/FriendCircle/DownFriendCircleMedia": {
-            "post": {
-                "tags": [
-                    "FriendCircle"
-                ],
-                "summary": "下载朋友圈视频",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "下载朋友圈视频",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/FriendCircle.DownFriendCircleParam"
                         }
                     }
                 ],
@@ -671,54 +681,6 @@
                 }
             }
         },
-        "/FriendCircle/CdnSnsUploadVideo": {
-            "post": {
-                "tags": [
-                    "FriendCircle"
-                ],
-                "summary": "CDN朋友圈上传视频",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "CDN上传朋友圈视频，分别输入视频和封面的base64",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/FriendCircle.SnsUploadVideoParam"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/FriendCircle/GetCommnet": {
-            "post": {
-                "tags": [
-                    "FriendCircle"
-                ],
-                "summary": "获取朋友圈评论内容",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/FriendCircle.GetIdDetailParam1"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/Group/AddChatRoomMember": {
             "post": {
                 "tags": [
@@ -780,7 +742,7 @@
                         "description": "ToWxids 多个微信ID用,隔开 至少三个好友微信ID以上",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/Group.CreateChatRoomParam"
+                            "$ref": "#/definitions/Group.FacingCreateChatRoomParam"
                         }
                     }
                 ],
@@ -1295,7 +1257,7 @@
                 "tags": [
                     "Login"
                 ],
-                "summary": "开启自动心跳, 自动二次登录 自动推送消息(优先长链接)",
+                "summary": "开启自动心跳, 自动二次登录（linux 长连接，win 短链接）",
                 "parameters": [
                     {
                         "in": "query",
@@ -1680,30 +1642,6 @@
                 }
             }
         },
-        "/Login/LoginAwaken": {
-            "post": {
-                "tags": [
-                    "Login"
-                ],
-                "summary": "唤醒登录(只限扫码登录)",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "不使用代理请留空",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/Login.AwakenReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/Login/LoginCheckQR": {
             "post": {
                 "tags": [
@@ -1731,55 +1669,7 @@
                 "tags": [
                     "Login"
                 ],
-                "summary": "获取二维码(iPad) 最新版本",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "不使用代理请留空，优先使用ipad > 安卓pad > win统一pc > car",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/Login.GetQRReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/Login/LoginGetQRNotCodePush": {
-            "post": {
-                "tags": [
-                    "Login"
-                ],
-                "summary": "获取二维码(特殊过识别通道) 新",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "不使用代理请留空",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/Login.GetQRReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/Login/LoginGetQRNotCode": {
-            "post": {
-                "tags": [
-                    "Login"
-                ],
-                "summary": "获取二维码(特殊过识别通道)",
+                "summary": "获取二维码(iPad)",
                 "parameters": [
                     {
                         "in": "body",
@@ -1846,12 +1736,36 @@
                 }
             }
         },
+        "/Login/LoginGetQRNotCode": {
+            "post": {
+                "tags": [
+                    "Login"
+                ],
+                "summary": "特殊过识别通道(2)",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "不使用代理请留空",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Login.GetQRReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/Login/LoginGetQRPad": {
             "post": {
                 "tags": [
                     "Login"
                 ],
-                "summary": "获取二维码(安卓Pad) --最新版本",
+                "summary": "获取二维码(安卓Pad)",
                 "parameters": [
                     {
                         "in": "body",
@@ -1875,7 +1789,7 @@
                 "tags": [
                     "Login"
                 ],
-                "summary": "获取二维码(安卓Pad-备用)",
+                "summary": "获取二维码(安卓Pad-绕过验证码)",
                 "parameters": [
                     {
                         "in": "body",
@@ -1923,7 +1837,7 @@
                 "tags": [
                     "Login"
                 ],
-                "summary": "获取二维码(WinUnified-统一PC版) -最新",
+                "summary": "获取二维码(WinUnified-统一PC版)",
                 "parameters": [
                     {
                         "in": "body",
@@ -1971,7 +1885,7 @@
                 "tags": [
                     "Login"
                 ],
-                "summary": "获取二维码(iPad-备用)",
+                "summary": "获取二维码(iPad-绕过验证码)",
                 "parameters": [
                     {
                         "in": "body",
@@ -2083,30 +1997,6 @@
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/Msg.RevokeMsgParam"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/Msg/SendGroupMassMsgText": {
-            "post": {
-                "tags": [
-                    "Msg"
-                ],
-                "summary": "群发消息",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "Type请根据场景设置,xml请自行构造",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/Msg.SendGroupMassMsgTextParam"
                         }
                     }
                 ],
@@ -2611,6 +2501,53 @@
                 }
             }
         },
+        "/QWContact/GetQWContactList": {
+            "post": {
+                "tags": [
+                    "QWContact"
+                ],
+                "summary": "获取企业微信联系人列表",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "首次调用两个 seq 请传 0",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/QWContact.GetQWContactListParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/QWContact/QWAddContact": {
+            "post": {
+                "tags": [
+                    "QWContact"
+                ],
+                "summary": "QWAddContact",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/QWContact.QWAddContactParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/QWContact/QWApplyAddContact": {
             "post": {
                 "tags": [
@@ -2624,29 +2561,6 @@
                         "description": "true",
                         "schema": {
                             "$ref": "#/definitions/QWContact.QWApplyAddContactParam"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/QWContact/QWContact/QWAddContact": {
-            "post": {
-                "tags": [
-                    "QWContact"
-                ],
-                "summary": "QWAddContact",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/QWContact.QWAddContactParam"
                         }
                     }
                 ],
@@ -2821,7 +2735,7 @@
                 }
             }
         },
-        "/TenPay/AutoHongBao": {
+        "/TenPay/OpenHongBao": {
             "post": {
                 "tags": [
                     "TenPay"
@@ -3219,19 +3133,6 @@
                 }
             }
         },
-        "/Tools/Version": {
-            "get": {
-                "tags": [
-                    "Tools"
-                ],
-                "summary": "获取当前版本号",
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/Tools/UpdateStepNumberApi": {
             "post": {
                 "tags": [
@@ -3256,44 +3157,19 @@
                 }
             }
         },
-        "/Tools/setproxy": {
-            "post": {
-                "tags": [
-                    "Tools"
-                ],
-                "summary": "设置/删除代理IP",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "删除代理ip时直接留空即可",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/Tools.SetProxyParam"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/Tools/UploadAppAttachApi": {
             "post": {
                 "tags": [
                     "Tools"
                 ],
-                "summary": "文件上传",
+                "summary": "UploadAppAttachApi",
                 "parameters": [
                     {
                         "in": "body",
                         "name": "body",
-                        "description": "注意参数",
-                        "required": true,
+                        "description": "true",
                         "schema": {
-                            "$ref": "#/definitions/Tools.UploadAppAttachApi"
+                            "$ref": "#/definitions/Tools.UploadAppAttachModel"
                         }
                     }
                 ],
@@ -3309,15 +3185,81 @@
                 "tags": [
                     "Tools"
                 ],
-                "summary": "文件上传-新",
+                "summary": "文件上传",
                 "parameters": [
                     {
                         "in": "body",
                         "name": "body",
-                        "description": "注意参数",
+                        "description": "文件上传",
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/Tools.UploadParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/Tools/UploadFileBinary": {
+            "post": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "文件上传 (二进制)",
+                "parameters": [
+                    {
+                        "in": "formData",
+                        "name": "wxid",
+                        "description": "用户wxid",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "formData",
+                        "name": "file",
+                        "description": "要上传的文件",
+                        "required": true,
+                        "type": "file"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/Tools/Version": {
+            "get": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "获取当前版本号",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/Tools/setproxy": {
+            "post": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "设置/删除代理IP",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "删除代理ip时直接留空即可",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Tools.SetProxyParam"
                         }
                     }
                 ],
@@ -3817,19 +3759,19 @@
                 }
             }
         },
-        "/Wxapp/Verifyplugin": {
+        "/Wxapp/GetRandomAvatar": {
             "post": {
                 "tags": [
                     "Wxapp"
                 ],
-                "summary": "小程序获取hostsign",
+                "summary": "GetRandomAvatar",
                 "parameters": [
                     {
                         "in": "body",
                         "name": "body",
                         "description": "true",
                         "schema": {
-                            "$ref": "#/definitions/Wxapp.JSOperateWxParam"
+                            "$ref": "#/definitions/Wxapp.DefaultParam"
                         }
                     }
                 ],
@@ -3845,7 +3787,7 @@
                 "tags": [
                     "Wxapp"
                 ],
-                "summary": "微信云闪付支付",
+                "summary": "云闪付支付",
                 "parameters": [
                     {
                         "in": "body",
@@ -3853,30 +3795,7 @@
                         "description": "支付请求数据",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/Wxapp.UnionpayData"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/Wxapp/GetRandomAvatar": {
-            "post": {
-                "tags": [
-                    "Wxapp"
-                ],
-                "summary": "GetRandomAvatar",
-                "parameters": [
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "description": "true",
-                        "schema": {
-                            "$ref": "#/definitions/Wxapp.DefaultParam"
+                            "$ref": "#/definitions/TenPay.UnionpayData"
                         }
                     }
                 ],
@@ -4038,6 +3957,29 @@
                         "description": "true",
                         "schema": {
                             "$ref": "#/definitions/Wxapp.AddAvatarImgParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/Wxapp/Verifyplugin": {
+            "post": {
+                "tags": [
+                    "Wxapp"
+                ],
+                "summary": "小程序获取HostSign",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "true",
+                        "schema": {
+                            "$ref": "#/definitions/Wxapp.Verifyplugin"
                         }
                     }
                 ],
@@ -4220,20 +4162,6 @@
                 }
             }
         },
-        "Friend.SendFriendRelation": {
-            "title": "SendFriendRelation",
-            "type": "object",
-            "properties": {
-
-                "UserName": {
-                    "type": "string",
-                    "description": "被检测好友"
-                },
-                "Wxid": {
-                    "type": "string"
-                }
-            }
-        },
         "Friend.SendRequestParam": {
             "title": "SendRequestParam",
             "type": "object",
@@ -4336,7 +4264,7 @@
                 }
             }
         },
-        "FriendCircle.GetIdDetailParam1": {
+        "FriendCircle.GetIdDetailParam": {
             "title": "GetIdDetailParam",
             "type": "object",
             "properties": {
@@ -4345,21 +4273,6 @@
                     "format": "int64"
                 },
                 "Towxid": {
-                    "type": "string"
-                },
-                "Wxid": {
-                    "type": "string"
-                }
-            }
-        },
-        "FriendCircle.DownFriendCircleParam": {
-            "title": "DownFriendCircleParam",
-            "type": "object",
-            "properties": {
-                "Url": {
-                    "type": "string"
-                },
-                "Key": {
                     "type": "string"
                 },
                 "Wxid": {
@@ -4466,34 +4379,10 @@
             "title": "SnsUploadVideoParam",
             "type": "object",
             "properties": {
-                "Wxid": {
+                "ThumbData": {
                     "type": "string"
                 },
                 "VideoData": {
-                    "type": "string"
-                },
-                "ThumbData": {
-                    "type": "string"
-                }
-            }
-        },
-        "FriendCircle.GetIdDetailParam": {
-            "title": "GetIdDetailParam",
-            "type": "object",
-            "properties": {
-                "xmlData": {
-                    "type": "string"
-                },
-                "Wxid": {
-                    "type": "string"
-                }
-            }
-        },
-        "Tools.UploadParam": {
-            "title": "UploadParam",
-            "type": "object",
-            "properties": {
-                "Base64": {
                     "type": "string"
                 },
                 "Wxid": {
@@ -4608,18 +4497,6 @@
                 },
                 "Wxid": {
                     "type": "string"
-                }
-            }
-        },
-        "Login.AwakenReq": {
-            "title": "AwakenReq",
-            "type": "object",
-            "properties": {
-                "Wxid": {
-                    "type": "string"
-                },
-                "Proxy": {
-                    "$ref": "#/definitions/models.ProxyInfo"
                 }
             }
         },
@@ -4879,24 +4756,6 @@
                 }
             }
         },
-        "Msg.SendGroupMassMsgTextParam": {
-            "title": "SendGroupMassMsgTextParam",
-            "type": "object",
-            "properties": {
-                "ToWxid": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "Wxid": {
-                    "type": "string"
-                },
-                "Content": {
-                    "type": "string"
-                }
-            }
-        },
         "Msg.SendAppMsgParam": {
             "title": "SendAppMsgParam",
             "type": "object",
@@ -4920,6 +4779,9 @@
             "title": "SendEmojiParam",
             "type": "object",
             "properties": {
+                "Base64": {
+                    "type": "string"
+                },
                 "Md5": {
                     "type": "string"
                 },
@@ -5147,6 +5009,23 @@
             "properties": {
                 "Username": {
                     "type": "string"
+                },
+                "Wxid": {
+                    "type": "string"
+                }
+            }
+        },
+        "QWContact.GetQWContactListParam": {
+            "title": "GetQWContactListParam",
+            "type": "object",
+            "properties": {
+                "CurrentChatRoomContactSeq": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "CurrentWxcontactSeq": {
+                    "type": "integer",
+                    "format": "int32"
                 },
                 "Wxid": {
                     "type": "string"
@@ -5400,6 +5279,10 @@
                 }
             }
         },
+        "TenPay.UnionpayData": {
+            "title": "UnionpayData",
+            "type": "object"
+        },
         "Tools.CdnDownloadImageParam": {
             "title": "CdnDownloadImageParam",
             "type": "object",
@@ -5483,7 +5366,7 @@
                 },
                 "MsgId": {
                     "type": "integer",
-                    "format": "int32"
+                    "format": "int64"
                 },
                 "Wxid": {
                     "type": "string"
@@ -5611,15 +5494,41 @@
                 }
             }
         },
-        "Tools.UploadAppAttachApi": {
-            "title": "UploadAppAttachApi",
+        "Tools.UploadAppAttachModel": {
+            "title": "UploadAppAttachModel",
             "type": "object",
             "properties": {
                 "Wxid": {
                     "type": "string"
                 },
+                "buffer": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "byte"
+                    }
+                },
                 "fileData": {
                     "type": "string"
+                }
+            }
+        },
+        "Tools.UploadParam": {
+            "title": "UploadParam",
+            "type": "object",
+            "properties": {
+                "Base64": {
+                    "type": "string"
+                },
+                "Wxid": {
+                    "type": "string"
+                },
+                "buffer": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "format": "byte"
+                    }
                 }
             }
         },
@@ -5977,33 +5886,6 @@
                 }
             }
         },
-        "Wxapp.UnionpayData": {
-            "title": "UnionpayData",
-            "type": "object",
-            "properties": {
-                "AppId": {
-                    "type": "string"
-                },
-                "NonceStr": {
-                    "type": "string"
-                },
-                "Package": {
-                    "type": "string"
-                },
-                "PaySign": {
-                    "type": "string"
-                },
-                "SignType": {
-                    "type": "string"
-                },
-                "TimeStamp": {
-                    "type": "string"
-                },
-                "Wxid": {
-                    "type": "string"
-                }
-            }
-        },
         "Wxapp.SessionidQRParam": {
             "title": "SessionidQRParam",
             "type": "object",
@@ -6030,6 +5912,10 @@
                     "type": "string"
                 }
             }
+        },
+        "Wxapp.Verifyplugin": {
+            "title": "Verifyplugin",
+            "type": "object"
         },
         "models.ProxyInfo": {
             "title": "ProxyInfo",
