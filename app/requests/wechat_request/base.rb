@@ -9,7 +9,7 @@ module WechatRequest
       send_cdn_file: { defaults: {}, required: [ :toWxid, :content ] },
       send_cdn_img: { defaults: {}, required: [ :toWxid, :content ] },
       send_cdn_video: { defaults: {}, required: [ :toWxid, :content ] },
-      send_emoji: { defaults: {}, required: [ :toWxid, :content ] },
+      send_emoji: { defaults: {}, required: [ :toWxid, :md5, :totalLen ] },
       send_video: { defaults: {}, required: [ :toWxid, :content ] },
       send_voice: { defaults: {}, required: [ :toWxid, :content, :voiceType, :voiceTime ] },
       share_card: { defaults: {}, required: [ :toWxid, :cardWxId, :cardNickName, :cardAlias ] },

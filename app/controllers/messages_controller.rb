@@ -435,17 +435,36 @@ class MessagesController < ApplicationController
       }
     )
 
-    base.merge(
-      "referenced_message" => referenced&.as_json(
-        only: [ :id, :chat_room_id, :created_at, :message_time ],
-        include: {
-          wx_message: {
-            only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                   :new_msg_id, :self_send, :real_msg_type ]
-          }
+    base["wx_message"] = serialize_wx_message_json(base["wx_message"])
+    referenced_json = referenced&.as_json(
+      only: [ :id, :chat_room_id, :created_at, :message_time ],
+      include: {
+        wx_message: {
+          only: [ :msg_type, :content, :from_user_name, :to_user_name,
+                 :new_msg_id, :self_send, :real_msg_type ]
         }
-      )
+      }
     )
+    referenced_json["wx_message"] = serialize_wx_message_json(referenced_json["wx_message"]) if referenced_json
+
+    base.merge(
+      "referenced_message" => referenced_json
+    )
+  end
+
+  def serialize_wx_message_json(wx_message_json)
+    return wx_message_json unless wx_message_json.is_a?(Hash)
+
+    wx_message_json.merge(
+      "new_msg_id" => serialize_frontend_identifier(wx_message_json["new_msg_id"]),
+      "refer_new_msg_id" => serialize_frontend_identifier(wx_message_json["refer_new_msg_id"])
+    )
+  end
+
+  def serialize_frontend_identifier(value)
+    return nil if value.blank?
+
+    value.to_s
   end
 
   def process_synced_payload(payload, wxid, full_backfill: false)
