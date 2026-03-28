@@ -32,6 +32,27 @@ class MessagesController < ApplicationController
     render json: serialize_messages([ message ], chat_room_id).first
   end
 
+  def resolve_reference
+    chat_room_id = params[:chat_room_id]
+    new_msg_id = params[:new_msg_id]
+
+    if new_msg_id.blank?
+      render json: { success: false, message: "new_msg_id 不能为空" }, status: :bad_request
+      return
+    end
+
+    message = messages_scope(chat_room_id)
+              .joins(:wx_message)
+              .find_by(wx_messages: { new_msg_id: new_msg_id })
+
+    if message.blank?
+      render json: { success: false, message: "引用消息不存在" }, status: :not_found
+      return
+    end
+
+    render json: serialize_messages([ message ], chat_room_id).first
+  end
+
   def create
     args = send_message_params
     chat_room = ChatRoom.includes(:contact).find(args[:chat_room_id])

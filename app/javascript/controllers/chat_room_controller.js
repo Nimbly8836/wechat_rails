@@ -120,6 +120,7 @@ export default class extends Controller {
 
     if (restoredMessages > 0) {
       this.renderMessages();
+      requestAnimationFrame(() => this.loadMessages({ replace: true }));
     } else {
       this.loadMessages();
     }
@@ -1276,6 +1277,20 @@ export default class extends Controller {
         }
       }
     } else {
+      const referNewMsgId = msg.refer_new_msg_id;
+      if (quoted && referNewMsgId) {
+        quoted.classList.remove("cursor-not-allowed", "opacity-60");
+        quoted.classList.add("cursor-pointer");
+        quoted.dataset.referNewMsgId = String(referNewMsgId);
+        quoted.onclick = async (event) => {
+          event.stopPropagation();
+          const resolvedId = await this.resolveReferencedMessageId(referNewMsgId);
+          if (resolvedId) {
+            this.focusMessageById(resolvedId);
+          }
+        };
+      }
+
       if (parsed.refContent) {
         if (quotedContent) {
           quotedContent.textContent = parsed.refContent;
@@ -2886,6 +2901,48 @@ export default class extends Controller {
       .catch((error) => {
         console.error("按消息 id 加载失败:", error);
         return false;
+      });
+  }
+
+  resolveReferencedMessageId(referNewMsgId) {
+    if (!referNewMsgId) {
+      return Promise.resolve(null);
+    }
+
+    const existing = this.messages.all.find((wrapper) =>
+      String(wrapper?.wx_message?.new_msg_id) === String(referNewMsgId));
+
+    if (existing?.id != null) {
+      return Promise.resolve(existing.id);
+    }
+
+    const url = `/chat_room/${this.idValue}/messages/resolve_reference?new_msg_id=${
+      encodeURIComponent(referNewMsgId)
+    }`;
+
+    return fetch(url)
+      .then((res) => {
+        if (!res.ok) {
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!data || data.id == null) {
+          return null;
+        }
+
+        if (!this.hasMessage(data.id)) {
+          this.messages.add(data);
+          this.persistMessages();
+          this.renderMessages();
+        }
+
+        return data.id;
+      })
+      .catch((error) => {
+        console.error("按引用消息 id 解析失败:", error);
+        return null;
       });
   }
 
