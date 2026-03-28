@@ -64,6 +64,7 @@ export const chatStorageKeys = {
   notificationSettings: () => ["notification-settings", ""],
   chatRoomList: () => ["chat-room-list", ""],
   activeChatFolder: () => ["active-chat-folder", ""],
+  activeChatSection: () => ["active-chat-section", ""],
   collapsedContactGroups: () => ["collapsed-contact-groups", ""],
   chatRoomTheme: (roomId) => ["chat-room-theme", String(roomId)],
   chatRoomMessages: (roomId) => ["chat-room-messages", String(roomId)],

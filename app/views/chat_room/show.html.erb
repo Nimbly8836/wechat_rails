@@ -220,21 +220,21 @@
   </div>
 
   <!-- 底部：输入区 -->
-  <div class="telegram-composer flex items-end gap-2 px-3 py-3 min-h-13">
+  <div class="telegram-composer flex items-end gap-2 px-3 py-2 min-h-13">
 
 
     <!-- 附件按钮 -->
     <div class="flex-shrink-0 w-10"
          data-action="mouseenter->chat-room#mouseenterAttachment">
-      <button class="flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-slate-100"><img src="icon/attachment.svg" alt="附件"></button>
+      <button class="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-slate-100"><img class="h-4 w-4" src="icon/attachment.svg" alt="附件"></button>
     </div>
 
     <!-- 输入框 -->
-    <div class="telegram-composer-shell flex-1 px-3 py-2">
+    <div class="telegram-composer-shell flex-1 px-2.5 py-1.5">
       <label>
         <textarea
           rows="1"
-          class="w-full resize-none px-2 py-2 text-slate-700 focus-border-none focus:outline-none
+          class="w-full resize-none px-2 py-1.5 text-sm text-slate-700 focus-border-none focus:outline-none
           overflow-hidden "
           placeholder="输入消息…"
           required
@@ -244,9 +244,9 @@
     </div>
 
     <div class="flex-shrink-0" data-controller="emoji">
-      <button class="flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-slate-100"
+      <button class="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-slate-100"
               data-action="mouseenter->emoji#mouseenter mouseleave->emoji#mouseleave">
-        <img src="icon/emoji-pleased-svgrepo-com.svg" alt="表情">
+        <img class="h-4 w-4" src="icon/emoji-pleased-svgrepo-com.svg" alt="表情">
       </button>
     </div>
 
