@@ -45,15 +45,14 @@ module WechatModels
     def self.parse_saves(res, current_wxid)
       return [] unless res["Success"]
       source_messages = callback_source_messages(res)
-      wx_messages = source_messages
+      persisted_ids = source_messages
                       .reject { |msg_hash| [ 51, 10002 ].include?(msg_hash["MsgType"]) }
-                      .map do |msg_hash|
-        parse(msg_hash, current_wxid).attributes.except("id", "created_at", "updated_at")
+                      .filter_map do |msg_hash|
+        persist_one(msg_hash, current_wxid)
       end
-      return [] if wx_messages.empty?
-      result = WxMessage.upsert_all(wx_messages, returning: %w[id])
-      ids = result.map { |r| r["id"] }
-      WxMessage.where(id: ids)
+      return [] if persisted_ids.empty?
+
+      WxMessage.where(id: persisted_ids)
     end
 
     def self.parse_refer_app_msg(content)
@@ -151,6 +150,42 @@ module WechatModels
 
     def self.extract_group_sender(content)
       content.to_s[/\A([^:\n]+):\n/, 1]
+    end
+
+    def self.persist_one(msg_hash, current_wxid)
+      attrs = nil
+
+      begin
+        attrs = parse(msg_hash, current_wxid).attributes.except("id", "created_at", "updated_at")
+        record = persist_wx_message!(attrs)
+        WxMessageIngestFailure.resolve!(
+          owner_wxid: current_wxid,
+          raw_payload: msg_hash,
+          normalized_payload: attrs
+        )
+        record.id
+      rescue => e
+        stage = attrs.present? ? "persist" : "parse"
+        WxMessageIngestFailure.record!(
+          owner_wxid: current_wxid,
+          stage: stage,
+          raw_payload: msg_hash,
+          normalized_payload: attrs,
+          error: e
+        )
+        Rails.logger.error(
+          "wx_message ingest failed owner_wxid=#{current_wxid} stage=#{stage} error=#{e.class} #{e.message}"
+        )
+        nil
+      end
+    end
+
+    def self.persist_wx_message!(attrs)
+      key_attrs = attrs.slice("msg_id", "new_msg_id", "msg_seq")
+      wx_message = WxMessage.find_or_initialize_by(key_attrs)
+      wx_message.assign_attributes(attrs)
+      wx_message.save!
+      wx_message
     end
 
   end

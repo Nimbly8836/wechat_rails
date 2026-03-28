@@ -119,4 +119,48 @@ class SaveChatRoomMessageJobTest < ActiveJob::TestCase
     assert_equal group_room.id, created_message.chat_room_id
     assert_not_equal member_room.id, created_message.chat_room_id
   end
+
+  test "creates placeholder contact and chat room when contact detail lookup returns nothing" do
+    owner_wxid = "wxid_owner"
+    remote_wxid = "25984991421883248@kefu.openim"
+    wx_message = WxMessage.create!(
+      msg_id: 501,
+      new_msg_id: 502,
+      msg_seq: 1,
+      msg_create_time: Time.current,
+      msg_type: 1,
+      from_user_name: remote_wxid,
+      to_user_name: owner_wxid,
+      content: "hello from support"
+    )
+
+    fake_contact_service = Object.new
+    fake_contact_service.define_singleton_method(:fetch_contacts_detail) do |_ids|
+      {
+        "Success" => true,
+        "Data" => {
+          "ContactList" => []
+        }
+      }
+    end
+    fake_contact_service.define_singleton_method(:parse_contact_data) do |_contact_data|
+      raise "parse_contact_data should not be called for an empty contact list"
+    end
+
+    ContactApiService.stub(:new, fake_contact_service) do
+      assert_difference("Contact.count", 1) do
+        assert_difference("ChatRoom.count", 1) do
+          assert_difference("Message.count", 1) do
+            SaveChatRoomMessageJob.perform_now([ wx_message.as_json ], owner_wxid)
+          end
+        end
+      end
+    end
+
+    created_message = Message.order(:id).last
+    assert_equal wx_message.id, created_message.wx_messages_id
+    assert_equal remote_wxid, created_message.chat_room.wx_id
+    assert_equal remote_wxid, created_message.chat_room.contact.nick_name
+    assert_equal owner_wxid, created_message.chat_room.contact.own_wxid
+  end
 end

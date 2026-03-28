@@ -96,20 +96,22 @@ class SaveChatRoomMessageJob < ApplicationJob
 
     missing.each_slice(20) do |batch|
       response = contact_service.fetch_contacts_detail(batch.join(","))
-      next unless response&.dig("Success")
+      if response&.dig("Success")
+        contact_list = response.dig("Data", "ContactList") || []
+        contact_list.each do |contact_data|
+          next if contact_data&.dig("UserName", "string").blank?
 
-      contact_list = response.dig("Data", "ContactList") || []
-      contact_list.each do |contact_data|
-        next if contact_data&.dig("UserName", "string").blank?
+          attrs = contact_service.parse_contact_data(contact_data)
+          attrs[:own_wxid] = owner_wxid
+          attrs[:user_name] ||= contact_data.dig("UserName", "string")
 
-        attrs = contact_service.parse_contact_data(contact_data)
-        attrs[:own_wxid] = owner_wxid
-        attrs[:user_name] ||= contact_data.dig("UserName", "string")
-
-        contact = Contact.find_or_initialize_by(own_wxid: owner_wxid, user_name: attrs[:user_name])
-        contact.assign_attributes(attrs)
-        contact.save!
+          contact = Contact.find_or_initialize_by(own_wxid: owner_wxid, user_name: attrs[:user_name])
+          contact.assign_attributes(attrs)
+          contact.save!
+        end
       end
+
+      create_placeholder_contacts_for!(batch, owner_wxid)
     end
   end
 
@@ -146,5 +148,20 @@ class SaveChatRoomMessageJob < ApplicationJob
   rescue => e
     Rails.logger.warn "Download avatar failed: #{url} #{e.message}"
     nil
+  end
+
+  def create_placeholder_contacts_for!(wx_ids, owner_wxid)
+    persisted = Contact.where(own_wxid: owner_wxid, user_name: wx_ids).pluck(:user_name)
+    unresolved = Array(wx_ids) - persisted
+    return if unresolved.empty?
+
+    Rails.logger.warn("Create placeholder contacts for unresolved wxids: #{unresolved.join(', ')}")
+
+    unresolved.each do |wx_id|
+      Contact.find_or_create_by!(own_wxid: owner_wxid, user_name: wx_id) do |contact|
+        contact.nick_name = wx_id
+        contact.remark = wx_id
+      end
+    end
   end
 end
