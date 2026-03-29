@@ -14,9 +14,9 @@
   <%= yield :head %>
 
   <%= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-  <link rel="icon" href="/icon.png" type="image/png">
-  <link rel="shortcut icon" href="/icon.png" type="image/png">
-  <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="icon" href="/fly.svg" type="image/svg">
+  <link rel="shortcut icon" href="/fly.svg" type="image/svg">
+  <link rel="apple-touch-icon" href="/fly.svg">
 
   <%# Includes all stylesheet files in app/assets/stylesheets %>
   <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
