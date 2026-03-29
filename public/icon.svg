@@ -1,3 +1,26 @@
-<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="256" cy="256" r="256" fill="red"/>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#52c7ff"/>
+      <stop offset="1" stop-color="#0a8dff"/>
+    </linearGradient>
+    <linearGradient id="bubble" x1="144" y1="116" x2="374" y2="332" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ecf7ff"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="20" stdDeviation="22" flood-color="#0666c2" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect x="32" y="32" width="448" height="448" rx="120" fill="url(#bg)"/>
+
+  <g filter="url(#shadow)">
+    <path d="M160 130c0-17.673 14.327-32 32-32h128c53.019 0 96 42.981 96 96v12c0 53.019-42.981 96-96 96h-46.54l-56.833 41.624c-12.675 9.284-30.627.236-30.627-15.475V302.42C171.949 286.941 160 265.058 160 240V130Z" fill="url(#bubble)"/>
+    <circle cx="328" cy="216" r="66" fill="#1495ff"/>
+    <path d="M357.9 183.8 303.5 205c-7.2 2.8-7.1 13 .2 15.6l20.4 7.3 7.7 24.4c2.3 7.2 12 8.5 16.2 2.2l27.9-42.5c3.6-5.6.8-13.1-5.9-14.2l-26.4-4.1 14.8-2.6Z" fill="#ffffff"/>
+    <path d="M321.2 226.3 360 193.6l-24 39.7a5.2 5.2 0 0 1-9.5-1.1l-5.3-5.9Z" fill="#d8f1ff"/>
+    <circle cx="205" cy="174" r="18" fill="#ffffff" fill-opacity="0.55"/>
+    <circle cx="178" cy="214" r="10" fill="#ffffff" fill-opacity="0.4"/>
+  </g>
 </svg>
