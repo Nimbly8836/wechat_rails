@@ -1,5 +1,5 @@
 <template id="emoji-select">
-  <div class="emoji-panel hidden absolute bottom-15 right-13 bg-white shadow-xl rounded-xl p-2 gap-2 border border-gray-200 z-99"
+  <div class="emoji-panel hidden absolute bottom-full right-0 mb-3 max-w-[min(24rem,calc(100vw-1.5rem))] bg-white shadow-xl rounded-2xl p-3 gap-2 border border-gray-200 z-[140]"
        data-action="mouseenter->emoji#panelMouseenter mouseleave->emoji#panelMouseleave">
     <div class="grid grid-cols-10 gap-2 min-w-30 overflow-y-auto">
       <% Dir.glob(Rails.root.join("public/emoji/*.webp")).each do |path| %>
