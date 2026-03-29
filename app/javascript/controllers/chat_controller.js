@@ -555,7 +555,7 @@ export default class extends Controller {
 
     const icon = this.isSidebarOpen
       ? `<span class="text-xl leading-none text-slate-500" aria-hidden="true">&times;</span>`
-      : `<img src="/icon/menu-unicorn.svg" alt="" class="h-5 w-5" aria-hidden="true">`
+      : `<img src="/icon/menu.svg" alt="" class="h-5 w-5" aria-hidden="true">`
 
     this.toggleButtonTarget.innerHTML = icon
     this.toggleButtonTarget.setAttribute("aria-expanded", String(this.isSidebarOpen))
@@ -776,7 +776,7 @@ export default class extends Controller {
       body: `${roomName}：${contentPreview}`,
       tag: payload?.chat_room_id ? `chat-room-${payload.chat_room_id}` : "wechat-rails-chat",
       icon: "/icon-192.png",
-      badge: "/chat-50.png",
+      badge: "/badge-50.png",
       renotify: true,
       data: {
         url: payload?.chat_room_id ? `/chat?chat_room_id=${payload.chat_room_id}` : "/chat"
