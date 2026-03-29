@@ -53,6 +53,7 @@ Rails.application.routes.draw do
   post "message/callback/:wxid" => "messages#callback"
   post "message/sync/:wxid" => "messages#sync"
   get "message/voice/:id" => "messages#download_voice"
+  get "message/emoji/md5/:md5" => "messages#download_emoji_by_md5"
   get "message/emoji/:id" => "messages#download_emoji"
   get "message/image/:id" => "messages#download_image"
   get "message/video/:id" => "messages#download_video"
