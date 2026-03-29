@@ -18,9 +18,7 @@
               class="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 sm:hidden"
               data-action="click->chat-room#openSidebar"
               aria-label="返回联系人和会话列表">
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 18 9 12l6-6"/>
-        </svg>
+        <img src="icon/arrow-left-unicorn.svg" alt="" class="h-5 w-5">
       </button>
       <div class="h-11 w-11 overflow-hidden rounded-full bg-slate-200 shadow-sm">
         <img src='data:image/png;base64,<%= @chat_room.avatar_base64 %>' class='w-full h-full
@@ -43,9 +41,7 @@
                 class="w-9 rounded-full p-2 transition hover:bg-slate-100 hover:text-slate-700"
                 title="查看群成员"
                 data-action="click->chat-room#toggleMembersPanel">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M17 21a5 5 0 0 0-10 0m10 0h1.5a1.5 1.5 0 0 0 0-3H17m0 3H7m10-11a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm-8 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12 1.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z"/>
-          </svg>
+          <img src="icon/user-unicorn.svg" alt="" class="h-5 w-5">
         </button>
       <% end %>
       <!-- 菜单触发 -->
@@ -71,9 +67,7 @@
         </button>
       </div>
       <label class="mt-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-        <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/>
-        </svg>
+        <img src="icon/search-svgrepo-com.svg" alt="" class="h-4 w-4">
         <input type="search"
                class="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
                placeholder="搜索消息内容、引用标题、系统通知…"
@@ -104,9 +98,7 @@
           </button>
         </div>
         <label class="mt-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/>
-          </svg>
+          <img src="icon/search-svgrepo-com.svg" alt="" class="h-4 w-4">
           <input type="search"
                  class="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
                  placeholder="搜索成员昵称、备注、微信号…"

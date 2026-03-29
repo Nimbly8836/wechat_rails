@@ -6,7 +6,7 @@
 # 环境
 
 1. 微信协议（main 分支是 857，861 分支是 861）
-2. PostgreSQL 数据库，存储数据
+2. PostgreSQL 数据库，存储数据, 需要 pgroonga 实现 CJK 搜索
 
 # 使用
 
@@ -35,7 +35,7 @@
 
 ### 使用
 
-镜像是这个；`docker pull finalpi/wx2tg-server:v4-latest`
+镜像是这个；`docker pull finalpi/wx2tg-server:v5-latest`
 
 compose 文件运行
 
@@ -44,7 +44,7 @@ compose 文件运行
 services:
     
   wx2tg-server:
-    image: finalpi/wx2tg-server:v3-latest # Pull image
+    image: finalpi/wx2tg-server:v5-latest # Pull image
     container_name: wx2tg-server
     ports:
       - "8059:8058"
@@ -93,8 +93,8 @@ redisdbnum = 5
 
 
 syncmessage = true
-msgpush = false
-# 需要能访问到的地址
+msgpush = true
+# 需要能访问到的地址, 就是你的 wx-server 能访问到本应用的地址
 syncmessagebusinessuri = "http://127.0.0.1:3000/message/callback/{0}"
 logoutbusinessuri = ""
 
