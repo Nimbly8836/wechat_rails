@@ -1636,16 +1636,16 @@ export default class extends Controller {
       const previewUrl = msg._sending ? msg.extra?.preview_url : "";
       const messageId = msg._messageId || msg.id;
       const cacheKey = msg._cacheKey;
-      const emojiMd5 = (msg.emoji_md5 || msg.extra?.md5 || "").trim();
+      const emojiFileMd5 = (msg.emoji_file_md5 || msg.extra?.file_md5 || "").trim();
 
       if (previewUrl) {
         requestAnimationFrame(() => {
           image.src = previewUrl;
         });
-      } else if (emojiMd5) {
+      } else if (emojiFileMd5) {
         const url = cacheKey
-          ? `/message/emoji/md5/${encodeURIComponent(emojiMd5)}?t=${encodeURIComponent(cacheKey)}`
-          : `/message/emoji/md5/${encodeURIComponent(emojiMd5)}`;
+          ? `/message/emoji/md5/${encodeURIComponent(emojiFileMd5)}?t=${encodeURIComponent(cacheKey)}`
+          : `/message/emoji/md5/${encodeURIComponent(emojiFileMd5)}`;
         requestAnimationFrame(() => {
           image.src = url;
         });

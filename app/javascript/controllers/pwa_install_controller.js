@@ -7,20 +7,22 @@ export default class extends Controller {
     serviceWorkerUrl: String
   }
 
-  static targets = ["banner"]
+  static targets = ["banner", "title", "description", "iosGuide", "installButton"]
 
   connect() {
     this.deferredPrompt = null
+    this.bannerMode = null
     this.boundBeforeInstallPrompt = this.captureInstallPrompt.bind(this)
     this.boundAppInstalled = this.handleAppInstalled.bind(this)
     this.registerServiceWorker()
 
-    if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone) {
+    if (this.isStandalone()) {
       return
     }
 
     window.addEventListener("beforeinstallprompt", this.boundBeforeInstallPrompt)
     window.addEventListener("appinstalled", this.boundAppInstalled)
+    this.showIosInstallGuideIfNeeded()
   }
 
   disconnect() {
@@ -47,10 +49,16 @@ export default class extends Controller {
 
     event.preventDefault()
     this.deferredPrompt = event
+    this.configureBannerForPrompt()
     this.showBanner()
   }
 
   async install() {
+    if (this.bannerMode === "ios-manual") {
+      this.toggleIosGuide()
+      return
+    }
+
     if (!this.deferredPrompt) {
       return
     }
@@ -73,8 +81,79 @@ export default class extends Controller {
 
   handleAppInstalled() {
     this.deferredPrompt = null
+    this.bannerMode = null
     this.hideBanner()
     localStorage.removeItem(DISMISS_KEY)
+  }
+
+  isStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone
+  }
+
+  isIosSafari() {
+    const userAgent = window.navigator.userAgent || ""
+    const isAppleTouchDevice = /iPhone|iPad|iPod/.test(userAgent)
+      || (window.navigator.platform === "MacIntel" && window.navigator.maxTouchPoints > 1)
+    const isSafari = /Safari/i.test(userAgent)
+    const excluded = /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser/i.test(userAgent)
+    return isAppleTouchDevice && isSafari && !excluded
+  }
+
+  showIosInstallGuideIfNeeded() {
+    if (localStorage.getItem(DISMISS_KEY) === "true") {
+      return
+    }
+
+    if (!this.isIosSafari()) {
+      return
+    }
+
+    this.configureBannerForIos()
+    this.showBanner()
+  }
+
+  configureBannerForPrompt() {
+    this.bannerMode = "prompt"
+    if (this.hasTitleTarget) {
+      this.titleTarget.textContent = "安装到手机主屏幕"
+    }
+    if (this.hasDescriptionTarget) {
+      this.descriptionTarget.textContent = "像应用一样打开聊天和通讯录，支持独立窗口使用。"
+    }
+    if (this.hasInstallButtonTarget) {
+      this.installButtonTarget.textContent = "安装"
+    }
+    if (this.hasIosGuideTarget) {
+      this.iosGuideTarget.classList.add("hidden")
+    }
+  }
+
+  configureBannerForIos() {
+    this.bannerMode = "ios-manual"
+    if (this.hasTitleTarget) {
+      this.titleTarget.textContent = "添加到主屏幕"
+    }
+    if (this.hasDescriptionTarget) {
+      this.descriptionTarget.textContent = "iPhone Safari 不会弹系统安装窗，需要手动加入主屏幕。"
+    }
+    if (this.hasInstallButtonTarget) {
+      this.installButtonTarget.textContent = "查看步骤"
+    }
+    if (this.hasIosGuideTarget) {
+      this.iosGuideTarget.classList.add("hidden")
+    }
+  }
+
+  toggleIosGuide() {
+    if (!this.hasIosGuideTarget) {
+      return
+    }
+
+    const shouldShow = this.iosGuideTarget.classList.contains("hidden")
+    this.iosGuideTarget.classList.toggle("hidden", !shouldShow)
+    if (this.hasInstallButtonTarget) {
+      this.installButtonTarget.textContent = shouldShow ? "收起步骤" : "查看步骤"
+    }
   }
 
   showBanner() {

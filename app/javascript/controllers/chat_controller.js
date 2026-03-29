@@ -91,6 +91,7 @@ export default class extends Controller {
     this.boundCloseNotificationPanel = this.closeNotificationPanel.bind(this)
     this.boundServiceWorkerMessage = this.handleServiceWorkerMessage.bind(this)
     this.boundLocalChatMessage = this.handleLocalChatMessage.bind(this)
+    this.boundVisualViewportChange = this.updateViewportMetrics.bind(this)
 
     this.applyChatRoomNames(this.chatRooms)
     this.ensureActiveFolder()
@@ -108,6 +109,7 @@ export default class extends Controller {
     }
 
     this.applySidebarState()
+    this.syncMobileViewportLock()
     this.establishEventSource()
     this.bootstrapOnlineSessions()
 
@@ -116,6 +118,8 @@ export default class extends Controller {
     this.element.addEventListener("chat:sidebar:close", this.boundCloseSidebar)
     window.addEventListener("chat:local-message", this.boundLocalChatMessage)
     window.addEventListener("resize", this.boundHandleViewportChange)
+    window.visualViewport?.addEventListener("resize", this.boundVisualViewportChange)
+    window.visualViewport?.addEventListener("scroll", this.boundVisualViewportChange)
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("message", this.boundServiceWorkerMessage)
     }
@@ -137,10 +141,13 @@ export default class extends Controller {
     this.element.removeEventListener("chat:sidebar:close", this.boundCloseSidebar)
     window.removeEventListener("chat:local-message", this.boundLocalChatMessage)
     window.removeEventListener("resize", this.boundHandleViewportChange)
+    window.visualViewport?.removeEventListener("resize", this.boundVisualViewportChange)
+    window.visualViewport?.removeEventListener("scroll", this.boundVisualViewportChange)
     document.removeEventListener("click", this.boundCloseNotificationPanel)
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.removeEventListener("message", this.boundServiceWorkerMessage)
     }
+    this.releaseMobileViewportLock()
     this.stopResize()
   }
 
@@ -475,7 +482,30 @@ export default class extends Controller {
       this.isSidebarOpen = true
     }
 
+    this.syncMobileViewportLock()
     this.applySidebarState()
+  }
+
+  syncMobileViewportLock() {
+    const mobile = this.isMobileViewport()
+    document.documentElement.classList.toggle("tg-mobile-app", mobile)
+    document.body.classList.toggle("tg-mobile-app", mobile)
+    this.updateViewportMetrics()
+  }
+
+  releaseMobileViewportLock() {
+    document.documentElement.classList.remove("tg-mobile-app")
+    document.body.classList.remove("tg-mobile-app")
+    document.documentElement.style.removeProperty("--tg-app-height")
+  }
+
+  updateViewportMetrics() {
+    const viewportHeight = window.visualViewport?.height || window.innerHeight
+    if (!viewportHeight) {
+      return
+    }
+
+    document.documentElement.style.setProperty("--tg-app-height", `${Math.round(viewportHeight)}px`)
   }
 
   applySidebarState() {

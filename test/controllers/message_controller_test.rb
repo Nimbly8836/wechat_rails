@@ -164,6 +164,33 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     message_payload = payload.find { |item| item["id"] == emoji_message.id }
     assert_equal emoji_md5, message_payload.dig("wx_message", "emoji_md5")
     assert_equal emoji_md5, emoji_message.wx_message.reload.emoji_md5
+    assert_nil message_payload.dig("wx_message", "emoji_file_md5")
+  end
+
+  test "download_emoji backfills file md5 from legacy emoji md5 cache" do
+    emoji_md5 = SecureRandom.hex(16)
+    cached_file = Rails.root.join("storage", "emojis", "#{emoji_md5}.gif")
+    file_md5 = Digest::MD5.hexdigest("GIF89a")
+    canonical_file = Rails.root.join("storage", "emojis", "#{file_md5}.gif")
+    FileUtils.mkdir_p(cached_file.dirname)
+    File.binwrite(cached_file, "GIF89a")
+    emoji_message = create_message!(
+      new_msg_id: 9_000_000_000_000_001_451,
+      msg_type: :emoji,
+      real_msg_type: :emoji,
+      content: emoji_xml(emoji_md5),
+      emoji_md5: emoji_md5
+    )
+
+    get "/message/emoji/#{emoji_message.id}"
+
+    assert_response :success
+    assert_equal "image/gif", response.media_type
+    assert_equal file_md5, emoji_message.wx_message.reload.emoji_file_md5
+    assert File.exist?(canonical_file)
+  ensure
+    FileUtils.rm_f(cached_file) if cached_file
+    FileUtils.rm_f(canonical_file) if canonical_file
   end
 
   test "download_emoji_by_md5 serves cached emoji file" do
@@ -261,7 +288,7 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
   private
 
   def create_message!(new_msg_id:, content:, msg_id: nil, msg_type: :text, real_msg_type: :text,
-    refer_new_msg_id: nil, refer_title: nil, message_time: Time.current, emoji_md5: nil)
+    refer_new_msg_id: nil, refer_title: nil, message_time: Time.current, emoji_md5: nil, emoji_file_md5: nil)
     wx_message = WxMessage.create!(
       msg_id: msg_id || new_msg_id - 100,
       new_msg_id: new_msg_id,
@@ -275,6 +302,7 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
       refer_new_msg_id: refer_new_msg_id,
       refer_title: refer_title,
       emoji_md5: emoji_md5,
+      emoji_file_md5: emoji_file_md5,
       self_send: false
     )
 

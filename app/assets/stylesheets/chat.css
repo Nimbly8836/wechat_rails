@@ -1,7 +1,16 @@
 .tg-app-shell {
+  min-height: 0;
+  height: var(--tg-app-height, 100dvh);
   background:
     radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 24%),
     linear-gradient(135deg, #e9eef4 0%, #dfe7f1 100%);
+}
+
+html.tg-mobile-app,
+body.tg-mobile-app {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .tg-folder-rail {
@@ -492,7 +501,34 @@
 
 @media (max-width: 639px) {
   .tg-app-shell {
+    width: 100vw;
     border-radius: 0;
+  }
+
+  .tg-main-panel,
+  .telegram-chat-room,
+  #chat-box {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .tg-main-panel > .sticky {
+    padding-top: calc(0.75rem + env(safe-area-inset-top));
+  }
+
+  .telegram-chat-room .telegram-chat-header {
+    min-height: calc(4rem + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .telegram-chat-room .telegram-message-list {
+    padding: 1rem 1rem 1.25rem;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .telegram-chat-room .telegram-composer {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
   }
 
   .tg-folder-rail {

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_14_055843) do
+ActiveRecord::Schema[8.0].define(version: 2026_03_29_161000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -147,7 +147,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_14_055843) do
     t.string "refer_title"
     t.boolean "self_send", default: false, null: false
     t.text "emoji_md5"
+    t.text "emoji_file_md5"
     t.integer "real_msg_type"
+    t.index ["emoji_file_md5"], name: "index_wx_messages_on_emoji_file_md5"
     t.index ["msg_id", "new_msg_id", "msg_seq"], name: "index_wx_messages_on_msg_id_and_new_msg_id_and_msg_seq", unique: true
   end
 

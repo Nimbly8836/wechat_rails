@@ -36,9 +36,9 @@ class MessageSender
 
       @extra ||= {}
       @extra[:base64] = payload[:base64]
-      @extra[:md5] = payload[:md5]
+      @extra[:file_md5] = payload[:file_md5]
       @extra[:total_len] = payload[:total_len]
-      res = message_api_service.send_emoji(@chat_room.wx_id, payload[:base64], md5: payload[:md5], total_len: payload[:total_len])
+      res = message_api_service.send_emoji(@chat_room.wx_id, payload[:base64], md5: payload[:file_md5], total_len: payload[:total_len])
     when MESSAGE_TYPES[:quote]
       reference_message = quoted_reference_message
       return { success: false, message: "引用消息不存在" } unless reference_message
@@ -57,7 +57,7 @@ class MessageSender
     result = save_send_message(res)
     save_send_image(result[:data]&.dig("id"), extra_value(:base64)) if @message_type.to_i ==
     MESSAGE_TYPES[:image]
-    save_send_emoji(extra_value(:md5), extra_value(:base64)) if @message_type == MESSAGE_TYPES[:emoji]
+    save_send_emoji(extra_value(:file_md5), extra_value(:base64)) if @message_type == MESSAGE_TYPES[:emoji]
     save_send_file(result[:data]&.dig("id"), @file) if @message_type == MESSAGE_TYPES[:file]
     result
   end
@@ -97,7 +97,7 @@ class MessageSender
     # 特殊类型字段
     wx_message_attrs[:msg_source] = msg_res["MsgSource"] if @message_type == MESSAGE_TYPES[:image]
     if @message_type == MESSAGE_TYPES[:emoji]
-      wx_message_attrs[:emoji_md5] = extra_value(:md5)
+      wx_message_attrs[:emoji_file_md5] = extra_value(:file_md5)
     end
     if @message_type == MESSAGE_TYPES[:quote]
       quoted = WechatModels::SyncMessageModel.parse_refer_app_msg(@message_content)
@@ -202,15 +202,15 @@ class MessageSender
     file_path.to_s
   end
 
-  def save_send_emoji(emoji_md5, emoji_base64)
-    return if emoji_md5.blank?
+  def save_send_emoji(file_md5, emoji_base64)
+    return if file_md5.blank?
     payload = decode_base64_payload(emoji_base64)
     return if payload[:encoded].blank?
 
     storage_dir = Rails.root.join("storage", "emojis")
     FileUtils.mkdir_p(storage_dir)
 
-    file_path = storage_dir.join("#{emoji_md5}.gif")
+    file_path = storage_dir.join("#{file_md5}.gif")
     File.binwrite(file_path, Base64.strict_decode64(payload[:encoded]))
 
     file_path.to_s
@@ -261,7 +261,7 @@ class MessageSender
 
     {
       base64: base64,
-      md5: Digest::MD5.hexdigest(data),
+      file_md5: Digest::MD5.hexdigest(data),
       total_len: data.bytesize
     }
   rescue ArgumentError
