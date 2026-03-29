@@ -15,7 +15,7 @@
     <div class="tg-sidebar-panel flex min-w-0 flex-1 flex-col">
       <div class="flex items-center gap-3 px-4 pb-3 pt-4">
         <label class="tg-search-shell flex-1">
-          <img src="icon/search.svg" alt="" class="h-4 w-4">
+          <img src="icon/search.svg" alt="" class="h-5 w-5 tg-ui-icon">
           <input type="text"
                  id="sidebar-search"
                  class="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
@@ -299,27 +299,30 @@
                 data-chat-section-tab
                 data-active="false"
                 data-action="click->chat#switchTab"
-                data-tab="contacts">
-          <img src="icon/user.svg" alt="" class="h-5 w-5">
-          <span>联系人</span>
+                data-tab="contacts"
+                aria-label="Contacts"
+                title="Contacts">
+          <img src="icon/user.svg" alt="" class="h-6 w-6 tg-ui-icon">
         </button>
         <button type="button"
                 class="tg-section-tab"
                 data-chat-section-tab
                 data-active="true"
                 data-action="click->chat#switchTab"
-                data-tab="messages">
-          <img src="icon/message.svg" alt="" class="h-5 w-5">
-          <span>消息</span>
+                data-tab="messages"
+                aria-label="Messages"
+                title="Messages">
+          <img src="icon/message.svg" alt="" class="h-6 w-6 tg-ui-icon">
         </button>
         <button type="button"
                 class="tg-section-tab"
                 data-chat-section-tab
                 data-active="false"
                 data-action="click->chat#switchTab"
-                data-tab="settings">
-          <img src="icon/settings.svg" alt="" class="h-5 w-5">
-          <span>设置</span>
+                data-tab="settings"
+                aria-label="Settings"
+                title="Settings">
+          <img src="icon/settings.svg" alt="" class="h-6 w-6 tg-ui-icon">
         </button>
       </div>
     </div>
