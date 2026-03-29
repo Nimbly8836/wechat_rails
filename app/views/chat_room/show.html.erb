@@ -18,7 +18,7 @@
               class="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 sm:hidden"
               data-action="click->chat-room#openSidebar"
               aria-label="返回联系人和会话列表">
-        <img src="icon/arrow-left-unicorn.svg" alt="" class="h-5 w-5">
+        <img src="icon/back.svg" alt="" class="h-5 w-5">
       </button>
       <div class="h-11 w-11 overflow-hidden rounded-full bg-slate-200 shadow-sm">
         <img src='data:image/png;base64,<%= @chat_room.avatar_base64 %>' class='w-full h-full
@@ -35,19 +35,19 @@
               class="w-9 rounded-full p-2 transition hover:bg-slate-100 hover:text-slate-700"
               title="搜索聊天信息"
               data-action="click->chat-room#toggleSearchPanel">
-        <img src="icon/search-svgrepo-com.svg" alt="搜索聊天信息"></button>
+        <img src="icon/search.svg" alt="搜索聊天信息"></button>
       <% if @chat_room.group_chat? %>
         <button type="button"
                 class="w-9 rounded-full p-2 transition hover:bg-slate-100 hover:text-slate-700"
                 title="查看群成员"
                 data-action="click->chat-room#toggleMembersPanel">
-          <img src="icon/user-unicorn.svg" alt="" class="h-5 w-5">
+          <img src="icon/user.svg" alt="" class="h-5 w-5">
         </button>
       <% end %>
       <!-- 菜单触发 -->
       <button class="relative w-9 rounded-full p-2 transition hover:bg-slate-100 hover:text-slate-700"
               data-action="click->chat-room#toggleMenu">
-        <img src="icon/setting.svg" alt="设置">
+        <img src="icon/settings.svg" alt="设置">
       </button>
     </div>
   </div>
@@ -67,7 +67,7 @@
         </button>
       </div>
       <label class="mt-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-        <img src="icon/search-svgrepo-com.svg" alt="" class="h-4 w-4">
+        <img src="icon/search.svg" alt="" class="h-4 w-4">
         <input type="search"
                class="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
                placeholder="搜索消息内容、引用标题、系统通知…"
@@ -98,7 +98,7 @@
           </button>
         </div>
         <label class="mt-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-          <img src="icon/search-svgrepo-com.svg" alt="" class="h-4 w-4">
+          <img src="icon/search.svg" alt="" class="h-4 w-4">
           <input type="search"
                  class="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
                  placeholder="搜索成员昵称、备注、微信号…"
@@ -240,14 +240,14 @@
             data-action="click->chat-room#openFilePicker"
             data-upload-type-param="image">
 
-      <span aria-hidden="true"><img class="w-5" src="icon/picture-frame-svgrepo.svg"></span>
+      <span aria-hidden="true"><img class="w-5" src="icon/image.svg"></span>
       <span>图片</span>
     </button>
     <button type="button"
             class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 focus:outline-none"
             data-action="click->chat-room#openFilePicker"
             data-upload-type-param="emoji">
-      <span aria-hidden="true"><img class="w-5" src="icon/emoji-pleased-svgrepo-com.svg"></span>
+      <span aria-hidden="true"><img class="w-5" src="icon/emoji.svg"></span>
       <span>GIF 表情</span>
     </button>
     <button type="button"
@@ -255,21 +255,21 @@
             data-action="click->chat-room#openFilePicker"
             data-upload-type-param="voice">
 
-      <span aria-hidden="true"><img class="w-5" src="icon/voice-square-svgrepo.svg"></span>
+      <span aria-hidden="true"><img class="w-5" src="icon/microphone.svg"></span>
       <span>语音</span>
     </button>
     <button type="button"
             class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150  focus:outline-none"
             data-action="click->chat-room#openFilePicker"
             data-upload-type-param="file">
-      <span aria-hidden="true"><img class="w-5" src="icon/document-svgrepo.svg"></span>
+      <span aria-hidden="true"><img class="w-5" src="icon/document.svg"></span>
       <span>附件</span>
     </button>
     <button type="button"
             class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150  focus:outline-none"
             data-action="click->chat-room#openFilePicker"
             data-upload-type-param="video">
-      <span aria-hidden="true"><img class="w-5" src="icon/video-svgrepo.svg"></span>
+      <span aria-hidden="true"><img class="w-5" src="icon/video.svg"></span>
       <span>视频</span>
     </button>
   </div>
@@ -339,7 +339,7 @@
     <div class="flex-shrink-0" data-controller="emoji">
       <button class="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-slate-100"
               data-action="mouseenter->emoji#mouseenter mouseleave->emoji#mouseleave">
-        <img class="h-4 w-4" src="icon/emoji-pleased-svgrepo-com.svg" alt="表情">
+        <img class="h-4 w-4" src="icon/emoji.svg" alt="表情">
       </button>
     </div>
 
