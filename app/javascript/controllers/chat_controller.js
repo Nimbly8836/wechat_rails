@@ -554,8 +554,8 @@ export default class extends Controller {
     }
 
     const icon = this.isSidebarOpen
-      ? `<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18 18 6M6 6l12 12"></path></svg>`
-      : `<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 7h16M4 12h16M4 17h16"></path></svg>`
+      ? `<span class="text-xl leading-none text-slate-500" aria-hidden="true">&times;</span>`
+      : `<img src="/icon/menu-unicorn.svg" alt="" class="h-5 w-5" aria-hidden="true">`
 
     this.toggleButtonTarget.innerHTML = icon
     this.toggleButtonTarget.setAttribute("aria-expanded", String(this.isSidebarOpen))

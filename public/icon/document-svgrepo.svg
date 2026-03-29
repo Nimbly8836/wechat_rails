@@ -1,5 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?><!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M22 10V15C22 20 20 22 15 22H9C4 22 2 20 2 15V9C2 4 4 2 9 2H14" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M22 10H18C15 10 14 9 14 6V2L22 10Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <g id="page2">
+    <g>
+      <path d="M114.664,77.273v-18.182c0-5.021,4.07-9.091,9.091-9.091h131.838" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+      <path d="M312.609,107.016v206.621c0,5.021-4.07,9.091-9.091,9.091h-18.182" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+      <path d="M312.609,107.016h-49.016c-4.418,0-8-3.582-8-8v-49.016l57.016,57.016Z" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+    </g>
+  </g>
+  <g id="page1">
+    <path d="M285.336,134.289v206.621c0,5.021-4.07,9.091-9.091,9.091H96.482c-5.021,0-9.091-4.07-9.091-9.091V86.364c0-5.021,4.07-9.091,9.091-9.091h131.838" fill="none" stroke="#191919" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+    <path d="M285.336,134.289h-49.016c-4.418,0-8-3.582-8-8v-49.016l57.016,57.016Z" fill="none" stroke="#191919" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  </g>
+  <g id="lines">
+    <line x1="187.237" y1="135.053" x2="123.697" y2="135.053" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+    <line x1="249.03" y1="175.417" x2="123.697" y2="175.417" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+    <line x1="249.03" y1="215.781" x2="123.697" y2="215.781" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+    <line x1="249.03" y1="256.145" x2="123.697" y2="256.145" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+    <line x1="249.03" y1="296.508" x2="123.697" y2="296.508" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  </g>
 </svg>

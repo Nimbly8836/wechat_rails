@@ -1,6 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?><!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
-<svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M12.53 20.4201H6.21C3.05 20.4201 2 18.3201 2 16.2101V7.79008C2 4.63008 3.05 3.58008 6.21 3.58008H12.53C15.69 3.58008 16.74 4.63008 16.74 7.79008V16.2101C16.74 19.3701 15.68 20.4201 12.53 20.4201Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M19.52 17.0999L16.74 15.1499V8.83989L19.52 6.88989C20.88 5.93989 22 6.51989 22 8.18989V15.8099C22 17.4799 20.88 18.0599 19.52 17.0999Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M11.5 11C12.3284 11 13 10.3284 13 9.5C13 8.67157 12.3284 8 11.5 8C10.6716 8 10 8.67157 10 9.5C10 10.3284 10.6716 11 11.5 11Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="reel" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <line x1="81.13" y1="136.043" x2="81.13" y2="263.957" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="319.826" y1="136.043" x2="319.826" y2="263.957" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="230" y1="85.228" x2="230" y2="136.043" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="290" y1="85.228" x2="290" y2="136.043" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="170" y1="85.228" x2="170" y2="136.043" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="110" y1="85.228" x2="110" y2="136.043" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="170" y1="314.772" x2="170" y2="263.957" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="230" y1="314.772" x2="230" y2="263.957" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="290" y1="314.772" x2="290" y2="263.957" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="110" y1="314.772" x2="110" y2="263.957" fill="none" stroke="#4f46e5" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <path d="M188.182,166.667l42.434,30.069c2.25,1.594,2.25,4.933,0,6.527l-42.434,30.069c-2.649,1.877-6.313-.017-6.313-3.264v-60.138c0-3.247,3.664-5.141,6.313-3.264Z" fill="none" stroke="#191919" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="50" y1="136.043" x2="350" y2="136.043" fill="none" stroke="#191919" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <line x1="50" y1="263.957" x2="350" y2="263.957" fill="none" stroke="#191919" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <rect x="50" y="85.228" width="300" height="229.543" rx="13" ry="13" fill="none" stroke="#191919" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
 </svg>
