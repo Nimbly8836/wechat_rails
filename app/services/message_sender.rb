@@ -38,6 +38,7 @@ class MessageSender
       @extra[:base64] = payload[:base64]
       @extra[:file_md5] = payload[:file_md5]
       @extra[:total_len] = payload[:total_len]
+      @message_content = build_emoji_content(payload[:file_md5])
       res = message_api_service.send_emoji(@chat_room.wx_id, payload[:base64], md5: payload[:file_md5], total_len: payload[:total_len])
     when MESSAGE_TYPES[:quote]
       reference_message = quoted_reference_message
@@ -274,6 +275,13 @@ class MessageSender
     return { mime_type: match[:mime], encoded: match[:data] } if match
 
     { mime_type: nil, encoded: value }
+  end
+
+  def build_emoji_content(file_md5)
+    return @message_content if @message_content.present?
+    return "" if file_md5.blank?
+
+    %(<msg><emoji md5="#{CGI.escapeHTML(file_md5.to_s)}" /></msg>)
   end
 
   def extra_value(key)

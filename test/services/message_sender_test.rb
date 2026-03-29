@@ -66,7 +66,64 @@ class MessageSenderTest < ActiveSupport::TestCase
     tempfile.close!
   end
 
+  test "send persists emoji metadata content for local echo" do
+    tempfile = Tempfile.new(["emoji", ".gif"])
+    tempfile.binmode
+    tempfile.write("GIF89a")
+    tempfile.rewind
+
+    uploaded = ActionDispatch::Http::UploadedFile.new(
+      tempfile: tempfile,
+      filename: "emoji.gif",
+      type: "image/gif"
+    )
+
+    expected_md5 = Digest::MD5.hexdigest("GIF89a")
+    service = FakeEmojiMessageApiService.new(@chat_room.wx_id)
+    sender = MessageSender.new(@chat_room, 47, "", {}, uploaded)
+
+    sender.stub(:message_api_service, service) do
+      result = sender.send
+
+      assert_equal true, result[:success]
+    end
+
+    wx_message = WxMessage.order(:id).last
+    assert_equal :emoji, wx_message.msg_type.to_sym
+    assert_equal :emoji, wx_message.real_msg_type.to_sym
+    assert_equal expected_md5, wx_message.emoji_file_md5
+    assert_equal %(<msg><emoji md5="#{expected_md5}" /></msg>), wx_message.content
+    assert_equal expected_md5, service.last_md5
+    assert_equal 6, service.last_total_len
+  ensure
+    tempfile.close!
+    FileUtils.rm_f(Rails.root.join("storage", "emojis", "#{expected_md5}.gif")) if defined?(expected_md5)
+  end
+
   private
+
+  class FakeEmojiMessageApiService
+    attr_reader :last_md5, :last_total_len
+
+    def initialize(to_wxid)
+      @to_wxid = to_wxid
+    end
+
+    def send_emoji(to_wxid, _base64, md5:, total_len:)
+      @last_md5 = md5
+      @last_total_len = total_len
+
+      {
+        "success" => true,
+        "Data" => {
+          "Msgid" => 123_456,
+          "Newmsgid" => 789_012,
+          "ToUserName" => { "string" => to_wxid },
+          "CreateTime" => Time.current.to_i
+        }
+      }
+    end
+  end
 
   def create_message_for(wx_message)
     timestamp = Time.current
