@@ -148,6 +148,39 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     assert_equal "no-cache", response.headers["Pragma"]
   end
 
+  test "index serializes and backfills emoji md5 for emoji messages" do
+    emoji_md5 = SecureRandom.hex(16)
+    emoji_message = create_message!(
+      new_msg_id: 9_000_000_000_000_001_450,
+      msg_type: :emoji,
+      real_msg_type: :emoji,
+      content: emoji_xml(emoji_md5)
+    )
+
+    get chat_room_messages_path(@chat_room)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    message_payload = payload.find { |item| item["id"] == emoji_message.id }
+    assert_equal emoji_md5, message_payload.dig("wx_message", "emoji_md5")
+    assert_equal emoji_md5, emoji_message.wx_message.reload.emoji_md5
+  end
+
+  test "download_emoji_by_md5 serves cached emoji file" do
+    emoji_md5 = SecureRandom.hex(16)
+    cached_file = Rails.root.join("storage", "emojis", "#{emoji_md5}.gif")
+    FileUtils.mkdir_p(cached_file.dirname)
+    File.binwrite(cached_file, "GIF89a")
+
+    get "/message/emoji/md5/#{emoji_md5}"
+
+    assert_response :success
+    assert_equal "image/gif", response.media_type
+    assert_equal "GIF89a", response.body
+  ensure
+    FileUtils.rm_f(cached_file) if cached_file
+  end
+
   test "callback resolves owner wxid before parsing group system messages" do
     ActiveJob::Base.queue_adapter = :test
     group_wxid = @chat_room.wx_id
@@ -228,7 +261,7 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
   private
 
   def create_message!(new_msg_id:, content:, msg_id: nil, msg_type: :text, real_msg_type: :text,
-    refer_new_msg_id: nil, refer_title: nil, message_time: Time.current)
+    refer_new_msg_id: nil, refer_title: nil, message_time: Time.current, emoji_md5: nil)
     wx_message = WxMessage.create!(
       msg_id: msg_id || new_msg_id - 100,
       new_msg_id: new_msg_id,
@@ -241,6 +274,7 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
       content: content,
       refer_new_msg_id: refer_new_msg_id,
       refer_title: refer_title,
+      emoji_md5: emoji_md5,
       self_send: false
     )
 
@@ -270,6 +304,14 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
           <svrid>#{referenced_new_msg_id}</svrid>
           <content>原消息</content>
         </refermsg>
+      </msg>
+    XML
+  end
+
+  def emoji_xml(emoji_md5)
+    <<~XML
+      <msg>
+        <emoji md5="#{emoji_md5}" cdnurl="https://example.com/#{emoji_md5}.gif" />
       </msg>
     XML
   end

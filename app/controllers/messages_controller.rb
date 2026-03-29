@@ -187,57 +187,28 @@ class MessagesController < ApplicationController
 
   def download_emoji
     message = Message.includes(:wx_message, :chat_room).find(params[:id])
-    wx_message = message.wx_message
+    return render json: { error: true, message: "emoji message not found" }, status: :not_found unless message.wx_message
 
-    unless wx_message&.content
-      render json: { error: true, message: "emoji message not found" }, status: :not_found and return
+    serve_emoji(message.wx_message)
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: true, message: "emoji message not found" }, status: :not_found
+  rescue URI::InvalidURIError, SocketError, Timeout::Error, Errno::ECONNREFUSED => e
+    Rails.logger.error { "emoji download error: #{e.message}" }
+    render json: { error: true, message: "emoji download error" }, status: :bad_gateway
+  end
+
+  def download_emoji_by_md5
+    emoji_md5 = params[:md5].to_s.strip
+    return render json: { error: true, message: "emoji md5 missing" }, status: :bad_request if emoji_md5.blank?
+
+    if (existing_path = locate_cached_emoji(emoji_md5))
+      return send_emoji_file(existing_path)
     end
 
-    storage_dir = Rails.root.join("storage", "emojis")
-    FileUtils.mkdir_p(storage_dir)
+    wx_message = WxMessage.where(emoji_md5: emoji_md5).where.not(content: [ nil, "" ]).order(:id).first
+    return render json: { error: true, message: "emoji message not found" }, status: :not_found unless wx_message
 
-    emoji_md5 = wx_message.emoji_md5.presence&.strip
-    cdn_url = nil
-    existing_path = if emoji_md5.present?
-                      Dir.glob(storage_dir.join("#{emoji_md5}.*")).first || (storage_dir.join(emoji_md5) if File.exist?(storage_dir.join(emoji_md5)))
-    end
-
-    return send_emoji_file(existing_path) if existing_path
-
-    emoji_content = wx_message.parse_emoji || {}
-    Rails.logger.debug "EMOJI parse : #{emoji_content.inspect}"
-    parsed_md5 = emoji_content[:md5].presence&.strip
-    cdn_url = emoji_content[:cdn_url].presence
-
-    if emoji_md5.blank? && parsed_md5.present?
-      emoji_md5 = parsed_md5
-      wx_message.update_column(:emoji_md5, parsed_md5)
-      existing_path = Dir.glob(storage_dir.join("#{emoji_md5}.*")).first || (storage_dir.join(emoji_md5) if File.exist?(storage_dir.join(emoji_md5)))
-      return send_emoji_file(existing_path) if existing_path
-    end
-
-    if emoji_md5.blank? || cdn_url.blank?
-      render json: { error: true, message: "emoji metadata missing" }, status: :unprocessable_content and return
-    end
-
-    existing_path = Dir.glob(storage_dir.join("#{emoji_md5}.*")).first
-    existing_path ||= storage_dir.join(emoji_md5) if File.exist?(storage_dir.join(emoji_md5))
-
-    uri = URI.parse(cdn_url)
-    response = Net::HTTP.get_response(uri)
-
-    unless response.is_a?(Net::HTTPSuccess)
-      render json: { error: true, message: "emoji download failed" }, status: :bad_gateway and return
-    end
-
-    content_type = response["content-type"]
-    extension = determine_extension(uri, content_type)
-    file_path = storage_dir.join("#{emoji_md5}#{extension}")
-
-    File.binwrite(file_path, response.body)
-    wx_message.update_column(:emoji_md5, emoji_md5) if wx_message.emoji_md5.blank? && emoji_md5.present?
-
-    send_emoji_file(file_path, content_type)
+    serve_emoji(wx_message, preferred_md5: emoji_md5)
   rescue URI::InvalidURIError, SocketError, Timeout::Error, Errno::ECONNREFUSED => e
     Rails.logger.error { "emoji download error: #{e.message}" }
     render json: { error: true, message: "emoji download error" }, status: :bad_gateway
@@ -393,6 +364,68 @@ class MessagesController < ApplicationController
     send_file(path, type: mime_type, disposition: "inline")
   end
 
+  def serve_emoji(wx_message, preferred_md5: nil)
+    unless wx_message&.content
+      render json: { error: true, message: "emoji message not found" }, status: :not_found and return
+    end
+
+    emoji_md5 = preferred_md5.presence || wx_message.emoji_md5.presence&.strip
+    if (existing_path = locate_cached_emoji(emoji_md5))
+      send_emoji_file(existing_path)
+      return
+    end
+
+    emoji_content = wx_message.parse_emoji || {}
+    Rails.logger.debug { "EMOJI parse : #{emoji_content.inspect}" }
+    parsed_md5 = emoji_content[:md5].presence&.strip
+    cdn_url = emoji_content[:cdn_url].presence
+    emoji_md5 = preferred_md5.presence || emoji_md5.presence || parsed_md5
+
+    if emoji_md5.present? && wx_message.emoji_md5.blank?
+      wx_message.update_column(:emoji_md5, emoji_md5)
+    end
+
+    if (existing_path = locate_cached_emoji(emoji_md5))
+      send_emoji_file(existing_path)
+      return
+    end
+
+    if emoji_md5.blank? || cdn_url.blank?
+      render json: { error: true, message: "emoji metadata missing" }, status: :unprocessable_content and return
+    end
+
+    storage_dir = emoji_storage_dir
+    uri = URI.parse(cdn_url)
+    response = Net::HTTP.get_response(uri)
+
+    unless response.is_a?(Net::HTTPSuccess)
+      render json: { error: true, message: "emoji download failed" }, status: :bad_gateway and return
+    end
+
+    content_type = response["content-type"]
+    extension = determine_extension(uri, content_type)
+    file_path = storage_dir.join("#{emoji_md5}#{extension}")
+
+    File.binwrite(file_path, response.body)
+    send_emoji_file(file_path, content_type)
+  end
+
+  def emoji_storage_dir
+    storage_dir = Rails.root.join("storage", "emojis")
+    FileUtils.mkdir_p(storage_dir)
+    storage_dir
+  end
+
+  def locate_cached_emoji(emoji_md5)
+    return nil if emoji_md5.blank?
+
+    storage_dir = emoji_storage_dir
+    Dir.glob(storage_dir.join("#{emoji_md5}.*")).first || begin
+      path = storage_dir.join(emoji_md5)
+      path if File.exist?(path)
+    end
+  end
+
   def determine_extension(uri, content_type)
     extension = File.extname(uri.path)
     return extension if extension.present?
@@ -465,34 +498,40 @@ class MessagesController < ApplicationController
       include: {
         wx_message: {
           only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                 :new_msg_id, :refer_new_msg_id, :refer_title, :self_send, :real_msg_type ]
+                 :new_msg_id, :refer_new_msg_id, :refer_title, :self_send, :real_msg_type, :emoji_md5 ]
         }
       }
     )
 
-    base["wx_message"] = serialize_wx_message_json(base["wx_message"])
+    base["wx_message"] = serialize_wx_message_json(base["wx_message"], message.wx_message)
     referenced_json = referenced&.as_json(
       only: [ :id, :chat_room_id, :created_at, :message_time ],
       include: {
         wx_message: {
           only: [ :msg_type, :content, :from_user_name, :to_user_name,
-                 :new_msg_id, :self_send, :real_msg_type ]
+                 :new_msg_id, :self_send, :real_msg_type, :emoji_md5 ]
         }
       }
     )
-    referenced_json["wx_message"] = serialize_wx_message_json(referenced_json["wx_message"]) if referenced_json
+    referenced_json["wx_message"] = serialize_wx_message_json(referenced_json["wx_message"], referenced.wx_message) if referenced_json
 
     base.merge(
       "referenced_message" => referenced_json
     )
   end
 
-  def serialize_wx_message_json(wx_message_json)
+  def serialize_wx_message_json(wx_message_json, wx_message = nil)
     return wx_message_json unless wx_message_json.is_a?(Hash)
+
+    emoji_md5 = wx_message_json["emoji_md5"].presence || wx_message&.parse_emoji&.dig(:md5)
+    if emoji_md5.present? && wx_message&.emoji_md5.blank?
+      wx_message.update_column(:emoji_md5, emoji_md5)
+    end
 
     wx_message_json.merge(
       "new_msg_id" => serialize_frontend_identifier(wx_message_json["new_msg_id"]),
-      "refer_new_msg_id" => serialize_frontend_identifier(wx_message_json["refer_new_msg_id"])
+      "refer_new_msg_id" => serialize_frontend_identifier(wx_message_json["refer_new_msg_id"]),
+      "emoji_md5" => emoji_md5
     )
   end
 
