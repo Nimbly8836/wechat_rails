@@ -187,8 +187,8 @@ class MessagesController < ApplicationController
   end
 
   def download_emoji
-    message = Message.includes(:wx_message, :chat_room).find(params[:id])
-    return render json: { error: true, message: "emoji message not found" }, status: :not_found unless message.wx_message
+    message = find_message_for_media(params[:id])
+    return render json: { error: true, message: "emoji message not found" }, status: :not_found unless message&.wx_message
 
     serve_emoji(message.wx_message)
   rescue ActiveRecord::RecordNotFound
@@ -487,6 +487,13 @@ class MessagesController < ApplicationController
     Message.includes(:wx_message).where(chat_room_id: chat_room_id)
   end
 
+  def find_message_for_media(identifier)
+    message = Message.includes(:wx_message, :chat_room).find_by(id: identifier)
+    return message if message
+
+    Message.includes(:wx_message, :chat_room).find_by(wx_messages_id: identifier)
+  end
+
   def search_messages_scope(chat_room_id, query)
     messages_scope(chat_room_id)
       .joins(:wx_message)
@@ -539,6 +546,8 @@ class MessagesController < ApplicationController
         }
       }
     )
+    base["message_id"] = message.id
+    base["wx_message_id"] = message.wx_messages_id
 
     base["wx_message"] = serialize_wx_message_json(base["wx_message"], message.wx_message)
     referenced_json = referenced&.as_json(

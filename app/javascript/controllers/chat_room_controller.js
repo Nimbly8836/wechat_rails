@@ -860,8 +860,11 @@ export default class extends Controller {
     const sortedMessages = this.sortedMessageWrappers();
     sortedMessages.forEach((wrapper, index) => {
       const msg = wrapper.wx_message;
-      msg.id = wrapper.id;
-      msg._messageId = wrapper.id;
+      const messageId = wrapper.message_id || wrapper.id || wrapper.wx_messages_id;
+      const wxMessageId = wrapper.wx_message_id || wrapper.wx_messages_id || null;
+      msg.id = messageId || wxMessageId;
+      msg._messageId = messageId || wxMessageId;
+      msg._wxMessageId = wxMessageId || msg._messageId;
       msg._cacheKey = wrapper.updated_at || wrapper.message_time
         || wrapper.created_at || msg.message_time;
       msg.referenced_message = wrapper.referenced_message;
@@ -1634,7 +1637,7 @@ export default class extends Controller {
       });
 
       const previewUrl = msg._sending ? msg.extra?.preview_url : "";
-      const messageId = msg._messageId || msg.id;
+      const messageId = msg._messageId || msg._wxMessageId || msg.id;
       const cacheKey = msg._cacheKey;
       const emojiFileMd5 = (msg.emoji_file_md5 || msg.extra?.file_md5 || "").trim();
 
@@ -2660,7 +2663,7 @@ export default class extends Controller {
     if (!msg) {
       return null;
     }
-    const messageId = msg._messageId || msg.id;
+      const messageId = msg._messageId || msg._wxMessageId || msg.id;
     if (!messageId) {
       return null;
     }

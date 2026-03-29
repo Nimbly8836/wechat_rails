@@ -193,6 +193,28 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     FileUtils.rm_f(canonical_file) if canonical_file
   end
 
+  test "download_emoji accepts wx_message id as fallback identifier" do
+    emoji_md5 = SecureRandom.hex(16)
+    cached_file = Rails.root.join("storage", "emojis", "#{emoji_md5}.gif")
+    FileUtils.mkdir_p(cached_file.dirname)
+    File.binwrite(cached_file, "GIF89a")
+    emoji_message = create_message!(
+      new_msg_id: 9_000_000_000_000_001_452,
+      msg_type: :emoji,
+      real_msg_type: :emoji,
+      content: emoji_xml(emoji_md5),
+      emoji_md5: emoji_md5
+    )
+
+    get "/message/emoji/#{emoji_message.wx_message.id}"
+
+    assert_response :success
+    assert_equal "image/gif", response.media_type
+    assert_equal "GIF89a", response.body
+  ensure
+    FileUtils.rm_f(cached_file) if cached_file
+  end
+
   test "download_emoji_by_md5 serves cached emoji file" do
     emoji_md5 = SecureRandom.hex(16)
     cached_file = Rails.root.join("storage", "emojis", "#{emoji_md5}.gif")
