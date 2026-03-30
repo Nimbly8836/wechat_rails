@@ -1684,37 +1684,27 @@ export default class extends Controller {
         image.click();
       });
 
-      const previewUrl = msg._sending ? msg.extra?.preview_url : "";
-      const serializedEmojiUrl = msg.emoji_url || "";
-      const messageId = msg._messageId || msg._wxMessageId || msg.id;
-      const cacheKey = msg._cacheKey;
-      const emojiCacheMd5 = (msg.emoji_file_md5 || msg.emoji_md5
-        || msg.extra?.file_md5 || msg.extra?.md5 || "").trim();
+      const sources = this.emojiRenderSourcesFor(msg);
+      let currentSourceIndex = -1;
 
-      if (previewUrl) {
+      const loadNextSource = () => {
+        currentSourceIndex += 1;
+        const nextSource = sources[currentSourceIndex];
+        if (!nextSource) {
+          showFallback("[表情加载失败]");
+          return;
+        }
+
+        image.src = nextSource;
+      };
+
+      image.addEventListener("error", () => {
+        loadNextSource();
+      });
+
+      if (sources.length > 0) {
         requestAnimationFrame(() => {
-          image.src = previewUrl;
-        });
-      } else if (serializedEmojiUrl) {
-        const url = cacheKey
-          ? `${serializedEmojiUrl}${serializedEmojiUrl.includes("?") ? "&" : "?"}t=${encodeURIComponent(cacheKey)}`
-          : serializedEmojiUrl;
-        requestAnimationFrame(() => {
-          image.src = url;
-        });
-      } else if (emojiCacheMd5) {
-        const url = cacheKey
-          ? `/message/emoji/md5/${encodeURIComponent(emojiCacheMd5)}?t=${encodeURIComponent(cacheKey)}`
-          : `/message/emoji/md5/${encodeURIComponent(emojiCacheMd5)}`;
-        requestAnimationFrame(() => {
-          image.src = url;
-        });
-      } else if (messageId) {
-        const url = cacheKey
-          ? `/message/emoji/${messageId}?t=${encodeURIComponent(cacheKey)}`
-          : `/message/emoji/${messageId}`;
-        requestAnimationFrame(() => {
-          image.src = url;
+          loadNextSource();
         });
       } else {
         showFallback("[暂不支持的表情]");
@@ -1739,6 +1729,65 @@ export default class extends Controller {
       content.classList.add("mt-1");
     }
     return applied;
+  }
+
+  emojiRenderSourcesFor(msg) {
+    const sources = [];
+    const pushSource = (value, { cacheKey = null } = {}) => {
+      const raw = String(value || "").trim();
+      if (!raw) {
+        return;
+      }
+
+      const source = cacheKey ? this.appendCacheKey(raw, cacheKey) : raw;
+      if (!sources.includes(source)) {
+        sources.push(source);
+      }
+    };
+
+    const previewUrl = msg._sending ? msg.extra?.preview_url : "";
+    const serializedEmojiUrl = msg.emoji_url || "";
+    const messageId = msg._messageId || msg._wxMessageId || msg.id;
+    const cacheKey = msg._cacheKey;
+    const emojiCacheMd5 = (msg.emoji_file_md5 || msg.emoji_md5
+      || msg.extra?.file_md5 || msg.extra?.md5 || "").trim();
+    const cdnUrl = this.extractEmojiCdnUrl(msg.content || "");
+
+    pushSource(previewUrl);
+    pushSource(serializedEmojiUrl, { cacheKey });
+
+    if (emojiCacheMd5) {
+      pushSource(`/message/emoji/md5/${encodeURIComponent(emojiCacheMd5)}`, {
+        cacheKey
+      });
+    }
+
+    if (messageId) {
+      pushSource(`/message/emoji/${messageId}`, { cacheKey });
+    }
+
+    pushSource(cdnUrl);
+    return sources;
+  }
+
+  appendCacheKey(url, cacheKey) {
+    const rawUrl = String(url || "").trim();
+    if (!rawUrl || !cacheKey) {
+      return rawUrl;
+    }
+
+    return `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}t=${encodeURIComponent(cacheKey)}`;
+  }
+
+  extractEmojiCdnUrl(xmlString = "") {
+    const xml = this.parseXmlDocument(xmlString);
+    if (!xml) {
+      return "";
+    }
+
+    return xml.querySelector("emoji")?.getAttribute("cdnurl")
+      || xml.querySelector("emoji > cdnurl")?.textContent?.trim()
+      || "";
   }
 
   renderTextMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {

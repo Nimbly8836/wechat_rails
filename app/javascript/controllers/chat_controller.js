@@ -45,6 +45,7 @@ export default class extends Controller {
     "settingsList",
     "folderBar",
     "letterNav",
+    "mobileHeader",
     "mobileTitle",
     "sidebarTitle",
     "resizer",
@@ -484,6 +485,7 @@ export default class extends Controller {
 
     this.syncMobileViewportLock()
     this.applySidebarState()
+    this.updateMobileHeaderVisibility()
   }
 
   syncMobileViewportLock() {
@@ -520,6 +522,16 @@ export default class extends Controller {
     }
 
     this.updateToggleButton()
+    this.updateMobileHeaderVisibility()
+  }
+
+  updateMobileHeaderVisibility() {
+    if (!this.hasMobileHeaderTarget) {
+      return
+    }
+
+    const shouldHide = this.isMobileViewport() && !!this.currentRoomId
+    this.mobileHeaderTarget.classList.toggle("hidden", shouldHide)
   }
 
   openSidebar(event = null) {
@@ -1136,6 +1148,7 @@ export default class extends Controller {
     this.contactTargets.forEach((item) => item.classList.remove("bg-slate-100"))
     contact.classList.add("bg-slate-100")
     this.currentRoomId = null
+    this.updateMobileHeaderVisibility()
     this.setMobileTitle(contactName || "联系人")
     this.renderChatRoomList(this.chatRooms)
 
@@ -1188,6 +1201,7 @@ export default class extends Controller {
     }
 
     this.currentRoomId = String(chatRoomId)
+    this.updateMobileHeaderVisibility()
     this.setMobileTitle(roomTitle)
     this.renderChatRoomList(this.chatRooms)
 
