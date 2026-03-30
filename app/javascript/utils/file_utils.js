@@ -123,7 +123,7 @@ export function replaceEmojis(text) {
   };
 
   Object.entries(emojiAliases).forEach(([name, aliases]) => {
-    const html = `<img src="/emoji/${name}.webp" alt="${name}" class="w-5 h-5 inline">`;
+    const html = `<img src="/emoji/${name}.webp" alt="${name}" class="mx-0.5 inline-block h-5 w-5 align-middle">`;
     emojiMap[`[${name}]`] = html;
     aliases.forEach(alias => {
       emojiMap[`[${alias}]`] = html;

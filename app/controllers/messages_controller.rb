@@ -75,7 +75,8 @@ class MessagesController < ApplicationController
       args[:file]
     )
     res = sender.send
-    render json: res
+    serialized = serialize_send_result(res, chat_room.id)
+    render json: serialized
   end
 
   def callback
@@ -549,7 +550,7 @@ class MessagesController < ApplicationController
     base["message_id"] = message.id
     base["wx_message_id"] = message.wx_messages_id
 
-    base["wx_message"] = serialize_wx_message_json(base["wx_message"], message.wx_message)
+    base["wx_message"] = serialize_wx_message_json(base["wx_message"], message: message, wx_message: message.wx_message)
     referenced_json = referenced&.as_json(
       only: [ :id, :chat_room_id, :created_at, :message_time ],
       include: {
@@ -559,17 +560,18 @@ class MessagesController < ApplicationController
         }
       }
     )
-    referenced_json["wx_message"] = serialize_wx_message_json(referenced_json["wx_message"], referenced.wx_message) if referenced_json
+    referenced_json["wx_message"] = serialize_wx_message_json(referenced_json["wx_message"], message: referenced, wx_message: referenced.wx_message) if referenced_json
 
     base.merge(
       "referenced_message" => referenced_json
     )
   end
 
-  def serialize_wx_message_json(wx_message_json, wx_message = nil)
+  def serialize_wx_message_json(wx_message_json, message: nil, wx_message: nil)
     return wx_message_json unless wx_message_json.is_a?(Hash)
 
     emoji_md5 = wx_message_json["emoji_md5"].presence || wx_message&.parse_emoji&.dig(:md5)
+    emoji_file_md5 = wx_message_json["emoji_file_md5"].presence || wx_message&.emoji_file_md5
     if emoji_md5.present? && wx_message&.emoji_md5.blank?
       wx_message.update_column(:emoji_md5, emoji_md5)
     end
@@ -578,8 +580,34 @@ class MessagesController < ApplicationController
       "new_msg_id" => serialize_frontend_identifier(wx_message_json["new_msg_id"]),
       "refer_new_msg_id" => serialize_frontend_identifier(wx_message_json["refer_new_msg_id"]),
       "emoji_md5" => emoji_md5,
-      "emoji_file_md5" => wx_message_json["emoji_file_md5"].presence || wx_message&.emoji_file_md5
+      "emoji_file_md5" => emoji_file_md5,
+      "emoji_url" => build_emoji_url(message: message, wx_message: wx_message, emoji_file_md5: emoji_file_md5, emoji_md5: emoji_md5)
     )
+  end
+
+  def build_emoji_url(message: nil, wx_message: nil, emoji_file_md5: nil, emoji_md5: nil)
+    md5 = emoji_file_md5.presence || emoji_md5.presence
+    if md5.present?
+      return "/message/emoji/md5/#{ERB::Util.url_encode(md5.to_s)}"
+    end
+
+    identifier = message&.id || wx_message&.id
+    return nil if identifier.blank?
+
+    "/message/emoji/#{identifier}"
+  end
+
+  def serialize_send_result(result, chat_room_id)
+    payload = result.is_a?(Hash) ? result.deep_dup : result
+    return payload unless payload.is_a?(Hash) && payload[:success] && payload[:data].is_a?(Hash)
+
+    message_id = payload.dig(:data, "id") || payload.dig(:data, :id)
+    return payload if message_id.blank?
+
+    message = messages_scope(chat_room_id).find_by(id: message_id)
+    return payload unless message
+
+    payload.merge(data: serialize_messages([ message ], chat_room_id).first)
   end
 
   def serialize_frontend_identifier(value)

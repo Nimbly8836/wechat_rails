@@ -132,6 +132,9 @@ export default class extends Controller {
         this.refreshRoomFromNotification(payload);
       }
     };
+    this.boundComposerFocus = this.handleComposerFocus.bind(this);
+    this.boundComposerBlur = this.handleComposerBlur.bind(this);
+    this.boundComposerViewportChange = this.handleComposerViewportChange.bind(this);
 
     window.addEventListener("chat:notify", this.boundChatNotify);
 
@@ -182,7 +185,13 @@ export default class extends Controller {
     this.messageListTarget.addEventListener("scroll",
       this.handleScroll.bind(this));
 
+    this.inputTarget.addEventListener("focus", this.boundComposerFocus);
+    this.inputTarget.addEventListener("blur", this.boundComposerBlur);
     this.inputTarget.addEventListener("input", this.autoResize.bind(this));
+    window.visualViewport?.addEventListener("resize",
+      this.boundComposerViewportChange);
+    window.visualViewport?.addEventListener("scroll",
+      this.boundComposerViewportChange);
     // this.autoResize();
 
     // 设置 emoji 预览功能
@@ -393,6 +402,13 @@ export default class extends Controller {
     if (this.boundChatNotify) {
       window.removeEventListener("chat:notify", this.boundChatNotify);
     }
+    this.inputTarget.removeEventListener("focus", this.boundComposerFocus);
+    this.inputTarget.removeEventListener("blur", this.boundComposerBlur);
+    window.visualViewport?.removeEventListener("resize",
+      this.boundComposerViewportChange);
+    window.visualViewport?.removeEventListener("scroll",
+      this.boundComposerViewportChange);
+    document.documentElement.classList.remove("tg-composer-active");
 
     if (this.pendingNotifyRefreshTimer) {
       clearTimeout(this.pendingNotifyRefreshTimer);
@@ -489,6 +505,38 @@ export default class extends Controller {
     const el = this.inputTarget;
     el.style.height = "auto";
     el.style.height = el.scrollHeight + "px";
+  }
+
+  handleComposerFocus() {
+    document.documentElement.classList.add("tg-composer-active");
+    this.ensureComposerVisible(true);
+  }
+
+  handleComposerBlur() {
+    document.documentElement.classList.remove("tg-composer-active");
+  }
+
+  handleComposerViewportChange() {
+    if (document.activeElement !== this.inputTarget) {
+      return;
+    }
+
+    this.ensureComposerVisible();
+  }
+
+  ensureComposerVisible(forceBottom = false) {
+    if (!this.hasMessageListTarget) {
+      return;
+    }
+
+    if (forceBottom) {
+      this.autoScrollPinnedToBottom = true;
+    }
+
+    const scrollToBottom = () => this.scrollToBottom();
+    requestAnimationFrame(scrollToBottom);
+    window.setTimeout(scrollToBottom, 80);
+    window.setTimeout(scrollToBottom, 220);
   }
 
   loadMessages({ replace = false } = {}) {
@@ -1637,18 +1685,27 @@ export default class extends Controller {
       });
 
       const previewUrl = msg._sending ? msg.extra?.preview_url : "";
+      const serializedEmojiUrl = msg.emoji_url || "";
       const messageId = msg._messageId || msg._wxMessageId || msg.id;
       const cacheKey = msg._cacheKey;
-      const emojiFileMd5 = (msg.emoji_file_md5 || msg.extra?.file_md5 || "").trim();
+      const emojiCacheMd5 = (msg.emoji_file_md5 || msg.emoji_md5
+        || msg.extra?.file_md5 || msg.extra?.md5 || "").trim();
 
       if (previewUrl) {
         requestAnimationFrame(() => {
           image.src = previewUrl;
         });
-      } else if (emojiFileMd5) {
+      } else if (serializedEmojiUrl) {
         const url = cacheKey
-          ? `/message/emoji/md5/${encodeURIComponent(emojiFileMd5)}?t=${encodeURIComponent(cacheKey)}`
-          : `/message/emoji/md5/${encodeURIComponent(emojiFileMd5)}`;
+          ? `${serializedEmojiUrl}${serializedEmojiUrl.includes("?") ? "&" : "?"}t=${encodeURIComponent(cacheKey)}`
+          : serializedEmojiUrl;
+        requestAnimationFrame(() => {
+          image.src = url;
+        });
+      } else if (emojiCacheMd5) {
+        const url = cacheKey
+          ? `/message/emoji/md5/${encodeURIComponent(emojiCacheMd5)}?t=${encodeURIComponent(cacheKey)}`
+          : `/message/emoji/md5/${encodeURIComponent(emojiCacheMd5)}`;
         requestAnimationFrame(() => {
           image.src = url;
         });
