@@ -25,9 +25,9 @@
         object-cover'
              alt='avatar'/>
       </div>
-      <div class="hidden min-w-0 leading-tight sm:block">
+      <div class="min-w-0 leading-tight">
         <div class="truncate font-semibold text-slate-900"><%= @chat_room.name.presence || "聊天窗口" %></div>
-        <div class="text-xs text-slate-500">实时消息</div>
+        <div class="hidden text-xs text-slate-500 sm:block">实时消息</div>
       </div>
     </div>
     <div class="flex items-center gap-3 text-slate-500">
