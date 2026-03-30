@@ -1666,21 +1666,20 @@ export default class extends Controller {
       content.appendChild(placeholder);
 
       const image = document.createElement("img");
-      image.loading = "lazy";
+      image.loading = "eager";
       image.decoding = "async";
       image.alt = "表情";
       image.referrerPolicy = "no-referrer";
-      image.className = "max-w-[208px] max-h-[208px] object-contain select-none";
+      image.className = "max-w-[208px] max-h-[208px] object-contain select-none opacity-0 transition-opacity duration-150";
       image.style.userSelect = "none";
       image.style.cursor = "zoom-in";
       image.setAttribute("role", "button");
       image.setAttribute("tabindex", "0");
-      image.classList.add("hidden");
       content.appendChild(image);
 
       const showImage = () => {
         placeholder.remove();
-        image.classList.remove("hidden");
+        image.classList.remove("opacity-0");
       };
 
       const showFallback = (message) => {
