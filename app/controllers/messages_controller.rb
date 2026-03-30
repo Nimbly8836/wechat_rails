@@ -613,15 +613,15 @@ class MessagesController < ApplicationController
   end
 
   def build_emoji_url(message: nil, wx_message: nil, emoji_file_md5: nil, emoji_md5: nil)
-    md5 = emoji_file_md5.presence || emoji_md5.presence
-    if md5.present?
-      return "/message/emoji/md5/#{ERB::Util.url_encode(md5.to_s)}"
+    identifier = message&.id || wx_message&.id
+    if identifier.present?
+      return "/message/emoji/#{identifier}"
     end
 
-    identifier = message&.id || wx_message&.id
-    return nil if identifier.blank?
+    md5 = emoji_file_md5.presence || emoji_md5.presence
+    return nil if md5.blank?
 
-    "/message/emoji/#{identifier}"
+    "/message/emoji/md5/#{ERB::Util.url_encode(md5.to_s)}"
   end
 
   def serialize_send_result(result, chat_room_id)

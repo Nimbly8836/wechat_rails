@@ -165,7 +165,7 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     assert_equal emoji_md5, message_payload.dig("wx_message", "emoji_md5")
     assert_equal emoji_md5, emoji_message.wx_message.reload.emoji_md5
     assert_nil message_payload.dig("wx_message", "emoji_file_md5")
-    assert_equal "/message/emoji/md5/#{emoji_md5}",
+    assert_equal "/message/emoji/#{emoji_message.id}",
       message_payload.dig("wx_message", "emoji_url")
   end
 
@@ -186,7 +186,7 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     payload = JSON.parse(response.body)
     message_payload = payload.find { |item| item["id"] == emoji_message.id }
-    assert_equal "/message/emoji/md5/#{emoji_file_md5}",
+    assert_equal "/message/emoji/#{emoji_message.id}",
       message_payload.dig("wx_message", "emoji_url")
   end
 

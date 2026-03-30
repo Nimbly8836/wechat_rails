@@ -118,6 +118,10 @@ export default class extends Controller {
     this.pendingQuote = null;
     this.messageSearchTimer = null;
     this.memberSearchTimer = null;
+    this.isInputComposing = false;
+    this.boundInputKeydown = this.handleInputKeydown.bind(this);
+    this.boundInputCompositionStart = this.handleInputCompositionStart.bind(this);
+    this.boundInputCompositionEnd = this.handleInputCompositionEnd.bind(this);
     this.messageSearchRequestId = 0;
     this.memberSearchRequestId = 0;
     const cachedMembers = this.readCachedChatMembers();
@@ -165,23 +169,11 @@ export default class extends Controller {
     this.renderPendingQuote();
     this.renderMembersPanel(this.chatMembers);
 
-    this.inputTarget.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        if (e.shiftKey) {
-          // Shift + Enter: 允许换行
-          return; // 不阻止默认行为，允许换行
-        } else {
-          // Enter: 发送消息
-          e.preventDefault(); // 阻止默认换行行为
-          if (this.inputTarget.value.trim() === '') {
-            this.inputTarget.placeholder = "发送消息不能为空";
-          } else {
-            this.sendMessage(this.pendingQuote ? "quote" : "text");
-            this.autoResize();
-          }
-        }
-      }
-    });
+    this.inputTarget.addEventListener("keydown", this.boundInputKeydown);
+    this.inputTarget.addEventListener("compositionstart",
+      this.boundInputCompositionStart);
+    this.inputTarget.addEventListener("compositionend",
+      this.boundInputCompositionEnd);
 
     this.messageListTarget.addEventListener("scroll",
       this.handleScroll.bind(this));
@@ -405,6 +397,11 @@ export default class extends Controller {
     }
     this.inputTarget.removeEventListener("focus", this.boundComposerFocus);
     this.inputTarget.removeEventListener("blur", this.boundComposerBlur);
+    this.inputTarget.removeEventListener("keydown", this.boundInputKeydown);
+    this.inputTarget.removeEventListener("compositionstart",
+      this.boundInputCompositionStart);
+    this.inputTarget.removeEventListener("compositionend",
+      this.boundInputCompositionEnd);
     window.visualViewport?.removeEventListener("resize",
       this.boundComposerViewportChange);
     window.visualViewport?.removeEventListener("scroll",
@@ -445,6 +442,37 @@ export default class extends Controller {
     }
 
 
+  }
+
+  handleInputCompositionStart() {
+    this.isInputComposing = true;
+  }
+
+  handleInputCompositionEnd() {
+    this.isInputComposing = false;
+  }
+
+  handleInputKeydown(event) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (event.shiftKey) {
+      return;
+    }
+
+    if (event.isComposing || this.isInputComposing || event.keyCode === 229) {
+      return;
+    }
+
+    event.preventDefault();
+    if (this.inputTarget.value.trim() === "") {
+      this.inputTarget.placeholder = "发送消息不能为空";
+      return;
+    }
+
+    this.sendMessage(this.pendingQuote ? "quote" : "text");
+    this.autoResize();
   }
 
   isRoom() {
