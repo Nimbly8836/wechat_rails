@@ -371,24 +371,37 @@ class MessagesController < ApplicationController
 
   def send_emoji_file(path, content_type = nil)
     mime_type = content_type || Marcel::MimeType.for(Pathname.new(path))
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["Pragma"] = "no-cache"
     send_file(path, type: mime_type, disposition: "inline")
   end
 
   def serve_emoji(wx_message, preferred_file_md5: nil)
-    unless wx_message&.content
+    unless wx_message
       render json: { error: true, message: "emoji message not found" }, status: :not_found and return
     end
 
-    emoji_meta = normalize_emoji_metadata!(wx_message)
     file_md5 = preferred_file_md5.presence || wx_message.emoji_file_md5.presence&.strip
-    legacy_md5 = emoji_meta[:emoji_md5].presence
+    legacy_md5 = wx_message.emoji_md5.presence&.strip
 
     if (existing_path = locate_cached_emoji(file_md5) || locate_cached_emoji(legacy_md5))
       send_emoji_file(backfill_emoji_file_cache!(wx_message, existing_path, preferred_file_md5: file_md5))
       return
     end
 
-    if emoji_meta[:emoji_md5].blank? || emoji_meta[:cdn_url].blank?
+    unless wx_message.content.present?
+      render json: { error: true, message: "emoji metadata missing" }, status: :unprocessable_content and return
+    end
+
+    emoji_meta = normalize_emoji_metadata!(wx_message)
+    legacy_md5 = emoji_meta[:emoji_md5].presence || legacy_md5
+
+    if (existing_path = locate_cached_emoji(file_md5) || locate_cached_emoji(legacy_md5))
+      send_emoji_file(backfill_emoji_file_cache!(wx_message, existing_path, preferred_file_md5: file_md5))
+      return
+    end
+
+    if legacy_md5.blank? || emoji_meta[:cdn_url].blank?
       render json: { error: true, message: "emoji metadata missing" }, status: :unprocessable_content and return
     end
 
@@ -407,7 +420,7 @@ class MessagesController < ApplicationController
 
     File.binwrite(file_path, response.body) unless File.exist?(file_path)
     wx_message.update_columns(
-      emoji_md5: emoji_meta[:emoji_md5],
+      emoji_md5: legacy_md5,
       emoji_file_md5: file_md5
     )
     send_emoji_file(file_path, content_type)

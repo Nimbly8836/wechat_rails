@@ -34,6 +34,7 @@ const DEFAULT_THEME = {
   otherBubbleBorderColor: "rgba(15,23,42,0.08)",
   fontFamily: "inherit"
 };
+const EMOJI_REQUEST_VERSION = "20260330b";
 
 export default class extends Controller {
   static targets = ["messageList", "input", "emptyMessage", "menu",
@@ -1772,11 +1773,16 @@ export default class extends Controller {
 
   appendCacheKey(url, cacheKey) {
     const rawUrl = String(url || "").trim();
-    if (!rawUrl || !cacheKey) {
+    if (!rawUrl) {
       return rawUrl;
     }
 
-    return `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}t=${encodeURIComponent(cacheKey)}`;
+    const params = [];
+    if (cacheKey) {
+      params.push(`t=${encodeURIComponent(cacheKey)}`);
+    }
+    params.push(`emoji_v=${encodeURIComponent(EMOJI_REQUEST_VERSION)}`);
+    return `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}${params.join("&")}`;
   }
 
   extractEmojiCdnUrl(xmlString = "") {
