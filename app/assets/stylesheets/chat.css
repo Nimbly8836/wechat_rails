@@ -373,7 +373,8 @@ body.tg-mobile-app {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  padding: 10px 12px 12px;
+  min-height: 64px;
+  padding: 10px 12px;
   border-top: 1px solid rgba(226, 232, 240, 0.85);
   background: rgba(255, 255, 255, 0.9);
 }
@@ -397,6 +398,41 @@ body.tg-mobile-app {
   background: rgba(59, 130, 246, 0.12);
   color: #2563eb;
   transform: translateY(-1px);
+}
+
+.emoji-panel {
+  width: min(34rem, calc(100vw - 1rem));
+  max-width: none;
+  overflow: hidden;
+}
+
+.emoji-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.75rem, 1fr));
+  gap: 0.5rem;
+  max-height: min(22rem, 60vh);
+  min-width: min(20rem, calc(100vw - 1rem));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.25rem;
+  scrollbar-width: none;
+}
+
+.emoji-panel-grid::-webkit-scrollbar,
+.emoji-preview-container::-webkit-scrollbar {
+  display: none;
+}
+
+.emoji-item {
+  width: 100%;
+  height: 2.75rem;
+  min-width: 0;
+}
+
+.emoji-preview-container {
+  overflow-x: hidden !important;
+  scrollbar-width: none;
 }
 
 .tg-main-panel {
@@ -554,7 +590,8 @@ body.tg-mobile-app {
 
   .tg-section-switcher {
     gap: 6px;
-    padding: 8px 10px 10px;
+    min-height: calc(64px + env(safe-area-inset-bottom));
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
   }
 
   .tg-folder-rail {
@@ -564,6 +601,16 @@ body.tg-mobile-app {
 
   .tg-folder-rail-item {
     min-height: 58px;
+  }
+
+  .emoji-panel {
+    right: -0.25rem;
+    width: min(30rem, calc(100vw - 0.75rem));
+  }
+
+  .emoji-panel-grid {
+    min-width: 0;
+    max-height: min(20rem, 56vh);
   }
 }
 

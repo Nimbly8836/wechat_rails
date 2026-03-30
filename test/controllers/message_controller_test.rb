@@ -253,6 +253,47 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     FileUtils.rm_f(cached_file) if cached_file
   end
 
+  test "download_emoji_by_md5 follows redirected remote emoji url" do
+    emoji_md5 = SecureRandom.hex(16)
+    emoji_message = create_message!(
+      new_msg_id: 9_000_000_000_000_001_453,
+      msg_type: :emoji,
+      real_msg_type: :emoji,
+      content: emoji_xml(emoji_md5, cdn_url: "https://example.com/start"),
+      emoji_md5: emoji_md5
+    )
+    redirect_response = build_http_response(Net::HTTPFound, code: "302",
+      message: "Found", headers: {
+        "location" => "https://cdn.example.com/emojis/#{emoji_md5}.gif"
+      })
+    success_response = build_http_response(Net::HTTPOK, code: "200",
+      message: "OK", headers: { "content-type" => "image/gif" },
+      body: "GIF89a")
+    requested_urls = []
+    stored_file = Rails.root.join("storage", "emojis",
+      "#{Digest::MD5.hexdigest('GIF89a')}.gif")
+
+    Net::HTTP.stub(:get_response, proc { |uri|
+      requested_urls << uri.to_s
+      uri.to_s == "https://example.com/start" ? redirect_response : success_response
+    }) do
+      get "/message/emoji/md5/#{emoji_md5}"
+    end
+
+    assert_response :success
+    assert_equal "image/gif", response.media_type
+    assert_equal "GIF89a", response.body
+    assert_equal [
+      "https://example.com/start",
+      "https://cdn.example.com/emojis/#{emoji_md5}.gif"
+    ], requested_urls
+    assert_equal Digest::MD5.hexdigest("GIF89a"),
+      emoji_message.wx_message.reload.emoji_file_md5
+    assert File.exist?(stored_file)
+  ensure
+    FileUtils.rm_f(stored_file) if stored_file
+  end
+
   test "callback resolves owner wxid before parsing group system messages" do
     ActiveJob::Base.queue_adapter = :test
     group_wxid = @chat_room.wx_id
@@ -381,11 +422,21 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     XML
   end
 
-  def emoji_xml(emoji_md5)
+  def emoji_xml(emoji_md5, cdn_url: "https://example.com/#{emoji_md5}.gif")
     <<~XML
       <msg>
-        <emoji md5="#{emoji_md5}" cdnurl="https://example.com/#{emoji_md5}.gif" />
+        <emoji md5="#{emoji_md5}" cdnurl="#{cdn_url}" />
       </msg>
     XML
+  end
+
+  def build_http_response(klass, code:, message:, headers: {}, body: nil)
+    response = klass.new("1.1", code, message)
+    headers.each do |key, value|
+      response[key] = value
+    end
+    response.instance_variable_set(:@read, true)
+    response.instance_variable_set(:@body, body) if body
+    response
   end
 end

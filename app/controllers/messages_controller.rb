@@ -1,5 +1,6 @@
 require "base64"
 require "digest/md5"
+require "net/http"
 require "stringio"
 
 class MessagesController < ApplicationController
@@ -393,7 +394,7 @@ class MessagesController < ApplicationController
 
     storage_dir = emoji_storage_dir
     uri = URI.parse(emoji_meta[:cdn_url])
-    response = Net::HTTP.get_response(uri)
+    response, resolved_uri = fetch_http_response(uri)
 
     unless response.is_a?(Net::HTTPSuccess)
       render json: { error: true, message: "emoji download failed" }, status: :bad_gateway and return
@@ -401,7 +402,7 @@ class MessagesController < ApplicationController
 
     file_md5 = preferred_file_md5.presence || Digest::MD5.hexdigest(response.body)
     content_type = response["content-type"]
-    extension = determine_extension(uri, content_type)
+    extension = determine_extension(resolved_uri, content_type)
     file_path = storage_dir.join("#{file_md5}#{extension}")
 
     File.binwrite(file_path, response.body) unless File.exist?(file_path)
@@ -480,6 +481,19 @@ class MessagesController < ApplicationController
     else
       ""
     end
+  end
+
+  def fetch_http_response(uri, limit: 3)
+    raise URI::InvalidURIError, "too many redirects" if limit <= 0
+
+    response = Net::HTTP.get_response(uri)
+    return [ response, uri ] unless response.is_a?(Net::HTTPRedirection)
+
+    location = response["location"].to_s.strip
+    raise URI::InvalidURIError, "redirect location missing" if location.blank?
+
+    redirected_uri = URI.join(uri.to_s, location)
+    fetch_http_response(redirected_uri, limit: limit - 1)
   end
 
   private
