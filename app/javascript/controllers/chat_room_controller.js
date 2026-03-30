@@ -15,7 +15,7 @@ import {
 
 const MESSAGE_CACHE_LIMIT = 80;
 const MESSAGE_CACHE_FALLBACK_LIMITS = [80, 40, 20, 10];
-const AUTO_REFRESH_INTERVAL_MS = 5000;
+const AUTO_REFRESH_INTERVAL_MS = 1200;
 const LEGACY_DEFAULT_THEME = {
   backgroundColor: "var(--color-gray-100)",
   backgroundImage: "",
@@ -1689,9 +1689,6 @@ export default class extends Controller {
       };
 
       image.addEventListener("load", showImage, { once: true });
-      image.addEventListener("error", () => {
-        showFallback("[表情加载失败]");
-      });
       image.addEventListener("click", (event) => {
         event.stopPropagation();
         const previewUrl = image.currentSrc || image.src;
@@ -3443,7 +3440,7 @@ export default class extends Controller {
         .catch((error) => {
           console.error("刷新当前聊天室失败:", error);
         });
-    }, attempt === 0 ? 120 : 250 * (attempt + 1));
+    }, attempt === 0 ? 40 : 180 * (attempt + 1));
   }
 
   loadNewMessages(msg) {
