@@ -1,16 +1,16 @@
 <template id="emoji-select">
   <div class="emoji-panel hidden absolute bottom-full right-0 mb-3 max-w-[min(24rem,calc(100vw-1.5rem))] bg-white shadow-xl rounded-2xl p-3 gap-2 border border-gray-200 z-[140]"
        data-action="mouseenter->emoji#panelMouseenter mouseleave->emoji#panelMouseleave">
-    <div class="grid grid-cols-10 gap-2 min-w-30 overflow-y-auto">
+    <div class="grid max-h-[min(18rem,52vh)] min-w-[18rem] grid-cols-6 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-8 lg:grid-cols-10">
       <% Dir.glob(Rails.root.join("public/emoji/*.webp")).each do |path| %>
         <% filename = File.basename(path, ".webp") %>
         <% name = filename %>
         <button
           type="button"
-          class="emoji-item w-8 h-8 hover:bg-gray-100 rounded"
+          class="emoji-item flex h-10 w-10 items-center justify-center rounded-xl p-1 transition hover:bg-gray-100"
           data-emoji-name="<%= name %>"
           data-action="click->emoji#insert">
-          <img src="/emoji/<%= filename %>.webp" alt="<%= name %>" class="w-full h-full"/>
+          <img src="/emoji/<%= filename %>.webp" alt="<%= name %>" class="h-full w-full object-contain"/>
         </button>
       <% end %>
     </div>

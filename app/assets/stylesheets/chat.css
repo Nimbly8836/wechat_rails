@@ -486,6 +486,11 @@ body.tg-mobile-app {
   background: transparent;
 }
 
+.telegram-chat-room .telegram-composer textarea,
+.telegram-chat-room .telegram-composer textarea::placeholder {
+  font-size: 16px;
+}
+
 .tg-ui-icon {
   object-fit: contain;
   filter: saturate(1.18) contrast(1.14);
@@ -532,10 +537,19 @@ body.tg-mobile-app {
     padding: 1rem 1rem 1.25rem;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
   }
 
   .telegram-chat-room .telegram-composer {
     padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+
+  html.tg-composer-active .telegram-chat-room .telegram-message-list {
+    padding-bottom: calc(1.75rem + env(safe-area-inset-bottom));
+  }
+
+  html.tg-composer-active .telegram-chat-room .telegram-composer {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
   }
 
   .tg-section-switcher {
@@ -550,6 +564,13 @@ body.tg-mobile-app {
 
   .tg-folder-rail-item {
     min-height: 58px;
+  }
+}
+
+@media (min-width: 640px) {
+  .telegram-chat-room .telegram-composer textarea,
+  .telegram-chat-room .telegram-composer textarea::placeholder {
+    font-size: 14px;
   }
 }
 

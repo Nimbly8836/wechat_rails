@@ -165,6 +165,29 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     assert_equal emoji_md5, message_payload.dig("wx_message", "emoji_md5")
     assert_equal emoji_md5, emoji_message.wx_message.reload.emoji_md5
     assert_nil message_payload.dig("wx_message", "emoji_file_md5")
+    assert_equal "/message/emoji/md5/#{emoji_md5}",
+      message_payload.dig("wx_message", "emoji_url")
+  end
+
+  test "index serializes emoji file md5 url when cached file fingerprint exists" do
+    emoji_md5 = SecureRandom.hex(16)
+    emoji_file_md5 = SecureRandom.hex(16)
+    emoji_message = create_message!(
+      new_msg_id: 9_000_000_000_000_001_451,
+      msg_type: :emoji,
+      real_msg_type: :emoji,
+      content: emoji_xml(emoji_md5),
+      emoji_md5: emoji_md5,
+      emoji_file_md5: emoji_file_md5
+    )
+
+    get chat_room_messages_path(@chat_room)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    message_payload = payload.find { |item| item["id"] == emoji_message.id }
+    assert_equal "/message/emoji/md5/#{emoji_file_md5}",
+      message_payload.dig("wx_message", "emoji_url")
   end
 
   test "download_emoji backfills file md5 from legacy emoji md5 cache" do
