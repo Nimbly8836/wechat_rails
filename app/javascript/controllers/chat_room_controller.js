@@ -88,7 +88,6 @@ import {
   isPlaceholderUpgradeUrl,
   attachmentUrl,
   normalizeReferenceId,
-  buildMediaPreviewTitle,
   findChatMember,
   resolveMemberName,
   resolveMemberAvatar,
