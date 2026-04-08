@@ -11,15 +11,15 @@ import {
   writeCache,
   removeCache
 } from "utils/chat_storage";
-import { ChatRoomMessageState } from "./chat_room/chat_room_message_state";
+import { ChatRoomMessageState } from "utils/chat_room_message_state";
 import {
   buildLocalMessagePreview,
   dispatchLocalChatMessage,
   createSendMessage,
   sendMessage
-} from "./chat_room/chat_room_message_sender";
+} from "controllers/chat_room/chat_room_message_sender";
 import { renderMessages as renderChatRoomMessages,
-  buildEmptyState as buildChatRoomEmptyState } from "./chat_room/chat_room_message_renderer";
+  buildEmptyState as buildChatRoomEmptyState } from "controllers/chat_room/chat_room_message_renderer";
 import {
   buildMessageGroup,
   buildRow,
@@ -46,7 +46,7 @@ import {
   renderStatus,
   addTimestamp,
   inlineTimestampTargetForBubble
-} from "./chat_room/chat_room_message_bubbles";
+} from "controllers/chat_room/chat_room_message_bubbles";
 import {
   formatTimestamp,
   buildLinkedText,
@@ -59,7 +59,7 @@ import {
   openMediaPreview,
   closeMediaPreview,
   handleMediaPreviewKeydown
-} from "./chat_room/chat_room_text_and_media";
+} from "controllers/chat_room/chat_room_text_and_media";
 import {
   getMessageType,
   parsedMessageFor,
@@ -102,7 +102,7 @@ import {
   buildSystemNoticeContent,
   lookupSenderInfo,
   humanizeMessageType
-} from "./chat_room/chat_room_message_content";
+} from "controllers/chat_room/chat_room_message_content";
 import {
   DEFAULT_THEME,
   readChatRoomTheme,
@@ -118,7 +118,7 @@ import {
   applyTheme,
   refreshBubbleStyles,
   syncThemeInputs
-} from "./chat_room/chat_room_theme";
+} from "controllers/chat_room/chat_room_theme";
 import {
   toggleSearchPanel,
   openSearchPanel,
@@ -153,14 +153,14 @@ import {
   syncMessages,
   syncContact,
   loadMore
-} from "./chat_room/chat_room_ui";
+} from "controllers/chat_room/chat_room_ui";
 import {
   handleVoiceClick,
   playVoice,
   seekVoice,
   toggleSpeed,
   formatVoiceDuration
-} from "./chat_room/chat_room_voice_player";
+} from "controllers/chat_room/chat_room_voice_player";
 
 const AUTO_REFRESH_INTERVAL_MS = 800;
 const EMOJI_REQUEST_VERSION = "20260330b";
