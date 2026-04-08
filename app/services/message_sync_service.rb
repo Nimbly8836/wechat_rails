@@ -29,7 +29,7 @@ class MessageSyncService
     payload
   end
 
-  def persist_payload(payload, full_backfill: false, inline_save: false)
+  def persist_payload(payload, full_backfill: false)
     saves = WechatModels::SyncMessageModel.parse_saves(normalize_payload(payload), sync_wxid)
     if saves.blank?
       BackfillMissingMessagesJob.perform_later(sync_wxid) if full_backfill
@@ -39,11 +39,7 @@ class MessageSyncService
     serialized_saves = saves.as_json
     synced_ids = saves.pluck(:id)
 
-    if inline_save
-      SaveChatRoomMessageJob.perform_now(serialized_saves, sync_wxid)
-    else
-      SaveChatRoomMessageJob.perform_later(serialized_saves, sync_wxid)
-    end
+    SaveChatRoomMessageJob.perform_later(serialized_saves, sync_wxid)
     SyncCreateContactsJob.perform_later(serialized_saves, sync_wxid)
     BackfillMissingMessagesJob.perform_later(sync_wxid, nil, synced_ids) if full_backfill
 
