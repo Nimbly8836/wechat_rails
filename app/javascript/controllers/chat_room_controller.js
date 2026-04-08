@@ -3,7 +3,8 @@ import {
   get_file_base64,
   replaceEmojis,
   setupEmojiInputPreview,
-  hideAllEmojiPreviews
+  hideAllEmojiPreviews,
+  MessageSet
 } from "utils/file_utils";
 import {
   chatStorageKeys,
@@ -11,159 +12,28 @@ import {
   writeCache,
   removeCache
 } from "utils/chat_storage";
-import { ChatRoomMessageState } from "./chat_room/chat_room_message_state";
-import {
-  buildLocalMessagePreview,
-  dispatchLocalChatMessage,
-  createSendMessage,
-  sendMessage
-} from "./chat_room/chat_room_message_sender";
-import { renderMessages as renderChatRoomMessages,
-  buildEmptyState as buildChatRoomEmptyState } from "./chat_room/chat_room_message_renderer";
-import {
-  buildMessageGroup,
-  buildRow,
-  buildQuoteActionButton,
-  renderMessageBubble,
-  renderCardMessage,
-  renderVoipMessage,
-  renderVideoAccountMessage,
-  renderChatHistoryMessage,
-  renderXmlMessage,
-  renderImageMessage,
-  renderFileMessage,
-  renderVideoMessageAttachment,
-  downloadFile,
-  renderEmojiMessage,
-  emojiRenderSourcesFor,
-  appendCacheKey,
-  extractEmojiCdnUrl,
-  renderTextMessage,
-  renderVoiceMessage,
-  renderReferMessage,
-  renderSystemNoticeMessage,
-  applyBubbleStyle,
-  renderStatus,
-  addTimestamp,
-  inlineTimestampTargetForBubble
-} from "./chat_room/chat_room_message_bubbles";
-import {
-  formatTimestamp,
-  buildLinkedText,
-  appendPlainSegment,
-  createAnchor,
-  decodeHtmlEntities,
-  normalizeHref,
-  buildMediaPreviewTitle,
-  ensureMediaPreviewElements,
-  openMediaPreview,
-  closeMediaPreview,
-  handleMediaPreviewKeydown
-} from "./chat_room/chat_room_text_and_media";
-import {
-  getMessageType,
-  parsedMessageFor,
-  payloadValue,
-  normalizeParsedMessageType,
-  cardPayloadFor,
-  voipPayloadFor,
-  chatHistoryPayloadFor,
-  filePayloadFor,
-  quotePayloadFor,
-  parseWxXmlMessage,
-  parseWxVideoMessage,
-  parseWxVoipMessage,
-  localizeVoipStatus,
-  parseWxChatHistoryMessage,
-  parseWxChatHistoryItem,
-  chatHistoryItemType,
-  chatHistoryTypeLabel,
-  formatVoipDuration,
-  parseWxFileAttachment,
-  extractXmlPayload,
-  parseXmlDocument,
-  mapAppMessageType,
-  cleanXmlTitle,
-  isUnsupportedXmlTitle,
-  isPlaceholderUpgradeUrl,
-  attachmentUrl,
-  normalizeReferenceId,
-  buildMediaPreviewTitle,
-  findChatMember,
-  resolveMemberName,
-  resolveMemberAvatar,
-  stripRoomSenderPrefix,
-  sortedMessageWrappers,
-  messageTimestampSortValue,
-  messageNumericIdSortValue,
-  oldestServerMessageId,
-  normalizeMessageType,
-  buildMessagePreview,
-  isSystemNoticeMessage,
-  buildSystemNoticeContent,
-  lookupSenderInfo,
-  humanizeMessageType
-} from "./chat_room/chat_room_message_content";
-import {
-  DEFAULT_THEME,
-  readChatRoomTheme,
-  normalizeThemeConfig,
-  persistTheme,
-  updateBackgroundColor,
-  updateBubbleColor,
-  updateBackgroundImage,
-  clearBackgroundImage,
-  resetTheme,
-  updateFontFamily,
-  updateCustomFont,
-  applyTheme,
-  refreshBubbleStyles,
-  syncThemeInputs
-} from "./chat_room/chat_room_theme";
-import {
-  toggleSearchPanel,
-  openSearchPanel,
-  closeSearchPanel,
-  searchMessages,
-  fetchMessageSearchResults,
-  renderMessageSearchResults,
-  toggleMembersPanel,
-  openMembersPanel,
-  closeMembersPanel,
-  searchMembers,
-  fetchMemberSearchResults,
-  renderMembersPanel,
-  toggleMenu,
-  closeMenu,
-  handleMenuClose,
-  openAppearanceSettings,
-  closeThemePanel,
-  handleInputCompositionStart,
-  handleInputCompositionEnd,
-  handleInputKeydown,
-  handleComposerFocus,
-  handleComposerBlur,
-  handleComposerViewportChange,
-  ensureComposerVisible,
-  composerElement,
-  scheduleComposerLayoutSync,
-  syncComposerLayout,
-  autoResize,
-  syncMembers,
-  openSidebar,
-  syncMessages,
-  syncContact,
-  loadMore
-} from "./chat_room/chat_room_ui";
-import {
-  handleVoiceClick,
-  playVoice,
-  seekVoice,
-  toggleSpeed,
-  formatVoiceDuration
-} from "./chat_room/chat_room_voice_player";
 
+const MESSAGE_CACHE_LIMIT = 80;
+const MESSAGE_CACHE_FALLBACK_LIMITS = [80, 40, 20, 10];
 const AUTO_REFRESH_INTERVAL_MS = 800;
+const LEGACY_DEFAULT_THEME = {
+  backgroundColor: "var(--color-gray-100)",
+  backgroundImage: "",
+  selfBubbleColor: "#6387f2",
+  selfBubbleTextColor: "#ffffff",
+  otherBubbleColor: "rgba(255,255,255,0.92)",
+  otherBubbleBorderColor: "rgba(148,163,184,0.45)",
+  fontFamily: "inherit"
+};
+const DEFAULT_THEME = {
+  backgroundColor: "#d7e3ef",
+  backgroundImage: "",
+  selfBubbleColor: "#d9fdd3",
+  selfBubbleTextColor: "#1f2937",
+  otherBubbleColor: "#ffffff",
+  otherBubbleBorderColor: "rgba(15,23,42,0.08)",
+  fontFamily: "inherit"
+};
 const EMOJI_REQUEST_VERSION = "20260330b";
 
 export default class extends Controller {
@@ -274,8 +144,8 @@ export default class extends Controller {
 
     window.addEventListener("chat:notify", this.boundChatNotify);
 
-    this.messageState = new ChatRoomMessageState(this.idValue);
-    this.messages = this.messageState.messages;
+    // Initialize messages as a Set
+    this.messages = new MessageSet();
     const restoredMessages = this.restoreCachedMessages();
 
     if (this.isRoom()) {
@@ -325,9 +195,38 @@ export default class extends Controller {
     }
   }
 
-  readChatRoomTheme() { return readChatRoomTheme(this); }
-  normalizeThemeConfig(rawTheme) { return normalizeThemeConfig(this, rawTheme); }
-  persistTheme() { return persistTheme(this); }
+  readChatRoomTheme() {
+    const [namespace, identifier] = chatStorageKeys.chatRoomTheme(this.idValue);
+    return readCache(namespace, identifier, {}) || {};
+  }
+
+  normalizeThemeConfig(rawTheme) {
+    const theme = rawTheme && typeof rawTheme === "object" ? { ...rawTheme } : {};
+    const migratePairs = [
+      "backgroundColor",
+      "selfBubbleColor",
+      "selfBubbleTextColor",
+      "otherBubbleColor",
+      "otherBubbleBorderColor"
+    ];
+
+    migratePairs.forEach((key) => {
+      if (!theme[key] || theme[key] === LEGACY_DEFAULT_THEME[key]) {
+        theme[key] = DEFAULT_THEME[key];
+      }
+    });
+
+    if (!theme.fontFamily) {
+      theme.fontFamily = DEFAULT_THEME.fontFamily;
+    }
+
+    return theme;
+  }
+
+  persistTheme() {
+    const [namespace, identifier] = chatStorageKeys.chatRoomTheme(this.idValue);
+    writeCache(namespace, identifier, this.theme);
+  }
 
   readCachedChatMembers() {
     const [namespace, identifier] = chatStorageKeys.chatRoomMembers(this.idValue);
@@ -399,12 +298,61 @@ export default class extends Controller {
       });
   }
 
+  sanitizeMessageForCache(wrapper) {
+    if (!wrapper || wrapper.id == null || String(wrapper.id).startsWith("temp-")) {
+      return null;
+    }
+
+    try {
+      const cloned = JSON.parse(JSON.stringify(wrapper));
+      if (cloned.extra?.base64) {
+        delete cloned.extra.base64;
+      }
+      if (cloned.wx_message?.extra?.base64) {
+        delete cloned.wx_message.extra.base64;
+      }
+      if (cloned.referenced_message) {
+        delete cloned.referenced_message;
+      }
+      return cloned;
+    } catch (error) {
+      console.warn("消息缓存序列化失败", error);
+      return null;
+    }
+  }
+
   persistMessages() {
-    this.messageState.persistMessages();
+    const [namespace, identifier] = chatStorageKeys.chatRoomMessages(this.idValue);
+    const cacheableMessages = this.messages.all
+      .map((wrapper) => this.sanitizeMessageForCache(wrapper))
+      .filter(Boolean);
+
+    let wrote = false;
+    for (const limit of MESSAGE_CACHE_FALLBACK_LIMITS) {
+      const slice = cacheableMessages.slice(-Math.min(limit, MESSAGE_CACHE_LIMIT));
+      if (!slice.length) {
+        continue;
+      }
+      wrote = writeCache(namespace, identifier, slice);
+      if (wrote) {
+        break;
+      }
+    }
+
+    if (!wrote) {
+      removeCache(namespace, identifier);
+    }
   }
 
   restoreCachedMessages() {
-    return this.messageState.restoreCachedMessages();
+    const [namespace, identifier] = chatStorageKeys.chatRoomMessages(this.idValue);
+    const cached = readCache(namespace, identifier, []);
+    if (!Array.isArray(cached) || cached.length === 0) {
+      return 0;
+    }
+
+    this.messages.merge(cached);
+    return cached.length;
   }
 
   disconnect() {
@@ -503,9 +451,36 @@ export default class extends Controller {
 
   }
 
-  handleInputCompositionStart() { return handleInputCompositionStart(this); }
-  handleInputCompositionEnd() { return handleInputCompositionEnd(this); }
-  handleInputKeydown(event) { return handleInputKeydown(this, event); }
+  handleInputCompositionStart() {
+    this.isInputComposing = true;
+  }
+
+  handleInputCompositionEnd() {
+    this.isInputComposing = false;
+  }
+
+  handleInputKeydown(event) {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (event.shiftKey) {
+      return;
+    }
+
+    if (event.isComposing || this.isInputComposing || event.keyCode === 229) {
+      return;
+    }
+
+    event.preventDefault();
+    if (this.inputTarget.value.trim() === "") {
+      this.inputTarget.placeholder = "发送消息不能为空";
+      return;
+    }
+
+    this.sendMessage(this.pendingQuote ? "quote" : "text");
+    this.autoResize();
+  }
 
   isRoom() {
     return String(this.currentWxidValue || "").endsWith("@chatroom");
@@ -562,14 +537,73 @@ export default class extends Controller {
     }
   }
 
-  autoResize() { return autoResize(this); }
-  handleComposerFocus() { return handleComposerFocus(this); }
-  handleComposerBlur() { return handleComposerBlur(this); }
-  handleComposerViewportChange() { return handleComposerViewportChange(this); }
-  ensureComposerVisible(forceBottom = false) { return ensureComposerVisible(this, forceBottom); }
-  composerElement() { return composerElement(this); }
-  scheduleComposerLayoutSync(options = {}) { return scheduleComposerLayoutSync(this, options); }
-  syncComposerLayout(options = {}) { return syncComposerLayout(this, options); }
+  autoResize() {
+    const el = this.inputTarget;
+    const maxHeight = Math.round(Math.max(window.innerHeight * 0.3, 140));
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+    this.scheduleComposerLayoutSync();
+  }
+
+  handleComposerFocus() {
+    document.documentElement.classList.add("tg-composer-active");
+    this.ensureComposerVisible(true);
+  }
+
+  handleComposerBlur() {
+    document.documentElement.classList.remove("tg-composer-active");
+    window.setTimeout(() => this.scheduleComposerLayoutSync(), 40);
+  }
+
+  handleComposerViewportChange() {
+    this.scheduleComposerLayoutSync({
+      scrollToBottom: document.activeElement === this.inputTarget
+        && this.autoScrollPinnedToBottom
+    });
+  }
+
+  ensureComposerVisible(forceBottom = false) {
+    if (forceBottom) {
+      this.autoScrollPinnedToBottom = true;
+    }
+
+    this.scheduleComposerLayoutSync({
+      scrollToBottom: this.autoScrollPinnedToBottom
+    });
+  }
+
+  composerElement() {
+    return this.element.querySelector(".telegram-composer");
+  }
+
+  scheduleComposerLayoutSync({ scrollToBottom = false } = {}) {
+    if (this.composerLayoutFrame) {
+      cancelAnimationFrame(this.composerLayoutFrame);
+    }
+
+    this.composerLayoutFrame = requestAnimationFrame(() => {
+      this.composerLayoutFrame = null;
+      this.syncComposerLayout({ scrollToBottom });
+    });
+  }
+
+  syncComposerLayout({ scrollToBottom = false } = {}) {
+    const composer = this.composerElement();
+    if (!composer) {
+      return;
+    }
+
+    const composerHeight = Math.max(
+      Math.ceil(composer.getBoundingClientRect().height || 0),
+      76
+    );
+    this.element.style.setProperty("--tg-composer-height", `${composerHeight}px`);
+
+    if (scrollToBottom && this.hasMessageListTarget) {
+      this.scheduleScrollToBottom();
+    }
+  }
 
   loadMessages({ replace = false } = {}) {
     return this.fetchMessages()
@@ -635,69 +669,504 @@ export default class extends Controller {
     return this.fetchJson(url, { emptyOnNotModified: [] });
   }
 
-  toggleSearchPanel(event = null) { return toggleSearchPanel(this, event); }
-  openSearchPanel() { return openSearchPanel(this); }
-  closeSearchPanel(event = null) { return closeSearchPanel(this, event); }
-  searchMessages(event) { return searchMessages(this, event); }
-  fetchMessageSearchResults(query) { return fetchMessageSearchResults(this, query); }
-  renderMessageSearchResults(messages) { return renderMessageSearchResults(this, messages); }
-  toggleMembersPanel(event = null) { return toggleMembersPanel(this, event); }
-  openMembersPanel() { return openMembersPanel(this); }
-  closeMembersPanel(event = null) { return closeMembersPanel(this, event); }
-  searchMembers(event) { return searchMembers(this, event); }
-  fetchMemberSearchResults(query) { return fetchMemberSearchResults(this, query); }
-  renderMembersPanel(members = []) { return renderMembersPanel(this, members); }
+  toggleSearchPanel(event = null) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!this.hasSearchPanelTarget) {
+      return;
+    }
+
+    const shouldOpen = this.searchPanelTarget.classList.contains("hidden");
+    if (shouldOpen) {
+      this.openSearchPanel();
+    } else {
+      this.closeSearchPanel();
+    }
+  }
+
+  openSearchPanel() {
+    if (!this.hasSearchPanelTarget) {
+      return;
+    }
+
+    this.closeMembersPanel();
+    this.searchPanelTarget.classList.remove("hidden");
+    document.addEventListener("click", this.boundCloseSearchPanel);
+    if (this.hasSearchInputTarget) {
+      this.searchInputTarget.focus();
+      this.searchInputTarget.select?.();
+    }
+  }
+
+  closeSearchPanel(event = null) {
+    if (!this.hasSearchPanelTarget) {
+      return;
+    }
+
+    if (event?.currentTarget === document && this.searchPanelTarget.contains(event.target)) {
+      return;
+    }
+
+    this.searchPanelTarget.classList.add("hidden");
+    document.removeEventListener("click", this.boundCloseSearchPanel);
+  }
+
+  searchMessages(event) {
+    const query = event?.target?.value?.trim() || "";
+    if (!this.hasSearchResultsTarget) {
+      return;
+    }
+
+    if (this.messageSearchTimer) {
+      clearTimeout(this.messageSearchTimer);
+      this.messageSearchTimer = null;
+    }
+
+    if (!query) {
+      this.renderMessageSearchResults([]);
+      return;
+    }
+
+    this.messageSearchTimer = setTimeout(() => {
+      const requestId = ++this.messageSearchRequestId;
+      this.fetchMessageSearchResults(query)
+        .then((messages) => {
+          if (requestId !== this.messageSearchRequestId) {
+            return;
+          }
+          this.renderMessageSearchResults(messages);
+        })
+        .catch((error) => {
+          console.error("搜索消息失败", error);
+          this.renderMessageSearchResults([]);
+        });
+    }, 180);
+  }
+
+  fetchMessageSearchResults(query) {
+    const params = new URLSearchParams({
+      q: query,
+      limit: "40"
+    });
+
+    return this.fetchJson(`/chat_room/${this.idValue}/messages?${params.toString()}`, {
+      emptyOnNotModified: []
+    });
+  }
+
+  renderMessageSearchResults(messages) {
+    if (!this.hasSearchResultsTarget) {
+      return;
+    }
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      this.searchResultsTarget.innerHTML = `
+        <div class="px-4 py-8 text-center text-sm text-slate-400">
+          没有匹配的聊天记录
+        </div>
+      `;
+      return;
+    }
+
+    this.searchResultsTarget.innerHTML = messages.map((wrapper) => {
+      const msg = wrapper?.wx_message || {};
+      const sender = this.lookupSenderInfo(msg, msg.content);
+      const preview = this.buildMessagePreview(msg);
+      const timestamp = wrapper?.message_time || wrapper?.created_at || "";
+      return `
+        <button type="button"
+                class="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50"
+                data-message-search-result-id="${this.escapeHtml(String(wrapper.id))}">
+          <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
+            ${this.escapeHtml((sender?.name || "消息").slice(0, 1))}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <div class="truncate text-sm font-medium text-slate-900">${this.escapeHtml(sender?.name || (msg.self_send ? "我" : "消息"))}</div>
+              <div class="shrink-0 text-[11px] text-slate-400">${this.escapeHtml(this.humanizeMessageType(preview.type))}</div>
+            </div>
+            <div class="mt-1 line-clamp-2 text-sm text-slate-600">${this.escapeHtml(preview.content || "[消息]")}</div>
+            <div class="mt-1 text-[11px] text-slate-400">${this.escapeHtml(timestamp ? this.formatTimestamp(timestamp) : "")}</div>
+          </div>
+        </button>
+      `;
+    }).join("");
+
+    messages.forEach((wrapper) => {
+      const button = this.searchResultsTarget.querySelector(`[data-message-search-result-id="${wrapper.id}"]`);
+      if (!button) {
+        return;
+      }
+      button.addEventListener("click", async () => {
+        this.closeSearchPanel();
+        await this.focusMessageById(wrapper.id);
+      });
+    });
+  }
+
+  toggleMembersPanel(event = null) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!this.hasMembersPanelTarget) {
+      return;
+    }
+
+    const shouldOpen = this.membersPanelTarget.classList.contains("hidden");
+    if (shouldOpen) {
+      this.openMembersPanel();
+    } else {
+      this.closeMembersPanel();
+    }
+  }
+
+  openMembersPanel() {
+    if (!this.hasMembersPanelTarget) {
+      return;
+    }
+
+    this.closeSearchPanel();
+    this.membersPanelTarget.classList.remove("hidden");
+    document.addEventListener("click", this.boundCloseMembersPanel);
+    if (this.hasMemberSearchInputTarget) {
+      this.memberSearchInputTarget.value = "";
+    }
+    this.renderMembersPanel(this.chatMembers);
+    this.loadChatMembers({ force: this.chatMembers.length === 0 });
+    this.memberSearchInputTarget?.focus();
+  }
+
+  closeMembersPanel(event = null) {
+    if (!this.hasMembersPanelTarget) {
+      return;
+    }
+
+    if (event?.currentTarget === document && this.membersPanelTarget.contains(event.target)) {
+      return;
+    }
+
+    this.membersPanelTarget.classList.add("hidden");
+    document.removeEventListener("click", this.boundCloseMembersPanel);
+  }
+
+  searchMembers(event) {
+    const query = event?.target?.value?.trim() || "";
+    if (!this.hasMemberResultsTarget) {
+      return;
+    }
+
+    if (this.memberSearchTimer) {
+      clearTimeout(this.memberSearchTimer);
+      this.memberSearchTimer = null;
+    }
+
+    if (!query) {
+      this.renderMembersPanel(this.chatMembers);
+      return;
+    }
+
+    this.memberSearchTimer = setTimeout(() => {
+      const requestId = ++this.memberSearchRequestId;
+      this.fetchMemberSearchResults(query)
+        .then((members) => {
+          if (requestId !== this.memberSearchRequestId) {
+            return;
+          }
+          this.renderMembersPanel(members);
+        })
+        .catch((error) => {
+          console.error("搜索群成员失败", error);
+          this.renderMembersPanel([]);
+        });
+    }, 180);
+  }
+
+  fetchMemberSearchResults(query) {
+    const params = new URLSearchParams({
+      q: query,
+      limit: "200"
+    });
+
+    return fetch(`/chat_room/${this.idValue}/chat_members?${params.toString()}`, {
+      headers: {
+        "Accept": "application/json"
+      }
+    }).then((res) => {
+      if (!res.ok) {
+        throw new Error(`搜索群成员失败: ${res.status}`);
+      }
+      return res.json();
+    });
+  }
+
+  renderMembersPanel(members = []) {
+    if (!this.hasMemberResultsTarget) {
+      return;
+    }
+
+    if (!Array.isArray(members) || members.length === 0) {
+      this.memberResultsTarget.innerHTML = `
+        <div class="px-4 py-8 text-center text-sm text-slate-400">
+          暂无匹配的群成员
+        </div>
+      `;
+      return;
+    }
+
+    this.memberResultsTarget.innerHTML = members.map((member) => {
+      const name = member?.display_name || member?.remark || member?.nick_name || member?.user_name || "群成员";
+      const avatar = member?.small_head_img_url || member?.big_head_img_url || "";
+      const avatarHtml = avatar
+        ? `<img src="${this.escapeHtml(avatar)}" class="h-full w-full object-cover" alt="${this.escapeHtml(name)}">`
+        : this.escapeHtml(String(name).slice(0, 1).toUpperCase());
+      const meta = [member?.remark, member?.nick_name, member?.user_name]
+        .filter(Boolean)
+        .join(" · ");
+      return `
+        <div class="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-slate-50">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-sm font-semibold text-slate-500">
+            ${avatarHtml}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm font-medium text-slate-900">${this.escapeHtml(name)}</div>
+            <div class="truncate text-xs text-slate-400">${this.escapeHtml(meta)}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  getMessageType(msg) {
+    return this.normalizeMessageType(msg);
+  }
+
+  parsedMessageFor(msg) {
+    const payload = msg?.parsed_message;
+    return payload && typeof payload === "object" ? payload : null;
+  }
+
+  payloadValue(payload, ...keys) {
+    if (!payload || typeof payload !== "object") {
+      return undefined;
+    }
+
+    for (const key of keys) {
+      if (payload[key] !== undefined && payload[key] !== null) {
+        return payload[key];
+      }
+    }
+
+    return undefined;
+  }
+
+  normalizeParsedMessageType(type) {
+    if (type == null || type === "") {
+      return null;
+    }
+
+    if (typeof type === "string" && !/^\d+$/.test(type)) {
+      if (["sys", "sys_notice", "function_message"].includes(type)) {
+        return "system_notice";
+      }
+      return type;
+    }
+
+    const numericType = Number(type);
+    if (!Number.isFinite(numericType)) {
+      return null;
+    }
+
+    return this.normalizeMessageType({ real_msg_type: numericType });
+  }
+
+  cardPayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    if (parsed) {
+      const parsedType = this.normalizeParsedMessageType(parsed.type);
+      if (parsedType && parsedType !== "quote") {
+        return parsed;
+      }
+    }
+
+    return this.parseWxXmlMessage(msg?.content || "");
+  }
+
+  voipPayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    if (parsed && this.normalizeParsedMessageType(parsed.type) === "voip") {
+      return parsed;
+    }
+
+    return this.parseWxVoipMessage(msg?.content || "");
+  }
+
+  chatHistoryPayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    if (parsed && this.normalizeParsedMessageType(parsed.type) === "chat_history") {
+      return {
+        ...parsed,
+        items: Array.isArray(parsed.items) ? parsed.items.map((item) => ({
+          type: this.normalizeParsedMessageType(item?.type) || item?.type || "text",
+          senderName: this.payloadValue(item, "senderName", "sender_name") || "",
+          time: this.payloadValue(item, "time") || "",
+          content: this.payloadValue(item, "content") || ""
+        })) : []
+      };
+    }
+
+    return this.parseWxChatHistoryMessage(msg?.content || "");
+  }
+
+  filePayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    if (parsed && this.normalizeParsedMessageType(parsed.type) === "file_message") {
+      return parsed;
+    }
+
+    return this.parseWxFileAttachment(msg?.content || "") || {};
+  }
+
+  quotePayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    const preview = this.payloadValue(parsed, "quote_preview", "quotePreview");
+
+    return {
+      title: this.payloadValue(parsed, "title") || "",
+      referNewMsgId: this.normalizeReferenceId(
+        this.payloadValue(parsed, "refer_new_msg_id", "referNewMsgId")
+      ),
+      quotePreview: preview && typeof preview === "object" ? {
+        type: this.normalizeParsedMessageType(
+          this.payloadValue(preview, "type")
+        ) || this.payloadValue(preview, "type"),
+        content: this.payloadValue(preview, "content") || "",
+        displayName: this.payloadValue(preview, "display_name", "displayName") || "",
+        senderUserName: this.payloadValue(preview, "sender_user_name", "senderUserName") || "",
+        fromUserName: this.payloadValue(preview, "from_user_name", "fromUserName") || "",
+        serverId: this.normalizeReferenceId(
+          this.payloadValue(preview, "server_id", "serverId")
+        )
+      } : null
+    };
+  }
 
   renderMessages(options = {}) {
-    return renderChatRoomMessages(this, options);
+    if (!this.hasMessageListTarget) {
+      return;
+    }
+    const container = this.messageListTarget;
+    const emptyState = this.hasEmptyMessageTarget
+      ? this.emptyMessageTarget.cloneNode(true)
+      : this.buildEmptyState();
+    container.replaceChildren();
+
+    let bottomOffset = null;
+    if (typeof options.preserveBottomOffset === "number") {
+      bottomOffset = options.preserveBottomOffset;
+    }
+    const forceScrollToBottom = options.forceScrollToBottom === true;
+
+    if (this.highlightTimer) {
+      clearTimeout(this.highlightTimer);
+      this.highlightTimer = null;
+    }
+    this.highlightedRow = null;
+
+    if (this.messages.length === 0) {
+      this.persistMessages();
+      emptyState.style.display = "block";
+      container.appendChild(emptyState);
+      return;
+    }
+
+    let lastSenderKey = null;
+    let currentGroupKey = null;
+    let currentGroup = null;
+    const sortedMessages = this.sortedMessageWrappers();
+    sortedMessages.forEach((wrapper, index) => {
+      const msg = wrapper.wx_message;
+      const messageId = wrapper.message_id || wrapper.id || wrapper.wx_messages_id;
+      const wxMessageId = wrapper.wx_message_id || wrapper.wx_messages_id || null;
+      msg.id = messageId || wxMessageId;
+      msg._messageId = messageId || wxMessageId;
+      msg._wxMessageId = wxMessageId || msg._messageId;
+      msg._cacheKey = wrapper.updated_at || wrapper.message_time
+        || wrapper.created_at || msg.message_time;
+      msg.referenced_message = wrapper.referenced_message;
+      msg._sending = wrapper.sending;
+      msg.extra = wrapper.extra;
+
+      if (this.isSystemNoticeMessage(msg)) {
+        msg.self_send = false;
+      }
+
+      const senderInfo = this.lookupSenderInfo(msg, msg.content);
+      msg.sender_name = senderInfo?.name;
+      msg.sender_avatar = senderInfo?.avatar;
+      msg.sender_initial = senderInfo?.initial;
+      msg.sender_key = senderInfo?.key;
+
+      const senderKey = msg.sender_key || (msg.self_send
+        ? `self:${msg.to_user_name || 'me'}` : msg.from_user_name || "");
+      const startsGroup = lastSenderKey === null || lastSenderKey !== senderKey;
+      const nextWrapper = sortedMessages[index + 1];
+      const nextMsg = nextWrapper?.wx_message;
+      const nextSenderInfo = nextMsg
+        ? this.lookupSenderInfo(nextMsg, nextMsg.content)
+        : null;
+      const nextSenderKey = nextSenderInfo?.key || (nextMsg?.self_send
+        ? `self:${nextMsg?.to_user_name || 'me'}`
+        : nextMsg?.from_user_name || "");
+      const endsGroup = !nextMsg || nextSenderKey !== senderKey;
+
+      msg._startsGroup = startsGroup;
+      msg._endsGroup = endsGroup;
+      lastSenderKey = senderKey;
+
+      if (msg.real_msg_type == "file_transfer_start") {
+        return
+      }
+      if (startsGroup || currentGroupKey !== senderKey || !currentGroup) {
+        currentGroupKey = senderKey;
+        currentGroup = this.buildMessageGroup(msg, senderInfo);
+        container.appendChild(currentGroup.group);
+      }
+
+      const row = this.buildRow(msg, senderInfo);
+      const bubble = this.renderMessageBubble(msg, startsGroup, senderInfo,
+        sortedMessages[0] === wrapper);
+      const actionButton = this.buildQuoteActionButton(wrapper, msg, senderInfo);
+      if (msg.self_send && actionButton) {
+        row.appendChild(actionButton);
+      }
+      row.appendChild(bubble);
+      if (!msg.self_send && actionButton) {
+        row.appendChild(actionButton);
+      }
+      currentGroup.stack.appendChild(row);
+
+      this.renderStatus(wrapper, bubble, msg);
+      this.addTimestamp(bubble, wrapper, msg);
+    });
+
+    if (forceScrollToBottom) {
+      this.autoScrollPinnedToBottom = true;
+      this.scheduleScrollToBottom();
+    } else if (bottomOffset !== null) {
+      container.scrollTop = Math.max(container.scrollHeight - bottomOffset, 0);
+    } else {
+      this.autoScrollPinnedToBottom = true;
+      this.scheduleScrollToBottom();
+    }
+
+    this.persistMessages();
   }
 
   buildEmptyState() {
-    return buildChatRoomEmptyState();
+    const emptyState = document.createElement("div");
+    emptyState.className = "text-gray-400 text-center py-8";
+    emptyState.textContent = "暂无消息";
+    return emptyState;
   }
-
-  getMessageType(msg) { return getMessageType(this, msg); }
-  parsedMessageFor(msg) { return parsedMessageFor(this, msg); }
-  payloadValue(payload, ...keys) { return payloadValue(this, payload, ...keys); }
-  normalizeParsedMessageType(type) { return normalizeParsedMessageType(this, type); }
-  cardPayloadFor(msg) { return cardPayloadFor(this, msg); }
-  voipPayloadFor(msg) { return voipPayloadFor(this, msg); }
-  chatHistoryPayloadFor(msg) { return chatHistoryPayloadFor(this, msg); }
-  filePayloadFor(msg) { return filePayloadFor(this, msg); }
-  quotePayloadFor(msg) { return quotePayloadFor(this, msg); }
-  parseWxXmlMessage(xmlString) { return parseWxXmlMessage(this, xmlString); }
-  parseWxVideoMessage(xmlString) { return parseWxVideoMessage(this, xmlString); }
-  parseWxVoipMessage(xmlString) { return parseWxVoipMessage(this, xmlString); }
-  localizeVoipStatus(rawMsg = "") { return localizeVoipStatus(this, rawMsg); }
-  parseWxChatHistoryMessage(xmlString) { return parseWxChatHistoryMessage(this, xmlString); }
-  parseWxChatHistoryItem(itemNode, fallbackLine = "") { return parseWxChatHistoryItem(this, itemNode, fallbackLine); }
-  chatHistoryItemType(dataType) { return chatHistoryItemType(this, dataType); }
-  chatHistoryTypeLabel(dataType) { return chatHistoryTypeLabel(this, dataType); }
-  formatVoipDuration(totalSeconds) { return formatVoipDuration(this, totalSeconds); }
-  parseWxFileAttachment(xmlString) { return parseWxFileAttachment(this, xmlString); }
-  extractXmlPayload(xmlString = "") { return extractXmlPayload(this, xmlString); }
-  parseXmlDocument(xmlString) { return parseXmlDocument(this, xmlString); }
-  mapAppMessageType(msgType) { return mapAppMessageType(this, msgType); }
-  cleanXmlTitle(title = "") { return cleanXmlTitle(this, title); }
-  isUnsupportedXmlTitle(title = "") { return isUnsupportedXmlTitle(this, title); }
-  isPlaceholderUpgradeUrl(url = "") { return isPlaceholderUpgradeUrl(this, url); }
-  attachmentUrl(type, msg, options = {}) { return attachmentUrl(this, type, msg, options); }
-  normalizeReferenceId(value) { return normalizeReferenceId(this, value); }
-  buildMediaPreviewTitle(msg, fallback = "媒体预览") { return buildMediaPreviewTitle(this, msg, fallback); }
-  findChatMember(wxid) { return findChatMember(this, wxid); }
-  resolveMemberName(member, fallback = "") { return resolveMemberName(this, member, fallback); }
-  resolveMemberAvatar(member) { return resolveMemberAvatar(this, member); }
-  stripRoomSenderPrefix(text = "") { return stripRoomSenderPrefix(this, text); }
-  sortedMessageWrappers() { return sortedMessageWrappers(this); }
-  messageTimestampSortValue(wrapper) { return messageTimestampSortValue(this, wrapper); }
-  messageNumericIdSortValue(wrapper) { return messageNumericIdSortValue(this, wrapper); }
-  oldestServerMessageId() { return oldestServerMessageId(this); }
-  normalizeMessageType(msg) { return normalizeMessageType(this, msg); }
-  buildMessagePreview(msg) { return buildMessagePreview(this, msg); }
-  isSystemNoticeMessage(msg) { return isSystemNoticeMessage(this, msg); }
-  buildSystemNoticeContent(msg) { return buildSystemNoticeContent(this, msg); }
-  lookupSenderInfo(msg, rawContent = "") { return lookupSenderInfo(this, msg, rawContent); }
-  humanizeMessageType(msgType) { return humanizeMessageType(this, msgType); }
 
   replaceRoomSenderWxid(msg) {
     if (this.chatMembers && msg.content) {
@@ -712,49 +1181,1428 @@ export default class extends Controller {
     }
   }
 
-  buildMessageGroup(msg, senderInfo) { return buildMessageGroup(this, msg, senderInfo); }
-  buildRow(msg, senderInfo) { return buildRow(this, msg, senderInfo); }
-  buildQuoteActionButton(wrapper, msg, senderInfo) { return buildQuoteActionButton(this, wrapper, msg, senderInfo); }
-  renderMessageBubble(msg, isNewGroup, senderInfo, isFirstMessage) { return renderMessageBubble(this, msg, isNewGroup, senderInfo, isFirstMessage); }
+  buildMessageGroup(msg, senderInfo) {
+    const group = document.createElement("div");
+    if (this.isSystemNoticeMessage(msg)) {
+      group.className = "tg-message-group w-full flex justify-center";
+      group.style.marginTop = "10px";
 
-  renderCardMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderCardMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderVoipMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderVoipMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderVideoAccountMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderVideoAccountMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderChatHistoryMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderChatHistoryMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderXmlMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderXmlMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderImageMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderImageMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderFileMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderFileMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderVideoMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderVideoMessageAttachment(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  downloadFile(url, filename) { return downloadFile(this, url, filename); }
-  renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderEmojiMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  emojiRenderSourcesFor(msg) { return emojiRenderSourcesFor(this, msg); }
-  appendCacheKey(url, cacheKey) { return appendCacheKey(this, url, cacheKey); }
-  extractEmojiCdnUrl(xmlString = "") { return extractEmojiCdnUrl(this, xmlString); }
-  renderTextMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderTextMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderVoiceMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderVoiceMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderReferMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderReferMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderSystemNoticeMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderSystemNoticeMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  applyBubbleStyle(bubble, msg, isNewGroup = true, senderInfo = null, isFirstMessage = false) { return applyBubbleStyle(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
-  renderStatus(m, bubble, msg) { return renderStatus(this, m, bubble, msg); }
-  addTimestamp(bubble, wrapper, msg = null) { return addTimestamp(this, bubble, wrapper, msg); }
-  inlineTimestampTargetForBubble(bubble, msg = null) { return inlineTimestampTargetForBubble(this, bubble, msg); }
+      const stack = document.createElement("div");
+      stack.className = "tg-message-group-stack flex w-full min-w-0 flex-col items-center";
+      group.appendChild(stack);
+      return { group, stack };
+    }
 
-  formatTimestamp(value) { return formatTimestamp(this, value); }
+    group.className = `tg-message-group w-full flex ${msg.self_send
+      ? "justify-end"
+      : "justify-start"} items-end`;
+    group.style.marginTop = msg._startsGroup ? "8px" : "2px";
+
+    const stack = document.createElement("div");
+    stack.className = "tg-message-group-stack flex min-w-0 flex-col";
+
+    if (!msg.self_send && this.isRoom()) {
+      const avatarLane = document.createElement("div");
+      avatarLane.className = "tg-message-avatar-lane mr-2 flex justify-center";
+      avatarLane.style.width = "3rem";
+
+      const senderName = senderInfo?.name || msg.sender_name || "";
+      const senderAvatar = senderInfo?.avatar || msg.sender_avatar || "";
+      group.dataset.senderName = senderName;
+      if (senderAvatar) {
+        group.dataset.senderAvatar = senderAvatar;
+      } else {
+        delete group.dataset.senderAvatar;
+      }
+
+      const avatar = document.createElement("div");
+      avatar.className = "tg-message-avatar-sticky w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
+
+      if (!senderAvatar) {
+        const initial = senderInfo?.initial || msg.sender_initial || "?";
+        avatar.textContent = initial;
+        avatar.classList.add("text-gray-600", "font-semibold");
+      } else {
+        const img = document.createElement("img");
+        img.src = senderAvatar;
+        img.alt = senderName;
+        img.className = "w-full h-full object-cover";
+        avatar.appendChild(img);
+      }
+
+      avatarLane.appendChild(avatar);
+      group.appendChild(avatarLane);
+      group.appendChild(stack);
+      return { group, stack };
+    }
+
+    const senderName = senderInfo?.name || msg.sender_name || (msg.self_send ? "我" : "");
+    const senderAvatar = senderInfo?.avatar || msg.sender_avatar || "";
+    if (senderName) {
+      group.dataset.senderName = senderName;
+    }
+    if (senderAvatar) {
+      group.dataset.senderAvatar = senderAvatar;
+    } else {
+      delete group.dataset.senderAvatar;
+    }
+
+    group.appendChild(stack);
+    return { group, stack };
+  }
+
+  buildRow(msg, senderInfo) {
+    const row = document.createElement("div");
+    if (this.isSystemNoticeMessage(msg)) {
+      row.className = "group w-full flex justify-center";
+      if (msg.id) {
+        row.dataset.messageId = msg.id;
+      }
+      row.dataset.senderName = "系统通知";
+      delete row.dataset.senderAvatar;
+      return row;
+    }
+
+    row.className = `group w-full flex ${msg.self_send ? "justify-end"
+      : "justify-start"} items-end gap-2`;
+    if (msg.id) {
+      row.dataset.messageId = msg.id;
+    }
+
+    if (!msg.self_send) {
+      const senderName = senderInfo?.name || msg.sender_name || "";
+      const senderAvatar = senderInfo?.avatar || msg.sender_avatar || "";
+      if (senderName) {
+        row.dataset.senderName = senderName;
+      }
+      if (senderAvatar) {
+        row.dataset.senderAvatar = senderAvatar;
+      } else {
+        delete row.dataset.senderAvatar;
+      }
+    } else {
+      row.dataset.senderName = "我";
+      delete row.dataset.senderAvatar;
+    }
+
+    return row;
+  }
+
+  buildQuoteActionButton(wrapper, msg, senderInfo) {
+    if (!wrapper?.id || String(wrapper.id).startsWith("temp-") || msg?._sending
+      || this.isSystemNoticeMessage(msg)) {
+      return null;
+    }
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pointer-events-none opacity-0 transition rounded-full border border-slate-200 bg-white/95 px-2 py-1 text-[11px] text-slate-500 shadow-sm group-hover:pointer-events-auto group-hover:opacity-100 hover:border-sky-200 hover:text-sky-700";
+    button.textContent = "引用";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.startQuoteMessage(wrapper, msg, senderInfo);
+    });
+    return button;
+  }
+
+  renderMessageBubble(msg, isNewGroup, senderInfo, isFirstMessage) {
+    const bubble = document.createElement("div");
+    const type = this.getMessageType(msg);
+
+    this.replaceRoomSenderWxid(msg);
+
+    switch (type) {
+      case "voice":
+        return this.renderVoiceMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      case "voip":
+        return this.renderVoipMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      case "video_account":
+        return this.renderVideoAccountMessage(bubble, msg, isNewGroup,
+          senderInfo, isFirstMessage);
+      case "chat_history":
+        return this.renderChatHistoryMessage(bubble, msg, isNewGroup,
+          senderInfo, isFirstMessage);
+      case "card":
+        return this.renderCardMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      case "refer": {
+        const parsed = this.parseWxXmlMessage(msg.content || "");
+        if (parsed.title || parsed.desc || parsed.cover || parsed.url) {
+          return this.renderCardMessage(bubble, msg, isNewGroup, senderInfo,
+            isFirstMessage);
+        }
+        return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      }
+      case "xml_unparsed":
+        return this.renderXmlMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      case "emoji":
+        return this.renderEmojiMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      case "image":
+        return this.renderImageMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      case "video":
+        return this.renderVideoMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      case "file_message":
+        return this.renderFileMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      case "quote":
+        return this.renderReferMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+      case "system_notice":
+        return this.renderSystemNoticeMessage(bubble, msg, isNewGroup,
+          senderInfo, isFirstMessage);
+      case "text":
+      default:
+        return this.renderTextMessage(bubble, msg, isNewGroup, senderInfo,
+          isFirstMessage);
+    }
+  }
+
+  renderCardMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-card");
+    const cardBubble = template || bubble;
+    const parsed = this.cardPayloadFor(msg);
+    const link = cardBubble.querySelector("[data-role='card-link']");
+    const cover = cardBubble.querySelector("[data-role='card-cover']");
+    const title = cardBubble.querySelector("[data-role='card-title']");
+    const desc = cardBubble.querySelector("[data-role='card-desc']");
+    const source = cardBubble.querySelector("[data-role='card-source']");
+    const parsedUrl = this.payloadValue(parsed, "url");
+    const parsedCover = this.payloadValue(parsed, "cover");
+    const parsedTitle = this.payloadValue(parsed, "title");
+    const parsedDesc = this.payloadValue(parsed, "desc");
+    const parsedSource = this.payloadValue(parsed, "source");
+
+    if (link) {
+      if (parsedUrl) {
+        link.href = parsedUrl;
+      } else {
+        link.removeAttribute("href");
+        link.classList.add("pointer-events-none");
+      }
+    }
+    if (cover) {
+      cover.innerHTML = parsedCover
+        ? `<img src="${parsedCover}" class="max-h-48 w-full object-cover" referrerpolicy="no-referrer"/>`
+        : "";
+    }
+    if (title) {
+      title.textContent = parsedTitle || "";
+    }
+    if (desc) {
+      desc.textContent = parsedDesc || "";
+    }
+    if (source) {
+      source.textContent = parsedSource ? `来自：${parsedSource}` : "";
+    }
+
+    return this.applyBubbleStyle(cardBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderVoipMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-voip");
+    const voipBubble = template || bubble;
+    const parsed = this.voipPayloadFor(msg);
+    const title = voipBubble.querySelector("[data-role='voip-title']");
+    const meta = voipBubble.querySelector("[data-role='voip-meta']");
+
+    if (title) {
+      title.textContent = parsed.title || "微信通话";
+    }
+    if (meta) {
+      meta.textContent = parsed.summary || "通话消息";
+    }
+
+    return this.applyBubbleStyle(voipBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderVideoAccountMessage(bubble, msg, isNewGroup, senderInfo,
+    isFirstMessage) {
+    const template = this.cloneTemplate("message-template-video-account");
+    const accountBubble = template || bubble;
+    const parsed = this.cardPayloadFor(msg);
+    const link = accountBubble.querySelector("[data-role='video-account-link']");
+    const coverShell = accountBubble.querySelector(
+      "[data-role='video-account-cover-shell']");
+    const cover = accountBubble.querySelector("[data-role='video-account-cover']");
+    const title = accountBubble.querySelector("[data-role='video-account-title']");
+    const desc = accountBubble.querySelector("[data-role='video-account-desc']");
+    const source = accountBubble.querySelector(
+      "[data-role='video-account-source']");
+    const duration = accountBubble.querySelector(
+      "[data-role='video-account-duration']");
+
+    const targetUrl = this.payloadValue(parsed, "url")
+      || this.payloadValue(parsed, "media_url", "mediaUrl")
+      || "";
+    if (link) {
+      if (targetUrl) {
+        link.href = targetUrl;
+      } else {
+        link.removeAttribute("href");
+        link.classList.add("pointer-events-none");
+      }
+    }
+
+    if (coverShell && cover) {
+      const parsedCover = this.payloadValue(parsed, "cover");
+      if (parsedCover) {
+        cover.addEventListener("load", () => {
+          this.stickToBottomIfNeeded();
+        }, { once: true });
+        cover.src = parsedCover;
+        cover.classList.remove("hidden");
+      } else {
+        coverShell.classList.add("hidden");
+      }
+    }
+
+    if (title) {
+      title.textContent = this.payloadValue(parsed, "title") || "视频号分享";
+    }
+    if (desc) {
+      const parsedDesc = this.payloadValue(parsed, "desc") || "";
+      desc.textContent = parsedDesc;
+      desc.classList.toggle("hidden", !parsedDesc);
+    }
+    if (source) {
+      source.textContent = this.payloadValue(parsed, "source") || "视频号";
+    }
+    if (duration) {
+      const durationSeconds = Number(this.payloadValue(parsed,
+        "duration_seconds", "durationSeconds") || 0);
+      if (durationSeconds) {
+        duration.textContent = this.formatVideoDuration(durationSeconds);
+        duration.classList.remove("hidden");
+      } else {
+        duration.classList.add("hidden");
+      }
+    }
+
+    return this.applyBubbleStyle(accountBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderChatHistoryMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-chat-history");
+    const historyBubble = template || bubble;
+    const title = historyBubble.querySelector("[data-role='history-title']");
+    const desc = historyBubble.querySelector("[data-role='history-desc']");
+    const items = historyBubble.querySelector("[data-role='history-items']");
+    const footer = historyBubble.querySelector("[data-role='history-footer']");
+    const parsed = this.chatHistoryPayloadFor(msg);
+
+    if (title) {
+      title.textContent = parsed.title || "聊天记录";
+    }
+    if (desc) {
+      desc.textContent = parsed.desc || "";
+      desc.classList.toggle("hidden", !parsed.desc);
+    }
+    if (items) {
+      items.innerHTML = "";
+      parsed.items.slice(0, 4).forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "rounded-xl bg-slate-50 px-3 py-2";
+
+        const meta = document.createElement("div");
+        meta.className = "text-[11px] text-slate-500";
+        meta.textContent = item.senderName
+          ? `${item.senderName}${item.time ? ` · ${item.time}` : ""}`
+          : (item.time || "");
+
+        const content = document.createElement("div");
+        content.className = "mt-0.5 text-sm text-slate-800 whitespace-pre-wrap break-words";
+        content.textContent = item.content || `[${this.humanizeMessageType(item.type)}]`;
+
+        if (meta.textContent) {
+          row.appendChild(meta);
+        }
+        row.appendChild(content);
+        items.appendChild(row);
+      });
+      items.classList.toggle("hidden", parsed.items.length === 0);
+    }
+    if (footer) {
+      const extraCount = parsed.count > parsed.items.length
+        ? `等 ${parsed.count} 条记录`
+        : (parsed.count > 0 ? `共 ${parsed.count} 条记录` : "");
+      footer.textContent = extraCount;
+      footer.classList.toggle("hidden", !extraCount);
+    }
+
+    return this.applyBubbleStyle(historyBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderXmlMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-xml");
+    const xmlBubble = template || bubble;
+    const wrapper = xmlBubble.querySelector("[data-role='xml-content']");
+    const toggle = xmlBubble.querySelector("[data-role='xml-toggle']");
+    if (wrapper) {
+      wrapper.textContent = msg.content || "";
+    }
+    if (toggle && wrapper) {
+      toggle.addEventListener("click", () => {
+        if (wrapper.style.maxHeight === "6rem") {
+          wrapper.style.maxHeight = wrapper.scrollHeight + "px";
+          toggle.textContent = "收起";
+        } else {
+          wrapper.style.maxHeight = "6rem";
+          toggle.textContent = "展开";
+        }
+      });
+    }
+    return this.applyBubbleStyle(xmlBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderImageMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-image");
+    const imageBubble = template || bubble;
+    const wrapper = imageBubble.querySelector("[data-role='image-wrapper']");
+    const placeholder = imageBubble.querySelector(
+      "[data-role='image-placeholder']");
+    const image = imageBubble.querySelector("[data-role='image']");
+
+    if (wrapper && placeholder && image) {
+      const resetPlaceholder = (message = "图片加载中…") => {
+        placeholder.textContent = message;
+        placeholder.classList.remove("hidden");
+        image.classList.add("hidden");
+        image.dataset.loaded = "false";
+        image.dataset.sourceUrl = "";
+        wrapper.classList.remove("cursor-zoom-in");
+        wrapper.removeAttribute("role");
+        wrapper.removeAttribute("tabindex");
+      };
+
+      resetPlaceholder();
+      image.removeAttribute("src");
+
+      const showImage = () => {
+        placeholder.classList.add("hidden");
+        image.classList.remove("hidden");
+        image.dataset.loaded = "true";
+        this.stickToBottomIfNeeded();
+      };
+
+      const showFallback = (message) => {
+        resetPlaceholder(message);
+        image.removeAttribute("src");
+      };
+
+      image.addEventListener("load", showImage, { once: true });
+      image.addEventListener("error", () => {
+        showFallback("[图片加载失败]");
+      }, { once: true });
+
+      const openPreview = () => {
+        if (image.dataset.loaded !== "true") {
+          return;
+        }
+
+        const previewUrl = image.dataset.sourceUrl || image.currentSrc || image.src;
+        if (!previewUrl) {
+          return;
+        }
+
+        this.openMediaPreview({
+          src: previewUrl,
+          title: this.buildMediaPreviewTitle(msg, "图片预览"),
+          meta: "Esc 关闭"
+        });
+      };
+
+      wrapper.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openPreview();
+      });
+      wrapper.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+        event.preventDefault();
+        openPreview();
+      });
+
+      let imageUrl;
+      if (msg.self_send && msg._sending) {
+        imageUrl = msg.extra?.base64;
+      } else {
+        imageUrl = this.attachmentUrl("image", msg);
+      }
+      if (imageUrl) {
+        wrapper.classList.add("cursor-zoom-in");
+        wrapper.setAttribute("role", "button");
+        wrapper.setAttribute("tabindex", "0");
+        requestAnimationFrame(() => {
+          image.dataset.sourceUrl = imageUrl;
+          image.src = imageUrl;
+        });
+      } else {
+        showFallback("[暂不支持的图片]");
+      }
+    }
+
+    const applied = this.applyBubbleStyle(imageBubble, msg, isNewGroup,
+      senderInfo, isFirstMessage);
+    applied.dataset.bubbleType = "image";
+    applied.dataset.tail = "false";
+    applied.style.background = "transparent";
+    applied.style.border = "none";
+    applied.style.boxShadow = "none";
+    applied.style.padding = "6px";
+    applied.style.paddingBottom = "32px";
+    applied.classList.remove("text-white");
+    applied.classList.add("inline-block");
+
+    const senderName = applied.querySelector('[data-role="sender-name"]');
+    if (senderName && wrapper) {
+      wrapper.classList.add("mt-2");
+    }
+
+    return applied;
+  }
+
+  renderFileMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-file");
+    const fileBubble = template || bubble;
+    const titleEl = fileBubble.querySelector("[data-role='file-title']");
+    const metaEl = fileBubble.querySelector("[data-role='file-meta']");
+    const extEl = fileBubble.querySelector("[data-role='file-ext']");
+    const downloadLink = fileBubble.querySelector(
+      "[data-role='file-download']");
+
+    const fileInfo = this.filePayloadFor(msg);
+    const title = fileInfo.title || msg.refer_title || msg.content || "文件";
+    const sizeLabel = fileInfo.totallen ? this.formatFileSize(fileInfo.totallen)
+      : "";
+    const extLabel = fileInfo.fileext ? fileInfo.fileext.toUpperCase() : "FILE";
+
+    if (titleEl) {
+      titleEl.textContent = title;
+    }
+    if (metaEl) {
+      metaEl.textContent = sizeLabel;
+      metaEl.classList.toggle("hidden", !sizeLabel);
+    }
+    if (extEl) {
+      extEl.textContent = extLabel;
+    }
+
+    const downloadUrl = this.attachmentUrl("file", msg);
+    if (downloadLink && downloadUrl) {
+      downloadLink.addEventListener("click", (event) => {
+        event.preventDefault();
+        this.downloadFile(downloadUrl, title);
+      });
+    } else if (downloadLink) {
+      downloadLink.classList.add("opacity-60", "pointer-events-none");
+    }
+
+    return this.applyBubbleStyle(fileBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderVideoMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-video");
+    const videoBubble = template || bubble;
+    const durationBadge = videoBubble.querySelector(
+      "[data-role='video-duration']");
+    const messageId = msg._messageId || msg.id;
+
+    const videoInfo = this.parseWxVideoMessage(msg.content || "");
+    if (durationBadge) {
+      if (videoInfo?.playLength) {
+        durationBadge.textContent = this.formatVideoDuration(
+          videoInfo.playLength);
+        durationBadge.classList.remove("hidden");
+      } else {
+        durationBadge.classList.add("hidden");
+      }
+    }
+
+    const videoUrl = this.attachmentUrl("video", msg);
+    if (videoUrl) {
+      const videoElement = document.createElement("video");
+
+      const video_a = document.createElement("a");
+      video_a.href = videoUrl;
+      video_a.textContent = "下载视频";
+
+      videoElement.src = videoUrl;
+      videoElement.controls = true;
+      videoElement.playsInline = true;
+      videoElement.disablePictureInPicture = true;
+      videoElement.style.maxWidth = "250px";
+      videoElement.style.display = "block";
+      videoElement.dataset.messageId = messageId;
+
+      const thumbWrapper = videoBubble.querySelector(
+        "[data-role='video-thumbnail']");
+      if (thumbWrapper) {
+        thumbWrapper.innerHTML = "";
+        thumbWrapper.appendChild(videoElement);
+      }
+
+      videoElement.addEventListener("click", (event) => {
+        event.stopPropagation();
+        videoElement.play();
+      });
+      videoElement.addEventListener("loadedmetadata", () => {
+        this.stickToBottomIfNeeded();
+      }, { once: true });
+    }
+
+    const applied = this.applyBubbleStyle(videoBubble, msg, isNewGroup,
+      senderInfo, isFirstMessage);
+    applied.dataset.bubbleType = "video";
+    applied.dataset.tail = "false";
+    applied.style.background = "transparent";
+    applied.style.border = "none";
+    applied.style.boxShadow = "none";
+    applied.style.padding = "6px";
+    applied.style.paddingBottom = "32px";
+    applied.classList.remove("text-white");
+    applied.classList.add("inline-block");
+
+    return applied;
+  }
+
+  downloadFile(url, filename) {
+    fetch(url, {
+      headers: {
+        "X-CSRF-Token": document.querySelector(
+          'meta[name="csrf-token"]').content
+      }
+    })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`下载失败: ${res.statusText}`);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+      })
+      .catch((err) => {
+        console.error("下载文件失败:", err);
+        alert("下载失败，请稍后重试");
+      });
+  }
+
+  renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-emoji");
+    const emojiBubble = template || bubble;
+    const content = emojiBubble.querySelector("[data-role='emoji-content']");
+
+    if (content) {
+      content.innerHTML = "";
+      content.classList.add("flex", "items-center", "justify-center", "p-1");
+
+      const placeholder = document.createElement("div");
+      placeholder.className = "min-w-[3.75rem] min-h-[3.75rem] flex items-center justify-center text-[11px] text-slate-400 px-2";
+      placeholder.textContent = "加载表情…";
+      content.appendChild(placeholder);
+
+      const image = document.createElement("img");
+      image.loading = "eager";
+      image.decoding = "async";
+      image.alt = "表情";
+      image.referrerPolicy = "no-referrer";
+      image.className = "max-w-[208px] max-h-[208px] object-contain select-none opacity-0 transition-opacity duration-150";
+      image.style.userSelect = "none";
+      image.style.cursor = "zoom-in";
+      image.setAttribute("role", "button");
+      image.setAttribute("tabindex", "0");
+      content.appendChild(image);
+
+      const showImage = () => {
+        placeholder.remove();
+        image.classList.remove("opacity-0");
+      };
+
+      const showFallback = (message) => {
+        image.remove();
+        placeholder.textContent = message;
+      };
+
+      image.addEventListener("load", showImage, { once: true });
+      image.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const previewUrl = image.currentSrc || image.src;
+        if (!previewUrl) {
+          return;
+        }
+
+        this.openMediaPreview({
+          src: previewUrl,
+          title: this.buildMediaPreviewTitle(msg, "表情预览"),
+          meta: "Esc 关闭"
+        });
+      });
+      image.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+        event.preventDefault();
+        image.click();
+      });
+
+      const sources = this.emojiRenderSourcesFor(msg);
+      let currentSourceIndex = -1;
+
+      const loadNextSource = () => {
+        currentSourceIndex += 1;
+        const nextSource = sources[currentSourceIndex];
+        if (!nextSource) {
+          showFallback("[表情加载失败]");
+          return;
+        }
+
+        image.src = nextSource;
+      };
+
+      image.addEventListener("error", () => {
+        loadNextSource();
+      });
+
+      if (sources.length > 0) {
+        requestAnimationFrame(() => {
+          loadNextSource();
+        });
+      } else {
+        showFallback("[暂不支持的表情]");
+      }
+    }
+
+    const applied = this.applyBubbleStyle(emojiBubble, msg, isNewGroup,
+      senderInfo, isFirstMessage);
+    applied.dataset.bubbleType = "emoji";
+    applied.dataset.tail = "false";
+    applied.style.background = "transparent";
+    applied.style.border = "none";
+    applied.style.boxShadow = "none";
+    applied.style.padding = "4px";
+    applied.style.paddingBottom = "32px";
+    applied.classList.remove("text-white", "text-gray-900", "border",
+      "inline-flex", "items-center", "justify-center");
+    applied.classList.add("inline-block");
+
+    const senderName = applied.querySelector('[data-role="sender-name"]');
+    if (senderName) {
+      content.classList.add("mt-1");
+    }
+    return applied;
+  }
+
+  emojiRenderSourcesFor(msg) {
+    const sources = [];
+    const pushSource = (value, { cacheKey = null } = {}) => {
+      const raw = String(value || "").trim();
+      if (!raw) {
+        return;
+      }
+
+      const source = cacheKey ? this.appendCacheKey(raw, cacheKey) : raw;
+      if (!sources.includes(source)) {
+        sources.push(source);
+      }
+    };
+
+    const previewUrl = msg._sending ? msg.extra?.preview_url : "";
+    const serializedEmojiUrl = msg.emoji_url || "";
+    const messageId = msg._messageId || msg._wxMessageId || msg.id;
+    const cacheKey = msg._cacheKey;
+    const emojiCacheMd5 = (msg.emoji_file_md5 || msg.emoji_md5
+      || msg.extra?.file_md5 || msg.extra?.md5 || "").trim();
+    const cdnUrl = this.extractEmojiCdnUrl(msg.content || "");
+
+    pushSource(previewUrl);
+    pushSource(serializedEmojiUrl, { cacheKey });
+
+    if (emojiCacheMd5) {
+      pushSource(`/message/emoji/md5/${encodeURIComponent(emojiCacheMd5)}`, {
+        cacheKey
+      });
+    }
+
+    if (messageId) {
+      pushSource(`/message/emoji/${messageId}`, { cacheKey });
+    }
+
+    pushSource(cdnUrl);
+    return sources;
+  }
+
+  appendCacheKey(url, cacheKey) {
+    const rawUrl = String(url || "").trim();
+    if (!rawUrl) {
+      return rawUrl;
+    }
+
+    const params = [];
+    if (cacheKey) {
+      params.push(`t=${encodeURIComponent(cacheKey)}`);
+    }
+    params.push(`emoji_v=${encodeURIComponent(EMOJI_REQUEST_VERSION)}`);
+    return `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}${params.join("&")}`;
+  }
+
+  extractEmojiCdnUrl(xmlString = "") {
+    const xml = this.parseXmlDocument(xmlString);
+    if (!xml) {
+      return "";
+    }
+
+    return xml.querySelector("emoji")?.getAttribute("cdnurl")
+      || xml.querySelector("emoji > cdnurl")?.textContent?.trim()
+      || "";
+  }
+
+  renderTextMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-text");
+    const textBubble = template || bubble;
+    const inner = textBubble.querySelector("[data-role='content']");
+    const content = msg.refer_title || msg.content || "";
+    if (inner) {
+      inner.innerHTML = "";
+
+      // 先处理链接（如果 buildLinkedText 有链接处理功能）
+      const tempDiv = document.createElement('div');
+      tempDiv.appendChild(this.buildLinkedText(content));
+      const linkProcessedContent = tempDiv.innerHTML;
+
+      // 然后处理 emoji
+      // 直接设置 HTML 内容
+      inner.innerHTML = replaceEmojis(linkProcessedContent);
+    }
+
+    return this.applyBubbleStyle(textBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderVoiceMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-voice");
+    const voiceBubble = template || bubble;
+    const container = voiceBubble.querySelector(
+      "[data-role='voice-container']");
+    const label = voiceBubble.querySelector("[data-role='voice-label']");
+    const wrapper = voiceBubble.querySelector("[data-role='voice-wrapper']");
+    const progressBar = voiceBubble.querySelector(
+      "[data-role='voice-progress']");
+    const progressInner = voiceBubble.querySelector(
+      "[data-role='voice-progress-inner']");
+    const speedButton = voiceBubble.querySelector("[data-role='voice-speed']");
+    const controls = voiceBubble.querySelector("[data-role='voice-controls']");
+
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(msg.content, "application/xml");
+    const fallbackDuration = Number(
+      xml.querySelector("voicemsg")?.getAttribute("voicelength") || 0) / 1000
+      || 10;
+
+    if (progressBar) {
+      progressBar.classList.remove("hidden");
+      progressBar.style.background = "rgba(148,163,184,0.35)";
+    }
+
+    if (progressInner) {
+      progressInner.style.background = msg.self_send
+        ? this.theme.selfBubbleTextColor || "#ffffff" : "#6366f1";
+      progressInner.style.transition = "width 120ms ease-out";
+    }
+
+    if (label) {
+      const durationLabel = this.formatVoiceDuration(fallbackDuration);
+      label.dataset.originalText = durationLabel;
+      label.textContent = durationLabel;
+    }
+
+    if (speedButton) {
+      speedButton.type = "button";
+      speedButton.className = "px-1 py-1 border-1 border-dashed text-xs rounded";
+      const rateIndex = this.voicePlaybackRates.get(msg.id) ?? 1;
+      const rate = this.voicePlaybackOptions[rateIndex] ?? 1.0;
+      speedButton.textContent = `${rate.toFixed(1)}x`;
+    }
+
+    const context = {
+      messageId: msg.id,
+      fallbackDuration,
+      progressBar,
+      progressInner,
+      speedButton,
+    };
+
+    const pendingRatio = this.pendingVoiceSeeks.get(msg.id);
+    if (typeof pendingRatio === "number" && progressInner) {
+      progressInner.style.width = `${Math.min(Math.max(pendingRatio, 0), 1)
+        * 100}%`;
+    }
+
+    if (controls && progressBar && speedButton) {
+      controls.appendChild(progressBar);
+      controls.appendChild(speedButton);
+    }
+
+    if (wrapper && controls) {
+      wrapper.appendChild(controls);
+    }
+
+    if (voiceBubble && wrapper) {
+      voiceBubble.appendChild(wrapper);
+    }
+
+    if (container && label) {
+      container.addEventListener("click",
+        () => this.handleVoiceClick(msg.id, container, label, context));
+    }
+
+    if (progressBar) {
+      progressBar.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.seekVoice(msg.id, context, event);
+      });
+    }
+
+    if (speedButton) {
+      speedButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.toggleSpeed(msg.id, context);
+      });
+    }
+
+    return this.applyBubbleStyle(voiceBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderReferMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-refer");
+    const referBubble = template || bubble;
+    const body = referBubble.querySelector("[data-role='refer-body']");
+    const quoted = referBubble.querySelector("[data-role='refer-quoted']");
+    const quotedMeta = referBubble.querySelector(
+      "[data-role='refer-quoted-meta']");
+    const quotedContent = referBubble.querySelector(
+      "[data-role='refer-quoted-content']");
+
+    const parsed = this.parseWxXmlMessage(msg.content || "");
+    const quotePayload = this.quotePayloadFor(msg);
+    const quotePreview = quotePayload.quotePreview || null;
+    const title = (msg.refer_title || quotePayload.title || parsed.title
+      || "引用的消息").trim();
+    const referNewMsgId = this.normalizeReferenceId(msg.refer_new_msg_id)
+      || quotePayload.referNewMsgId
+      || this.normalizeReferenceId(parsed.refServerId)
+      || quotePreview?.serverId
+      || this.normalizeReferenceId(msg.referenced_message?.wx_message?.new_msg_id);
+    if (body) {
+      body.textContent = title;
+    }
+
+    const referenced = msg.referenced_message;
+    if (referenced && referenced.wx_message) {
+      const refWx = referenced.wx_message;
+      this.replaceRoomSenderWxid(refWx);
+      const preview = this.buildMessagePreview(refWx);
+      const referenceSender = this.lookupSenderInfo(refWx, refWx.content);
+
+      if (quoted) {
+        quoted.classList.remove("cursor-not-allowed", "opacity-60");
+        if (referNewMsgId) {
+          quoted.classList.add("cursor-pointer");
+          quoted.dataset.referNewMsgId = String(referNewMsgId);
+          delete quoted.dataset.referMessageId;
+          quoted.onclick = async (event) => {
+            event.stopPropagation();
+            const resolvedId = await this.resolveReferencedMessageId(referNewMsgId);
+            if (resolvedId) {
+              this.focusMessageById(resolvedId);
+            }
+          };
+        } else if (referenced.id) {
+          quoted.classList.add("cursor-pointer");
+          quoted.dataset.referMessageId = String(referenced.id);
+          delete quoted.dataset.referNewMsgId;
+          quoted.onclick = (event) => {
+            event.stopPropagation();
+            this.focusMessageById(referenced.id);
+          };
+        } else {
+          quoted.classList.remove("cursor-pointer");
+          delete quoted.dataset.referMessageId;
+          delete quoted.dataset.referNewMsgId;
+          quoted.onclick = null;
+        }
+      }
+
+      if (quotedMeta) {
+        const typeLabel = this.humanizeMessageType(preview.type);
+        quotedMeta.textContent = referenceSender?.name
+          ? `${referenceSender.name} · ${typeLabel}`
+          : `引用的${typeLabel}消息`;
+      }
+
+      if (quotedContent) {
+        quotedContent.innerHTML = "";
+        if (preview.asLinkedText) {
+          quotedContent.appendChild(this.buildLinkedText(preview.content));
+        } else {
+          quotedContent.textContent = preview.content;
+        }
+      }
+    } else {
+      if (quoted && referNewMsgId) {
+        quoted.classList.remove("cursor-not-allowed", "opacity-60");
+        quoted.classList.add("cursor-pointer");
+        quoted.dataset.referNewMsgId = String(referNewMsgId);
+        quoted.onclick = async (event) => {
+          event.stopPropagation();
+          const resolvedId = await this.resolveReferencedMessageId(referNewMsgId);
+          if (resolvedId) {
+            this.focusMessageById(resolvedId);
+          }
+        };
+      }
+
+      if (quotedMeta) {
+        const previewType = this.normalizeParsedMessageType(quotePreview?.type)
+          || quotePreview?.type || "quote";
+        const previewSender = quotePreview?.displayName || quotePreview?.senderUserName
+          || quotePreview?.fromUserName || "";
+        const typeLabel = this.humanizeMessageType(previewType);
+        quotedMeta.textContent = previewSender
+          ? `${previewSender} · ${typeLabel}`
+          : `引用的${typeLabel}消息`;
+      }
+
+      if (quotePreview?.content) {
+        if (quotedContent) {
+          quotedContent.textContent = quotePreview.content;
+        }
+      } else if (parsed.refContent) {
+        if (quotedContent) {
+          quotedContent.textContent = parsed.refContent;
+        }
+      } else {
+        if (quoted) {
+          quoted.classList.add("cursor-not-allowed", "opacity-60");
+          quoted.classList.remove("cursor-pointer");
+          delete quoted.dataset.referMessageId;
+          quoted.onclick = null;
+        }
+        if (quotedMeta) {
+          quotedMeta.textContent = "引用的消息";
+        }
+        if (quotedContent) {
+          quotedContent.textContent = "该消息尚未加载";
+        }
+      }
+    }
+
+    return this.applyBubbleStyle(referBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  renderSystemNoticeMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+    const template = this.cloneTemplate("message-template-system-notice");
+    const noticeBubble = template || bubble;
+    const content = noticeBubble.querySelector("[data-role='system-notice-content']");
+    const preview = this.buildSystemNoticeContent(msg);
+
+    if (content) {
+      content.textContent = preview;
+    } else {
+      noticeBubble.textContent = preview;
+    }
+
+    return this.applyBubbleStyle(noticeBubble, msg, isNewGroup, senderInfo,
+      isFirstMessage);
+  }
+
+  applyBubbleStyle(bubble, msg, isNewGroup = true, senderInfo = null,
+    isFirstMessage = false) {
+    if (!bubble) {
+      return bubble;
+    }
+
+    bubble.classList.add("relative", "inline-block", "rounded-2xl", "shadow-sm",
+      "message-bubble");
+
+    bubble.style.marginTop = "";
+    bubble.style.paddingBottom = "";
+    bubble.dataset.tail = msg._endsGroup ? "true" : "false";
+
+    bubble.classList.remove("bg-blue-500", "text-white", "rounded-bl-2xl",
+      "rounded-tr-2xl", "rounded-br-md", "bg-white", "text-gray-900",
+      "border", "border-gray-200", "rounded-br-2xl", "rounded-tl-2xl",
+      "rounded-bl-md");
+
+    bubble.style.background = "";
+    bubble.style.color = "";
+    bubble.style.border = "";
+    bubble.style.boxShadow = "";
+    bubble.style.borderRadius = "";
+    bubble.style.setProperty("--tg-bubble-bg", "");
+    bubble.style.setProperty("--tg-bubble-border-color", "");
+    delete bubble.dataset.senderType;
+
+    if (this.isSystemNoticeMessage(msg)) {
+      bubble.dataset.senderType = "system";
+      bubble.classList.remove("rounded-bl-2xl", "rounded-tr-2xl",
+        "rounded-br-md", "rounded-br-2xl", "rounded-tl-2xl",
+        "rounded-bl-md", "border");
+      bubble.classList.add("mx-auto");
+      bubble.style.background = "rgba(255,255,255,0.92)";
+      bubble.style.color = "#475569";
+      bubble.style.border = "1px solid rgba(203,213,225,0.9)";
+      bubble.style.boxShadow = "0 8px 30px -20px rgba(15,23,42,0.35)";
+      bubble.style.borderRadius = "9999px";
+      bubble.style.setProperty("--tg-bubble-bg", "rgba(255,255,255,0.92)");
+      bubble.style.setProperty("--tg-bubble-border-color",
+        "rgba(203,213,225,0.9)");
+      return bubble;
+    }
+
+    if (msg.self_send) {
+      bubble.dataset.senderType = "self";
+      bubble.classList.add("text-white", "rounded-bl-2xl", "rounded-tr-2xl",
+        "rounded-br-md");
+      bubble.classList.remove("rounded-br-2xl", "rounded-tl-2xl",
+        "rounded-bl-md");
+      bubble.style.background = this.theme.selfBubbleColor;
+      bubble.style.color = this.theme.selfBubbleTextColor;
+      bubble.style.border = "1px solid rgba(181, 214, 173, 0.92)";
+      bubble.style.boxShadow = "0 1px 1px rgba(15,23,42,0.05)";
+      bubble.style.borderRadius = "18px 18px 6px 18px";
+      bubble.style.setProperty("--tg-bubble-bg", this.theme.selfBubbleColor);
+      bubble.style.setProperty("--tg-bubble-border-color",
+        "rgba(181, 214, 173, 0.92)");
+    } else {
+      bubble.dataset.senderType = "other";
+      bubble.classList.add("text-gray-900", "border", "rounded-br-2xl",
+        "rounded-tl-2xl", "rounded-bl-md");
+      bubble.classList.remove("rounded-bl-2xl", "rounded-tr-2xl",
+        "rounded-br-md");
+      bubble.style.background = this.theme.otherBubbleColor;
+      bubble.style.color = "#111827";
+      bubble.style.border = `1px solid ${this.theme.otherBubbleBorderColor}`;
+      bubble.style.boxShadow = "0 1px 1px rgba(15,23,42,0.06)";
+      bubble.style.borderRadius = "18px 18px 18px 6px";
+      bubble.style.setProperty("--tg-bubble-bg", this.theme.otherBubbleColor);
+      bubble.style.setProperty("--tg-bubble-border-color",
+        this.theme.otherBubbleBorderColor);
+    }
+
+    const existingName = bubble.querySelector('[data-role="sender-name"]');
+    if (existingName) {
+      existingName.remove();
+    }
+
+    if (!msg.self_send && this.isRoom() && msg._startsGroup) {
+      const name = senderInfo?.name || msg.sender_name || "";
+      if (name) {
+        const nameTag = document.createElement("div");
+        nameTag.dataset.role = "sender-name";
+        nameTag.className = "px-3 pt-1 text-[11px] font-semibold text-sky-600/90";
+        nameTag.textContent = name;
+        bubble.insertBefore(nameTag, bubble.firstChild);
+      }
+    }
+
+    return bubble;
+  }
+
+  renderStatus(m, bubble, msg) {
+    if (!msg.self_send) {
+      return;
+    }
+    if (m.sending || msg._sending) {
+      const loader = document.createElement("div");
+      loader.className = "absolute bottom-1 left-2 flex space-x-1";
+      loader.innerHTML = `
+                <span class="w-1 h-1 bg-blue-300 rounded-full animate-tg-dot"></span>
+                <span class="w-1 h-1 bg-blue-300 rounded-full animate-tg-dot" style="animation-delay:0.2s"></span>
+                <span class="w-1 h-1 bg-blue-300 rounded-full animate-tg-dot" style="animation-delay:0.4s"></span>
+            `;
+      bubble.appendChild(loader);
+    } else if (m.send_failed) {
+      const retry = document.createElement("button");
+      retry.className = "absolute bottom-1 left-2 text-[10px] text-red-500 underline";
+      retry.textContent = "重试";
+      retry.addEventListener("click", () => {
+        this.inputTarget.value = msg.content;
+        this.sendMessage("text");
+        this.autoResize();
+      });
+      bubble.appendChild(retry);
+    }
+  }
+
+  addTimestamp(bubble, wrapper, msg = null) {
+    const time = document.createElement("span");
+    const ts = wrapper.message_time || wrapper.created_at
+      || wrapper.wx_message?.message_time;
+    time.textContent = ts ? this.formatTimestamp(ts) : "";
+
+    const isSelf = msg?.self_send;
+    const inlineTarget = this.inlineTimestampTargetForBubble(bubble, msg);
+    if (inlineTarget) {
+      time.className = "float-right ml-2 mt-1 text-[10px] leading-none tracking-wide select-none";
+      time.style.color = isSelf ? "rgba(255,255,255,0.72)"
+        : "rgba(100,116,139,0.92)";
+      inlineTarget.appendChild(time);
+      return;
+    }
+
+    time.className = "absolute bottom-2 right-3 text-[10px] leading-none tracking-wide";
+    if (!bubble.dataset.timestampPrepared) {
+      bubble.style.minWidth = bubble.style.minWidth || "140px";
+      bubble.style.minHeight = bubble.style.minHeight || "52px";
+      bubble.style.paddingBottom = bubble.style.paddingBottom || "28px";
+      bubble.dataset.timestampPrepared = "true";
+    }
+
+    time.style.padding = "3px 8px";
+    time.style.borderRadius = "9999px";
+    time.style.background = isSelf ? "rgba(255,255,255,0.18)"
+      : "rgba(15,23,42,0.08)";
+    time.style.color = isSelf ? "rgba(255,255,255,0.85)"
+      : "rgba(100,116,139,0.95)";
+    time.style.boxShadow = isSelf ? "0 4px 12px -8px rgba(15,23,42,0.45)"
+      : "0 4px 10px -8px rgba(15,23,42,0.25)";
+
+    bubble.appendChild(time);
+  }
+
+  inlineTimestampTargetForBubble(bubble, msg = null) {
+    const type = this.normalizeMessageType(msg);
+    const inlineTypes = ["text", "quote", "refer", "xml_unparsed"];
+    if (!inlineTypes.includes(type)) {
+      return null;
+    }
+
+    return bubble.querySelector("[data-role='content']")
+      || bubble.querySelector("[data-role='refer-body']")
+      || bubble.querySelector("[data-role='xml-content']");
+  }
+
+  formatTimestamp(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    const now = new Date();
+    const sameDay = date.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const sameYear = date.getFullYear() === now.getFullYear();
+
+    const timePart = date.toLocaleTimeString("zh-Hans-CN", {
+      hour: "2-digit", minute: "2-digit"
+    });
+
+    if (sameDay) {
+      return timePart;
+    }
+
+    if (date.toDateString() === yesterday.toDateString()) {
+      return `昨 ${timePart}`;
+    }
+
+    if (sameYear) {
+      return date.toLocaleDateString("zh-Hans-CN", {
+        month: "2-digit", day: "2-digit"
+      }) + ` ${timePart}`;
+    }
+
+    return date.toLocaleDateString("zh-Hans-CN", {
+      year: "2-digit", month: "2-digit", day: "2-digit"
+    }) + ` ${timePart}`;
+  }
 
   buildLocalMessagePreview(type, tempMsg) {
-    return buildLocalMessagePreview(this, type, tempMsg);
+    switch (type) {
+      case "text":
+        return tempMsg?.wx_message?.content || "新消息"
+      case "quote":
+        return tempMsg?.wx_message?.refer_title || "[引用消息]"
+      case "image":
+        return "[图片]"
+      case "emoji":
+        return "[表情]"
+      case "file":
+        return "[文件]"
+      case "voice":
+        return "[语音]"
+      case "video":
+        return "[视频]"
+      default:
+        return "[新消息]"
+    }
   }
 
   dispatchLocalChatMessage(type, tempMsg) {
-    return dispatchLocalChatMessage(this, type, tempMsg);
+    window.dispatchEvent(new CustomEvent("chat:local-message", {
+      detail: {
+        chat_room_id: this.idValue,
+        chat_room_name: this.nameValue || "聊天窗口",
+        content_preview: this.buildLocalMessagePreview(type, tempMsg),
+        message_time: tempMsg?.message_time || new Date().toISOString(),
+        self_send: true
+      }
+    }));
   }
 
   createSendMessage(type, message) {
-    return createSendMessage(this, type, message);
+    const tempId = "temp-" + Date.now();
+
+    let tempMsg = {
+      id: tempId,
+      chat_room_id: this.idValue,
+      message_time: new Date().toISOString(),
+      sending: true,
+      send_failed: false,
+      wx_message: {
+        msg_type: type,
+        content: "",
+        to_user_name: this.currentWxidValue,
+        self_send: true,
+        real_msg_type: type,
+      }
+    };
+
+    if (type === "text") {
+      const content = this.inputTarget.value
+      tempMsg.wx_message.content = content;
+      tempMsg.msg_type = 1;
+      this.inputTarget.value = "";
+    }
+    if (type === "quote") {
+      const pendingQuote = message?.pendingQuote || this.pendingQuote;
+      const content = this.inputTarget.value.trim();
+      tempMsg.msg_type = 49;
+      tempMsg.wx_message.real_msg_type = "quote";
+      tempMsg.wx_message.content = content;
+      tempMsg.wx_message.refer_title = content;
+      tempMsg.wx_message.refer_new_msg_id = pendingQuote?.newMsgId;
+      tempMsg.referenced_message = pendingQuote?.wrapper || null;
+      tempMsg.extra = {
+        reference_message_id: pendingQuote?.messageId
+      };
+      this.inputTarget.value = "";
+    }
+    if (type === "image") {
+      tempMsg.msg_type = 3;
+      tempMsg.extra = {
+        base64: message.extra?.base64,
+      }
+    }
+    if (type === "emoji") {
+      tempMsg.msg_type = 47;
+      tempMsg.extra = {
+        base64: message?.extra?.base64 || "",
+        preview_url: message?.extra?.preview_url || "",
+      };
+    }
+    if (type === "file") {
+      tempMsg.msg_type = 6;
+      tempMsg.wx_message.real_msg_type = "file_message"
+    }
+    this.messages.add(tempMsg);
+    this.renderMessages({ forceScrollToBottom: true });
+    this.dispatchLocalChatMessage(type, tempMsg);
+    return tempMsg;
+
   }
 
   sendMessage(type, message) {
-    return sendMessage(this, type, message);
+    const pendingQuote = type === "quote" ? this.pendingQuote : null;
+    const msg = this.createSendMessage(type, {
+      ...(message || {}),
+      pendingQuote
+    });
+    if (type == "text") {
+      hideAllEmojiPreviews();
+    }
+    if (type === "quote") {
+      this.pendingQuote = null;
+      this.renderPendingQuote();
+    }
+    let body;
+    let headers;
+    const usesFormData = type === "file";
+    if (usesFormData) {
+      const formData = new FormData();
+      formData.append("chat_room_id", this.idValue);
+      formData.append("msg_type", msg.msg_type);
+      formData.append("content", msg.wx_message.content || "");
+      formData.append("file", message.file);
+      body = formData
+
+      headers = {
+        "X-CSRF-Token": document.querySelector(
+          'meta[name="csrf-token"]').content
+      }
+    } else {
+      const requestExtra = { ...(msg.extra || {}) };
+      if (type === "emoji") {
+        delete requestExtra.preview_url;
+      }
+      body = JSON.stringify({
+        chat_room_id: this.idValue,
+        content: msg.wx_message.content,
+        msg_type: msg.msg_type,
+        extra: requestExtra,
+      })
+      headers = {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": document.querySelector(
+          'meta[name="csrf-token"]').content
+      }
+    }
+
+    fetch(`/chat_room/${this.idValue}/messages`, {
+      method: "POST", headers: headers, body: body
+    })
+      .then(res => res.json())
+      .then(newMsg => {
+        if (newMsg?.data) {
+          this.messages.remove(msg.id);
+          this.messages.add(
+            { ...newMsg.data, sending: false, send_failed: false });
+          this.renderMessages({ forceScrollToBottom: true });
+        } else {
+          this.messages.remove(msg.id)
+          this.messages.add({ ...msg, sending: false, send_failed: true });
+          this.renderMessages({ forceScrollToBottom: true });
+        }
+      })
+      .catch(error => {
+        this.messages.remove(msg.id);
+        this.messages.add({ ...msg, sending: false, send_failed: true });
+        this.renderMessages({ forceScrollToBottom: true });
+      });
   }
 
   parseWxXmlMessage(xmlString) {
@@ -1202,13 +3050,135 @@ export default class extends Controller {
     return normalized;
   }
 
-  buildMediaPreviewTitle(msg, fallback = "媒体预览") { return buildMediaPreviewTitle(this, msg, fallback); }
-  ensureMediaPreviewElements() { return ensureMediaPreviewElements(this); }
-  openMediaPreview(options = {}) { return openMediaPreview(this, options); }
-  closeMediaPreview() { return closeMediaPreview(this); }
-  handleMediaPreviewKeydown(event) { return handleMediaPreviewKeydown(this, event); }
+  buildMediaPreviewTitle(msg, fallback = "媒体预览") {
+    const senderName = msg?.self_send ? "我" : (msg?.sender_name
+      || this.lookupSenderInfo(msg, msg?.content)?.name || "");
+    return senderName ? `${senderName} · ${fallback}` : fallback;
+  }
 
-  toggleMenu(event) { return toggleMenu(this, event); }
+  ensureMediaPreviewElements() {
+    if (this.mediaPreviewOverlay?.isConnected) {
+      return;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "fixed inset-0 z-[120] hidden items-center justify-center bg-slate-950/90 px-4 py-5";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.innerHTML = `
+      <div class="absolute inset-0 backdrop-blur-sm" data-role="media-preview-backdrop"></div>
+      <div class="relative z-10 flex max-h-full w-full max-w-6xl flex-col gap-3">
+        <div class="flex items-center justify-between gap-3 text-slate-100">
+          <div class="min-w-0">
+            <div class="truncate text-sm font-medium" data-role="media-preview-title">图片预览</div>
+            <div class="truncate text-xs text-slate-400" data-role="media-preview-meta"></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <a class="rounded-full border border-white/15 px-3 py-1.5 text-xs text-slate-100 transition hover:border-white/30 hover:bg-white/10"
+               data-role="media-preview-open"
+               target="_blank"
+               rel="noopener noreferrer">新窗口打开</a>
+            <button type="button"
+                    class="rounded-full border border-white/15 px-3 py-1.5 text-xs text-slate-100 transition hover:border-white/30 hover:bg-white/10"
+                    data-role="media-preview-close">关闭</button>
+          </div>
+        </div>
+        <div class="relative flex max-h-[calc(100vh-7rem)] w-full items-center justify-center overflow-auto rounded-[28px] bg-black/30 p-3"
+             data-role="media-preview-frame">
+          <img data-role="media-preview-image"
+               alt="媒体预览"
+               class="max-h-[calc(100vh-9rem)] max-w-full object-contain select-none">
+        </div>
+      </div>
+    `;
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target.closest("[data-role='media-preview-backdrop']")
+        || event.target.closest("[data-role='media-preview-close']")) {
+        event.preventDefault();
+        this.closeMediaPreview();
+      }
+    });
+
+    document.body.appendChild(overlay);
+    this.mediaPreviewOverlay = overlay;
+    this.mediaPreviewFrame = overlay.querySelector(
+      "[data-role='media-preview-frame']");
+    this.mediaPreviewImage = overlay.querySelector(
+      "[data-role='media-preview-image']");
+    this.mediaPreviewTitle = overlay.querySelector(
+      "[data-role='media-preview-title']");
+    this.mediaPreviewMeta = overlay.querySelector(
+      "[data-role='media-preview-meta']");
+    this.mediaPreviewOpenLink = overlay.querySelector(
+      "[data-role='media-preview-open']");
+  }
+
+  openMediaPreview({ src, title = "图片预览", meta = "" } = {}) {
+    if (!src) {
+      return;
+    }
+
+    this.ensureMediaPreviewElements();
+    if (!this.mediaPreviewOverlay || !this.mediaPreviewImage) {
+      return;
+    }
+
+    if (this.mediaPreviewTitle) {
+      this.mediaPreviewTitle.textContent = title;
+    }
+    if (this.mediaPreviewMeta) {
+      this.mediaPreviewMeta.textContent = meta;
+      this.mediaPreviewMeta.classList.toggle("hidden", !meta);
+    }
+    if (this.mediaPreviewOpenLink) {
+      this.mediaPreviewOpenLink.href = src;
+    }
+
+    this.mediaPreviewImage.src = src;
+    this.mediaPreviewOverlay.classList.remove("hidden");
+    this.mediaPreviewOverlay.classList.add("flex");
+    this.mediaPreviewPreviousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", this.boundHandleMediaPreviewKeydown);
+  }
+
+  closeMediaPreview() {
+    if (!this.mediaPreviewOverlay) {
+      return;
+    }
+
+    this.mediaPreviewOverlay.classList.add("hidden");
+    this.mediaPreviewOverlay.classList.remove("flex");
+    if (this.mediaPreviewImage) {
+      this.mediaPreviewImage.removeAttribute("src");
+    }
+
+    document.body.style.overflow = this.mediaPreviewPreviousBodyOverflow || "";
+    document.removeEventListener("keydown", this.boundHandleMediaPreviewKeydown);
+  }
+
+  handleMediaPreviewKeydown(event) {
+    if (event.key === "Escape") {
+      this.closeMediaPreview();
+    }
+  }
+
+  toggleMenu(event) {
+    event.stopPropagation();
+
+    if (!this.hasMenuTarget) {
+      return;
+    }
+
+    const shouldShow = this.menuTarget.classList.contains("hidden");
+    if (shouldShow) {
+      this.menuTarget.classList.remove("hidden");
+      document.addEventListener("click", this.boundCloseMenu);
+    } else {
+      this.closeMenu();
+    }
+  }
 
   mouseenterAttachment(event) {
     event.stopPropagation(); // 防止冒泡导致其他事件触发
@@ -1224,40 +3194,398 @@ export default class extends Controller {
     }
   }
 
-  mouseleaveAttachment() { return this.attachmentSelectTarget?.classList?.add("hidden"); }
-  hideAttachmentSelect(event) { return this.mouseleaveAttachment(); }
-  closeMenu(event = null) { return closeMenu(this, event); }
-  handleMenuClose(event = null) { return handleMenuClose(this, event); }
-  openAppearanceSettings(event) { return openAppearanceSettings(this, event); }
-  closeThemePanel(event = null) { return closeThemePanel(this, event); }
+  mouseleaveAttachment() {
+    // 隐藏附件选择框
+    if (!this.attachmentSelectTarget.classList.contains("hidden")) {
+      this.attachmentSelectTarget.classList.add("hidden");
 
-  updateBackgroundColor(event) { return updateBackgroundColor(this, event); }
-  updateBubbleColor(event) { return updateBubbleColor(this, event); }
-  updateBackgroundImage(event) { return updateBackgroundImage(this, event); }
-  clearBackgroundImage(event) { return clearBackgroundImage(this, event); }
-  resetTheme(event = null) { return resetTheme(this, event); }
-  updateFontFamily(event) { return updateFontFamily(this, event); }
-  updateCustomFont(event) { return updateCustomFont(this, event); }
-  applyTheme(options = {}) { return applyTheme(this, options); }
-  refreshBubbleStyles() { return refreshBubbleStyles(this); }
-  syncThemeInputs() { return syncThemeInputs(this); }
+      // 移除文档点击监听器
+      document.removeEventListener("click", this._boundHideAttachmentSelect);
+    }
+  }
 
-  syncMembers(event = null) { return syncMembers(this, event); }
-  openSidebar(event = null) { return openSidebar(this, event); }
-  syncMessages(event = null) { return syncMessages(this, event); }
-  syncContact(event = null) { return syncContact(this, event); }
-  loadMore() { return loadMore(this); }
+  hideAttachmentSelect(event) {
+    // 检查点击目标是否在附件选择框内，如果不在，则关闭附件选择框
+    if (!this.attachmentSelectTarget.contains(event.target)) {
+      this.mouseleaveAttachment();
+    }
+  }
+
+  closeMenu(event = null) {
+    if (!this.hasMenuTarget) {
+      return;
+    }
+
+    if (event) {
+      const target = event.target;
+      if (this.menuTarget.contains(target)) {
+        return;
+      }
+      if (this.hasThemePanelTarget && this.themePanelTarget.contains(target)) {
+        return;
+      }
+    }
+
+    if (!this.menuTarget.classList.contains("hidden")) {
+      this.menuTarget.classList.add("hidden");
+    }
+
+    document.removeEventListener("click", this.boundCloseMenu);
+  }
+
+  handleMenuClose(event = null) {
+    event?.stopPropagation();
+    this.closeMenu();
+  }
+
+  openAppearanceSettings(event) {
+    event.stopPropagation();
+    this.closeMenu();
+
+    if (!this.hasThemePanelTarget) {
+      return;
+    }
+
+    this.themePanelTarget.classList.remove("hidden");
+    this.syncThemeInputs();
+    document.addEventListener("click", this.boundCloseThemePanel);
+  }
+
+  closeThemePanel(event = null) {
+    if (!this.hasThemePanelTarget) {
+      return;
+    }
+    if (!this.themePanelTarget.classList.contains("hidden")) {
+      this.themePanelTarget.classList.add("hidden");
+    }
+
+    document.removeEventListener("click", this.boundCloseThemePanel);
+  }
+
+  updateBackgroundColor(event) {
+    const value = event?.target?.value;
+    if (!value) {
+      return;
+    }
+    this.theme.backgroundColor = value;
+    this.applyTheme();
+  }
+
+  updateBubbleColor(event) {
+    const value = event?.target?.value;
+    if (!value) {
+      return;
+    }
+    this.theme.selfBubbleColor = value;
+    this.applyTheme();
+  }
+
+  updateBackgroundImage(event) {
+    const value = event?.target?.value ?? "";
+    this.theme.backgroundImage = value.trim();
+    this.applyTheme();
+  }
+
+  clearBackgroundImage(event) {
+    event?.preventDefault();
+    this.theme.backgroundImage = "";
+    this.applyTheme();
+    this.syncThemeInputs();
+  }
+
+  resetTheme(event = null) {
+    event?.preventDefault();
+    this.theme = { ...DEFAULT_THEME };
+    this.syncThemeInputs();
+    this.applyTheme();
+  }
+
+  updateFontFamily(event) {
+    const value = event?.target?.value ?? "inherit";
+    if (value === "custom") {
+      if (this.hasFontCustomInputTarget) {
+        this.fontCustomInputTarget.focus();
+      }
+      return;
+    }
+
+    this.theme.fontFamily = value || "inherit";
+    this.applyTheme({ refreshBubbles: false });
+    if (this.hasFontCustomInputTarget) {
+      this.fontCustomInputTarget.value = "";
+    }
+  }
+
+  updateCustomFont(event) {
+    const rawValue = event?.target?.value ?? "";
+    const value = rawValue.trim();
+    if (!value) {
+      this.theme.fontFamily = "inherit";
+      if (this.hasFontSelectTarget) {
+        this.fontSelectTarget.value = "inherit";
+      }
+    } else {
+      this.theme.fontFamily = value;
+      if (this.hasFontSelectTarget) {
+        this.fontSelectTarget.value = "custom";
+      }
+    }
+    this.applyTheme({ refreshBubbles: false });
+  }
+
+  applyTheme({ refreshBubbles = true } = {}) {
+    const backgroundColor = this.theme.backgroundColor || "#ffffff";
+    const backgroundImage = this.theme.backgroundImage || "";
+    const fontFamily = this.theme.fontFamily || "inherit";
+
+    const resolveBackgroundImage = (image) => {
+      if (!image) {
+        return "";
+      }
+      const trimmed = image.trim();
+      if (!trimmed) {
+        return "";
+      }
+      if (/^url\(/i.test(trimmed)) {
+        return trimmed;
+      }
+      const sanitized = trimmed.replace(/"/g, "'");
+      return `url("${sanitized}")`;
+    };
+
+    const backgroundImageValue = resolveBackgroundImage(backgroundImage);
+
+    if (this.element) {
+      this.element.style.backgroundColor = backgroundColor;
+      if (backgroundImageValue) {
+        this.element.style.backgroundImage = backgroundImageValue;
+        this.element.style.backgroundSize = "cover";
+        this.element.style.backgroundRepeat = "no-repeat";
+        this.element.style.backgroundPosition = "center";
+      } else {
+        this.element.style.backgroundImage = "";
+        this.element.style.backgroundSize = "";
+        this.element.style.backgroundRepeat = "";
+        this.element.style.backgroundPosition = "";
+      }
+      this.element.style.fontFamily = fontFamily;
+    }
+
+    if (this.hasMessageListTarget) {
+      const list = this.messageListTarget;
+      if (backgroundImageValue) {
+        list.style.backgroundColor = "transparent";
+        list.style.backgroundImage = backgroundImageValue;
+        list.style.backgroundSize = "cover";
+        list.style.backgroundRepeat = "no-repeat";
+        list.style.backgroundAttachment = "fixed";
+        list.style.backgroundPosition = "center";
+      } else {
+        list.style.backgroundColor = backgroundColor;
+        list.style.backgroundImage = "";
+        list.style.backgroundAttachment = "";
+        list.style.backgroundSize = "";
+        list.style.backgroundRepeat = "";
+        list.style.backgroundPosition = "";
+      }
+      list.style.fontFamily = fontFamily;
+    }
+
+    if (refreshBubbles) {
+      this.refreshBubbleStyles();
+    }
+
+    this.persistTheme();
+  }
+
+  refreshBubbleStyles() {
+    if (!this.hasMessageListTarget) {
+      return;
+    }
+    const bubbles = this.messageListTarget.querySelectorAll(".message-bubble");
+    bubbles.forEach((bubble) => {
+      if (["emoji", "image", "video"].includes(bubble.dataset.bubbleType)) {
+        bubble.style.background = "transparent";
+        bubble.style.border = "none";
+        bubble.style.boxShadow = "none";
+        bubble.classList.remove("text-white");
+        return;
+      }
+      const senderType = bubble.dataset.senderType;
+      if (senderType === "self") {
+        bubble.style.background = this.theme.selfBubbleColor;
+        bubble.style.color = this.theme.selfBubbleTextColor;
+        bubble.style.border = "none";
+        bubble.classList.add("text-white");
+        const progressInner = bubble.querySelector(
+          '[data-role="voice-progress-inner"]');
+        if (progressInner) {
+          progressInner.style.background = this.theme.selfBubbleTextColor
+            || "#ffffff";
+        }
+      } else {
+        bubble.style.background = this.theme.otherBubbleColor;
+        bubble.style.color = "#111827";
+        bubble.style.border = `1px solid ${this.theme.otherBubbleBorderColor}`;
+        bubble.classList.remove("text-white");
+        const progressInner = bubble.querySelector(
+          '[data-role="voice-progress-inner"]');
+        if (progressInner) {
+          progressInner.style.background = "#6366f1";
+        }
+      }
+    });
+  }
+
+  syncThemeInputs() {
+    if (this.hasBackgroundInputTarget && this.backgroundInputTarget.value
+      !== this.theme.backgroundColor) {
+      this.backgroundInputTarget.value = this.theme.backgroundColor;
+    }
+    if (this.hasBubbleInputTarget && this.bubbleInputTarget.value
+      !== this.theme.selfBubbleColor) {
+      this.bubbleInputTarget.value = this.theme.selfBubbleColor;
+    }
+    if (this.hasBackgroundImageInputTarget) {
+      this.backgroundImageInputTarget.value = this.theme.backgroundImage || "";
+    }
+    const fontValue = this.theme.fontFamily || "inherit";
+    const presetFonts = new Set(["inherit",
+      '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+      '"Source Han Serif SC", "Songti SC", serif', '"LXGW WenKai", cursive',
+      '"JetBrains Mono", monospace']);
+    if (this.hasFontSelectTarget) {
+      if (presetFonts.has(fontValue)) {
+        this.fontSelectTarget.value = fontValue;
+      } else {
+        this.fontSelectTarget.value = "custom";
+      }
+    }
+    if (this.hasFontCustomInputTarget) {
+      this.fontCustomInputTarget.value = presetFonts.has(fontValue) || fontValue
+        === "inherit" ? "" : fontValue;
+    }
+  }
+
+  syncMembers(event = null) {
+    event?.stopPropagation();
+    this.closeMenu();
+    const [namespace, identifier] = chatStorageKeys.chatRoomMembers(this.idValue);
+    removeCache(namespace, identifier);
+    fetch(`/chat_room/${this.idValue}/sync_chat_members`, {
+      method: "PUT", headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": document.querySelector(
+          'meta[name="csrf-token"]').content
+      },
+      body: JSON.stringify({
+        chat_room_id: this.idValue,
+      })
+    });
+    setTimeout(() => this.loadChatMembers({ force: true }), 1200);
+    setTimeout(() => this.loadChatMembers({ force: true }), 2600);
+  }
+
+  openSidebar(event = null) {
+    event?.stopPropagation();
+    const inChatShell = this.element.closest('[data-controller~="chat"]');
+    if (!inChatShell) {
+      window.location.href = "/chat";
+      return;
+    }
+
+    const sidebarEvent = new CustomEvent("chat:sidebar:open", {
+      bubbles: true
+    });
+    this.element.dispatchEvent(sidebarEvent);
+  }
+
+  syncMessages(event = null) {
+    event?.stopPropagation();
+    this.closeMenu();
+    const syncWxid = this.ownerWxidValue || this.currentWxidValue;
+    fetch(`/message/sync/${encodeURIComponent(syncWxid)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRF-Token": document.querySelector(
+          'meta[name="csrf-token"]').content
+      }
+    })
+      .then((resp) => {
+        if (!resp.ok) {
+          throw new Error(`同步消息失败: ${resp.status}`);
+        }
+        return resp.json();
+      })
+      .then((data) => {
+        if (data?.sync_wxid && data.sync_wxid !== syncWxid) {
+          console.info("message sync resolved owner wxid", data);
+        }
+        this.loadMessages({ replace: true });
+        setTimeout(() => this.loadMessages({ replace: true }), 1200);
+        setTimeout(() => this.loadMessages({ replace: true }), 2600);
+      })
+      .catch((error) => {
+        console.error("同步消息失败", error);
+        if (typeof window.showErrorToast === "function") {
+          window.showErrorToast("同步消息失败，请稍后重试");
+        } else {
+          alert("同步消息失败，请稍后重试");
+        }
+      });
+  }
+
+  syncContact(event = null) {
+    event?.stopPropagation();
+    this.closeMenu();
+    const [shellNamespace, shellIdentifier] = chatStorageKeys.chatRoomShell(this.idValue);
+    const [listNamespace, listIdentifier] = chatStorageKeys.chatRoomList();
+    removeCache(shellNamespace, shellIdentifier);
+    removeCache(listNamespace, listIdentifier);
+    fetch(`/chat_room/${this.idValue}/sync_chat_contact`, {
+      method: "PUT", headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": document.querySelector(
+          'meta[name="csrf-token"]').content
+      }, body: JSON.stringify({
+        chat_room_id: this.idValue,
+      })
+    });
+  }
+
+  loadMore() {
+    this.loadOlderMessagesChunk();
+  }
 
   matchesCurrentRoom(payload) {
     return String(payload?.chat_room_id || "") === String(this.idValue);
   }
 
   hasMessage(messageId) {
-    return this.messageState.hasMessage(messageId);
+    if (messageId == null) {
+      return false;
+    }
+
+    return this.messages.all.some((wrapper) => String(wrapper?.id) === String(messageId));
   }
 
   latestServerMessageId() {
-    return this.messageState.latestServerMessageId();
+    let latest = null;
+
+    this.messages.all.forEach((wrapper) => {
+      const candidateId = Number(wrapper?.id);
+      if (!Number.isFinite(candidateId)) {
+        return;
+      }
+
+      if (latest == null || candidateId > latest) {
+        latest = candidateId;
+      }
+    });
+
+    return latest;
   }
 
   refreshRoomFromNotification(payload, attempt = 0) {
@@ -1361,23 +3689,250 @@ export default class extends Controller {
   }
 
   handleVoiceClick(messageId, container, label, context) {
-    return handleVoiceClick(this, messageId, container, label, context);
+    if (container.dataset.loading === "true") {
+      return;
+    }
+
+    const original = label.dataset.originalText;
+    const cachedUrl = this.voiceBlobUrls.get(messageId);
+
+    if (cachedUrl) {
+      this.playVoice(cachedUrl, container, label, context);
+      return;
+    }
+
+    container.dataset.loading = "true";
+    label.textContent = "加载中…";
+
+    fetch(`/message/voice/${messageId}`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`请求失败: ${res.status}`);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        this.voiceBlobUrls.set(messageId, url);
+        this.playVoice(url, container, label, context);
+      })
+      .catch((err) => {
+        console.error("语音下载失败:", err);
+        label.textContent = "下载失败";
+        setTimeout(() => {
+          label.textContent = original;
+        }, 1500);
+      })
+      .finally(() => {
+        container.dataset.loading = "false";
+      });
   }
 
   playVoice(url, container, label, context) {
-    return playVoice(this, url, container, label, context);
+    this.stopCurrentVoicePlayback();
+
+    const audio = new Audio(url);
+    const original = label.dataset.originalText;
+
+    const {
+      messageId, progressBar, progressInner, fallbackDuration, speedButton,
+    } = context;
+
+    const playbackState = {
+      audio,
+      progressBar,
+      progressInner,
+      speedButton,
+      rateIndex: this.voicePlaybackRates.get(messageId) ?? 1,
+      fallbackDuration,
+      messageId,
+      animationId: null,
+      applyRate: null,
+      cleanup: null,
+    };
+
+    const stopAnimation = () => {
+      if (playbackState.animationId) {
+        cancelAnimationFrame(playbackState.animationId);
+        playbackState.animationId = null;
+      }
+    };
+
+    const hideProgress = () => {
+      const pending = this.pendingVoiceSeeks.get(messageId);
+      const ratio = typeof pending === "number" ? pending : 0;
+      if (progressInner) {
+        progressInner.style.width = `${Math.min(Math.max(ratio, 0), 1) * 100}%`;
+      }
+      stopAnimation();
+    };
+
+    const cleanup = () => {
+      container.classList.remove("opacity-60");
+      label.textContent = original;
+      if (this.currentVoicePlayback?.audio === audio) {
+        this.currentVoicePlayback = null;
+      }
+      hideProgress();
+      this.pendingVoiceSeeks.delete(messageId);
+    };
+
+    playbackState.cleanup = cleanup;
+
+    const updateProgress = () => {
+      const duration = Number.isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration : fallbackDuration;
+      if (duration > 0 && progressInner) {
+        const percent = Math.min(1, audio.currentTime / duration) * 100;
+        progressInner.style.width = `${percent}%`;
+      }
+      playbackState.animationId = requestAnimationFrame(updateProgress);
+    };
+
+    const applyPendingSeek = () => {
+      const pending = this.pendingVoiceSeeks.get(messageId);
+      if (typeof pending !== "number") {
+        return;
+      }
+      const clamped = Math.min(Math.max(pending, 0), 1);
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = clamped * audio.duration;
+        if (progressInner) {
+          progressInner.style.width = `${clamped * 100}%`;
+        }
+        this.pendingVoiceSeeks.delete(messageId);
+      } else {
+        if (progressInner) {
+          progressInner.style.width = `${clamped * 100}%`;
+        }
+      }
+    };
+
+    const startTracking = () => {
+      if (this.currentVoicePlayback?.audio !== audio) {
+        return;
+      }
+      applyPendingSeek();
+      stopAnimation();
+      playbackState.animationId = requestAnimationFrame(updateProgress);
+    };
+
+    const applyRate = () => {
+      const rate = this.voicePlaybackOptions[playbackState.rateIndex] ?? 1.0;
+      audio.playbackRate = rate;
+      speedButton.textContent = `${rate.toFixed(1)}x`;
+      this.voicePlaybackRates.set(messageId, playbackState.rateIndex);
+    };
+
+    playbackState.applyRate = applyRate;
+
+    this.currentVoicePlayback = playbackState;
+    applyRate();
+
+    label.textContent = "播放中…";
+    container.classList.add("opacity-60");
+
+    audio.addEventListener("loadedmetadata", startTracking, { once: true });
+    audio.addEventListener("play", startTracking, { once: true });
+    audio.addEventListener("ended", cleanup, { once: true });
+
+    let playResult;
+    try {
+      playResult = audio.play();
+    } catch (err) {
+      console.error("语音播放失败:", err);
+      cleanup();
+      label.textContent = "播放失败";
+      setTimeout(() => {
+        label.textContent = original;
+      }, 2500);
+      return;
+    }
+
+    if (playResult && typeof playResult.then === "function") {
+      playResult.catch((err) => {
+        console.error("语音播放失败:", err);
+        cleanup();
+        label.textContent = "播放失败";
+        setTimeout(() => {
+          label.textContent = original;
+        }, 2500);
+      });
+    } else {
+      startTracking();
+    }
   }
 
   seekVoice(messageId, context, event) {
-    return seekVoice(this, messageId, context, event);
+    const { progressBar, progressInner } = context;
+    const rect = progressBar.getBoundingClientRect();
+    if (!rect.width) {
+      return;
+    }
+
+    const ratio = Math.min(
+      Math.max((event.clientX - rect.left) / rect.width, 0), 1);
+    if (progressInner) {
+      progressInner.style.width = `${ratio * 100}%`;
+    }
+    this.pendingVoiceSeeks.set(messageId, ratio);
+
+    if (this.currentVoicePlayback?.messageId !== messageId) {
+      return;
+    }
+
+    const activeState = this.currentVoicePlayback;
+    const { audio } = activeState;
+    const previousInner = activeState.progressInner;
+    activeState.progressBar = progressBar;
+    activeState.progressInner = progressInner;
+    if (previousInner && previousInner !== progressInner) {
+      previousInner.style.width = `${ratio * 100}%`;
+    }
+
+    const apply = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = ratio * audio.duration;
+        this.pendingVoiceSeeks.delete(messageId);
+      }
+    };
+
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      apply();
+    } else {
+      audio.addEventListener("loadedmetadata", apply, { once: true });
+    }
   }
 
   toggleSpeed(messageId, context) {
-    return toggleSpeed(this, messageId, context);
+    const currentIndex = this.voicePlaybackRates.get(messageId) ?? 1;
+    const nextIndex = (currentIndex + 1) % this.voicePlaybackOptions.length;
+    this.voicePlaybackRates.set(messageId, nextIndex);
+
+    const rate = this.voicePlaybackOptions[nextIndex] ?? 1.0;
+    context.speedButton.textContent = `${rate.toFixed(1)}x`;
+
+    if (this.currentVoicePlayback?.messageId !== messageId) {
+      return;
+    }
+
+    this.currentVoicePlayback.rateIndex = nextIndex;
+    this.currentVoicePlayback.speedButton = context.speedButton;
+    if (typeof this.currentVoicePlayback.applyRate === "function") {
+      this.currentVoicePlayback.applyRate();
+    } else {
+      this.currentVoicePlayback.audio.playbackRate = rate;
+    }
   }
 
   formatVoiceDuration(seconds) {
-    return formatVoiceDuration(seconds);
+    const safe = Math.max(1, Math.round(Number(seconds) || 0));
+    if (safe >= 60) {
+      const minutes = Math.floor(safe / 60);
+      const remaining = safe % 60;
+      return `${minutes}:${String(remaining).padStart(2, "0")}`;
+    }
+    return `${safe}″`;
   }
 
   formatVideoDuration(seconds) {
@@ -1414,11 +3969,100 @@ export default class extends Controller {
     cleanup();
   }
 
-  buildLinkedText(text) { return buildLinkedText(this, text); }
-  appendPlainSegment(fragment, text) { return appendPlainSegment(this, fragment, text); }
-  createAnchor(href, label) { return createAnchor(this, href, label); }
-  decodeHtmlEntities(text) { return decodeHtmlEntities(this, text); }
-  normalizeHref(href) { return normalizeHref(this, href); }
+  buildLinkedText(text) {
+    const fragment = document.createDocumentFragment();
+    if (!text) {
+      fragment.appendChild(document.createTextNode(""));
+      return fragment;
+    }
+
+    const anchorRegex = /<a\s+[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = anchorRegex.exec(text)) !== null) {
+      const preceding = text.slice(lastIndex, match.index);
+      if (preceding) {
+        this.appendPlainSegment(fragment, preceding);
+      }
+
+      const href = match[1];
+      const labelHtml = match[2];
+      const cleanHref = this.normalizeHref(href);
+
+      if (cleanHref) {
+        const anchor = this.createAnchor(cleanHref,
+          this.decodeHtmlEntities(labelHtml));
+        fragment.appendChild(anchor);
+      } else {
+        this.appendPlainSegment(fragment, match[0]);
+      }
+
+      lastIndex = anchorRegex.lastIndex;
+    }
+
+    const trailing = text.slice(lastIndex);
+    if (trailing) {
+      this.appendPlainSegment(fragment, trailing);
+    }
+
+    return fragment;
+  }
+
+  appendPlainSegment(fragment, text) {
+    const urlRegex = /(https?:\/\/[^\s]+)/gi;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = urlRegex.exec(text)) !== null) {
+      const preceding = text.slice(lastIndex, match.index);
+      if (preceding) {
+        fragment.appendChild(document.createTextNode(preceding));
+      }
+
+      const url = match[0];
+      const cleanHref = this.normalizeHref(url);
+      if (cleanHref) {
+        fragment.appendChild(this.createAnchor(cleanHref, url));
+      } else {
+        fragment.appendChild(document.createTextNode(url));
+      }
+
+      lastIndex = match.index + url.length;
+    }
+
+    const trailing = text.slice(lastIndex);
+    if (trailing) {
+      fragment.appendChild(document.createTextNode(trailing));
+    }
+  }
+
+  createAnchor(href, label) {
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.textContent = label;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.className = "underline text-blue-500 hover:text-blue-600";
+    return anchor;
+  }
+
+  decodeHtmlEntities(text) {
+    const textarea = document.createElement("textarea");
+    textarea.innerHTML = text;
+    return textarea.value;
+  }
+
+  normalizeHref(href) {
+    if (!href) {
+      return null;
+    }
+    const trimmed = href.trim();
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return null;
+    }
+    return trimmed;
+  }
 
   focusMessageById(messageId) {
     if (!messageId || !this.hasMessageListTarget) {
@@ -1700,19 +4344,45 @@ export default class extends Controller {
   }
 
   sortedMessageWrappers() {
-    return this.messageState.sortedMessageWrappers();
+    return [...this.messages.all].sort((left, right) => {
+      const timeDiff = this.messageTimestampSortValue(left)
+        - this.messageTimestampSortValue(right);
+      if (timeDiff !== 0) {
+        return timeDiff;
+      }
+
+      return this.messageNumericIdSortValue(left)
+        - this.messageNumericIdSortValue(right);
+    });
   }
 
   messageTimestampSortValue(wrapper) {
-    return this.messageState.messageTimestampSortValue(wrapper);
+    const value = wrapper?.message_time || wrapper?.created_at
+      || wrapper?.wx_message?.message_time;
+    const time = value ? new Date(value).getTime() : NaN;
+    return Number.isFinite(time) ? time : this.messageNumericIdSortValue(wrapper);
   }
 
   messageNumericIdSortValue(wrapper) {
-    return this.messageState.messageNumericIdSortValue(wrapper);
+    const numericId = Number(wrapper?.id);
+    return Number.isFinite(numericId) ? numericId : Number.MAX_SAFE_INTEGER;
   }
 
   oldestServerMessageId() {
-    return this.messageState.oldestServerMessageId();
+    let oldest = null;
+
+    this.messages.all.forEach((wrapper) => {
+      const candidateId = Number(wrapper?.id);
+      if (!Number.isFinite(candidateId)) {
+        return;
+      }
+
+      if (oldest == null || candidateId < oldest) {
+        oldest = candidateId;
+      }
+    });
+
+    return oldest;
   }
 
   normalizeMessageType(msg) {
