@@ -499,15 +499,23 @@ export default class extends Controller {
     document.documentElement.classList.remove("tg-mobile-app")
     document.body.classList.remove("tg-mobile-app")
     document.documentElement.style.removeProperty("--tg-app-height")
+    document.documentElement.style.removeProperty("--tg-keyboard-offset")
   }
 
   updateViewportMetrics() {
-    const viewportHeight = window.visualViewport?.height || window.innerHeight
+    const visualViewport = window.visualViewport
+    const viewportHeight = visualViewport?.height || window.innerHeight
     if (!viewportHeight) {
       return
     }
 
     document.documentElement.style.setProperty("--tg-app-height", `${Math.round(viewportHeight)}px`)
+    const keyboardOffset = Math.max(
+      window.innerHeight - ((visualViewport?.height || window.innerHeight)
+        + (visualViewport?.offsetTop || 0)),
+      0
+    )
+    document.documentElement.style.setProperty("--tg-keyboard-offset", `${Math.round(keyboardOffset)}px`)
   }
 
   applySidebarState() {

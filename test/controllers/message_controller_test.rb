@@ -118,6 +118,76 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
       quote_payload.dig("referenced_message", "wx_message", "content")
   end
 
+  test "index backfills quote metadata from group-prefixed xml and resolves referenced message" do
+    referenced_new_msg_id = 3_404_025_882_978_823_795
+    referenced = create_message!(
+      new_msg_id: referenced_new_msg_id,
+      msg_type: :image,
+      real_msg_type: :image,
+      content: image_xml("b8bd630d79ce44b5cc2dd503ffd879b9")
+    )
+    quoted = create_message!(
+      new_msg_id: referenced_new_msg_id + 1,
+      msg_type: :refer,
+      real_msg_type: :quote,
+      content: quoted_message_xml(
+        referenced_new_msg_id,
+        title: "这笔订单，是没有收到吗？",
+        display_name: "小枫",
+        type: 3,
+        from_user: "18479154916@chatroom",
+        chat_user: "Like_peng",
+        content: "Like_peng:\n<?xml version=\"1.0\"?>\n<msg><img md5=\"abc\" /></msg>",
+        prefix: "wxid_3gs9e3fkynja12:\n"
+      )
+    )
+
+    get chat_room_messages_path(@chat_room)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    quote_payload = payload.find { |item| item["id"] == quoted.id }
+    assert_equal referenced_new_msg_id.to_s,
+      quote_payload.dig("wx_message", "refer_new_msg_id")
+    assert_equal "这笔订单，是没有收到吗？",
+      quote_payload.dig("wx_message", "refer_title")
+    assert_equal referenced.id, quote_payload.dig("referenced_message", "id")
+    assert_equal "quote", quote_payload.dig("wx_message", "parsed_message", "type")
+    assert_equal "[图片]",
+      quote_payload.dig("wx_message", "parsed_message", "quote_preview", "content")
+  end
+
+  test "index serializes nested quote preview text without exposing raw xml as preview" do
+    quoted = create_message!(
+      new_msg_id: 7_057_159_837_024_330_545,
+      msg_type: :refer,
+      real_msg_type: :quote,
+      content: quoted_message_xml(
+        nil,
+        title: "我这单能也能看到",
+        display_name: "东康",
+        type: 49,
+        from_user: "18479154916@chatroom",
+        chat_user: "wxid_3gs9e3fkynja12",
+        content: "<msg><appmsg><title>这个就是你刚刚这笔订单推送成功的日志，是推送了的</title><type>57</type></appmsg></msg>",
+        prefix: "Like_peng:\n"
+      )
+    )
+
+    get chat_room_messages_path(@chat_room)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    quote_payload = payload.find { |item| item["id"] == quoted.id }
+    parsed_message = quote_payload.dig("wx_message", "parsed_message")
+
+    assert_equal "quote", parsed_message["type"]
+    assert_equal "我这单能也能看到", parsed_message["title"]
+    assert_equal "这个就是你刚刚这笔订单推送成功的日志，是推送了的",
+      parsed_message.dig("quote_preview", "content")
+    refute_match(/<msg>|<appmsg>/, parsed_message.dig("quote_preview", "content"))
+  end
+
   test "index supports keyword search for wx_messages content" do
     target = create_message!(
       new_msg_id: 9_000_000_000_000_001_300,
@@ -429,17 +499,25 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     Message.includes(:wx_message).find(result.rows.dig(0, 0))
   end
 
-  def quoted_message_xml(referenced_new_msg_id)
+  def quoted_message_xml(referenced_new_msg_id, title: "引用标题", content: "原消息",
+    type: 1, display_name: "引用人", from_user: "wxid_sender",
+    chat_user: "wxid_sender", prefix: "")
+    svrid_node = referenced_new_msg_id.present? ? "<svrid>#{referenced_new_msg_id}</svrid>" : ""
+
     <<~XML
-      <msg>
+      #{prefix}<msg>
         <appmsg>
           <type>57</type>
-          <title>引用标题</title>
+          <title>#{title}</title>
+          <refermsg>
+            <type>#{type}</type>
+            <displayname>#{display_name}</displayname>
+            <fromusr>#{from_user}</fromusr>
+            <chatusr>#{chat_user}</chatusr>
+            #{svrid_node}
+            <content>#{ERB::Util.html_escape(content)}</content>
+          </refermsg>
         </appmsg>
-        <refermsg>
-          <svrid>#{referenced_new_msg_id}</svrid>
-          <content>原消息</content>
-        </refermsg>
       </msg>
     XML
   end
@@ -448,6 +526,14 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     <<~XML
       <msg>
         <emoji md5="#{emoji_md5}" cdnurl="#{cdn_url}" />
+      </msg>
+    XML
+  end
+
+  def image_xml(image_md5)
+    <<~XML
+      <msg>
+        <img md5="#{image_md5}" />
       </msg>
     XML
   end

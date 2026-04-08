@@ -539,12 +539,12 @@ class MessagesController < ApplicationController
   end
 
   def serialize_messages(messages, chat_room_id)
-    refer_ids = messages.filter_map { |msg| msg.wx_message&.refer_new_msg_id }.uniq
+    refer_ids = messages.filter_map { |msg| reference_identifier_for(msg.wx_message) }.uniq
     referenced_by_new_msg_id = referenced_messages_by_new_msg_id(chat_room_id, refer_ids)
 
     messages.map do |message|
       wx_message = message.wx_message
-      referenced = wx_message && referenced_by_new_msg_id[wx_message.refer_new_msg_id]
+      referenced = wx_message && referenced_by_new_msg_id[reference_identifier_for(wx_message)]
       serialize_message(message, referenced)
     end
   end
@@ -599,16 +599,31 @@ class MessagesController < ApplicationController
 
     emoji_md5 = wx_message_json["emoji_md5"].presence || wx_message&.parse_emoji&.dig(:md5)
     emoji_file_md5 = wx_message_json["emoji_file_md5"].presence || wx_message&.emoji_file_md5
+    quote_metadata = wx_message&.quote_metadata || {}
+    refer_new_msg_id = wx_message_json["refer_new_msg_id"].presence || quote_metadata[:srv_id]
+    refer_title = wx_message_json["refer_title"].presence || quote_metadata[:title]
+    parsed_message = wx_message&.parsed_message_payload
+
+    updates = {}
     if emoji_md5.present? && wx_message&.emoji_md5.blank?
-      wx_message.update_column(:emoji_md5, emoji_md5)
+      updates[:emoji_md5] = emoji_md5
     end
+    if refer_new_msg_id.present? && wx_message&.refer_new_msg_id.blank?
+      updates[:refer_new_msg_id] = refer_new_msg_id
+    end
+    if refer_title.present? && wx_message&.refer_title.blank?
+      updates[:refer_title] = refer_title
+    end
+    wx_message.update_columns(updates) if updates.any?
 
     wx_message_json.merge(
       "new_msg_id" => serialize_frontend_identifier(wx_message_json["new_msg_id"]),
-      "refer_new_msg_id" => serialize_frontend_identifier(wx_message_json["refer_new_msg_id"]),
+      "refer_new_msg_id" => serialize_frontend_identifier(refer_new_msg_id),
+      "refer_title" => refer_title,
       "emoji_md5" => emoji_md5,
       "emoji_file_md5" => emoji_file_md5,
-      "emoji_url" => build_emoji_url(message: message, wx_message: wx_message, emoji_file_md5: emoji_file_md5, emoji_md5: emoji_md5)
+      "emoji_url" => build_emoji_url(message: message, wx_message: wx_message, emoji_file_md5: emoji_file_md5, emoji_md5: emoji_md5),
+      "parsed_message" => parsed_message&.deep_stringify_keys
     )
   end
 
@@ -641,6 +656,12 @@ class MessagesController < ApplicationController
     return nil if value.blank?
 
     value.to_s
+  end
+
+  def reference_identifier_for(wx_message)
+    return nil unless wx_message
+
+    wx_message.refer_new_msg_id.presence || wx_message.quote_metadata[:srv_id]
   end
 
   def disable_http_cache
