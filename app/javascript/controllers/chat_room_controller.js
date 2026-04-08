@@ -15,7 +15,7 @@ import {
 
 const MESSAGE_CACHE_LIMIT = 80;
 const MESSAGE_CACHE_FALLBACK_LIMITS = [80, 40, 20, 10];
-const AUTO_REFRESH_INTERVAL_MS = 1200;
+const AUTO_REFRESH_INTERVAL_MS = 800;
 const LEGACY_DEFAULT_THEME = {
   backgroundColor: "var(--color-gray-100)",
   backgroundImage: "",
@@ -140,6 +140,7 @@ export default class extends Controller {
     this.boundComposerFocus = this.handleComposerFocus.bind(this);
     this.boundComposerBlur = this.handleComposerBlur.bind(this);
     this.boundComposerViewportChange = this.handleComposerViewportChange.bind(this);
+    this.boundAutoResize = this.autoResize.bind(this);
 
     window.addEventListener("chat:notify", this.boundChatNotify);
 
@@ -180,12 +181,12 @@ export default class extends Controller {
 
     this.inputTarget.addEventListener("focus", this.boundComposerFocus);
     this.inputTarget.addEventListener("blur", this.boundComposerBlur);
-    this.inputTarget.addEventListener("input", this.autoResize.bind(this));
+    this.inputTarget.addEventListener("input", this.boundAutoResize);
     window.visualViewport?.addEventListener("resize",
       this.boundComposerViewportChange);
     window.visualViewport?.addEventListener("scroll",
       this.boundComposerViewportChange);
-    // this.autoResize();
+    this.autoResize();
 
     // 设置 emoji 预览功能
     if (this.hasInputTarget) {
@@ -397,6 +398,7 @@ export default class extends Controller {
     }
     this.inputTarget.removeEventListener("focus", this.boundComposerFocus);
     this.inputTarget.removeEventListener("blur", this.boundComposerBlur);
+    this.inputTarget.removeEventListener("input", this.boundAutoResize);
     this.inputTarget.removeEventListener("keydown", this.boundInputKeydown);
     this.inputTarget.removeEventListener("compositionstart",
       this.boundInputCompositionStart);
@@ -407,6 +409,11 @@ export default class extends Controller {
     window.visualViewport?.removeEventListener("scroll",
       this.boundComposerViewportChange);
     document.documentElement.classList.remove("tg-composer-active");
+    if (this.composerLayoutFrame) {
+      cancelAnimationFrame(this.composerLayoutFrame);
+      this.composerLayoutFrame = null;
+    }
+    this.element?.style?.removeProperty("--tg-composer-height");
 
     if (this.pendingNotifyRefreshTimer) {
       clearTimeout(this.pendingNotifyRefreshTimer);
@@ -532,8 +539,11 @@ export default class extends Controller {
 
   autoResize() {
     const el = this.inputTarget;
+    const maxHeight = Math.round(Math.max(window.innerHeight * 0.3, 140));
     el.style.height = "auto";
-    el.style.height = el.scrollHeight + "px";
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+    this.scheduleComposerLayoutSync();
   }
 
   handleComposerFocus() {
@@ -543,29 +553,56 @@ export default class extends Controller {
 
   handleComposerBlur() {
     document.documentElement.classList.remove("tg-composer-active");
+    window.setTimeout(() => this.scheduleComposerLayoutSync(), 40);
   }
 
   handleComposerViewportChange() {
-    if (document.activeElement !== this.inputTarget) {
-      return;
-    }
-
-    this.ensureComposerVisible();
+    this.scheduleComposerLayoutSync({
+      scrollToBottom: document.activeElement === this.inputTarget
+        && this.autoScrollPinnedToBottom
+    });
   }
 
   ensureComposerVisible(forceBottom = false) {
-    if (!this.hasMessageListTarget) {
-      return;
-    }
-
     if (forceBottom) {
       this.autoScrollPinnedToBottom = true;
     }
 
-    const scrollToBottom = () => this.scrollToBottom();
-    requestAnimationFrame(scrollToBottom);
-    window.setTimeout(scrollToBottom, 80);
-    window.setTimeout(scrollToBottom, 220);
+    this.scheduleComposerLayoutSync({
+      scrollToBottom: this.autoScrollPinnedToBottom
+    });
+  }
+
+  composerElement() {
+    return this.element.querySelector(".telegram-composer");
+  }
+
+  scheduleComposerLayoutSync({ scrollToBottom = false } = {}) {
+    if (this.composerLayoutFrame) {
+      cancelAnimationFrame(this.composerLayoutFrame);
+    }
+
+    this.composerLayoutFrame = requestAnimationFrame(() => {
+      this.composerLayoutFrame = null;
+      this.syncComposerLayout({ scrollToBottom });
+    });
+  }
+
+  syncComposerLayout({ scrollToBottom = false } = {}) {
+    const composer = this.composerElement();
+    if (!composer) {
+      return;
+    }
+
+    const composerHeight = Math.max(
+      Math.ceil(composer.getBoundingClientRect().height || 0),
+      76
+    );
+    this.element.style.setProperty("--tg-composer-height", `${composerHeight}px`);
+
+    if (scrollToBottom && this.hasMessageListTarget) {
+      this.scheduleScrollToBottom();
+    }
   }
 
   loadMessages({ replace = false } = {}) {
@@ -902,6 +939,116 @@ export default class extends Controller {
     return this.normalizeMessageType(msg);
   }
 
+  parsedMessageFor(msg) {
+    const payload = msg?.parsed_message;
+    return payload && typeof payload === "object" ? payload : null;
+  }
+
+  payloadValue(payload, ...keys) {
+    if (!payload || typeof payload !== "object") {
+      return undefined;
+    }
+
+    for (const key of keys) {
+      if (payload[key] !== undefined && payload[key] !== null) {
+        return payload[key];
+      }
+    }
+
+    return undefined;
+  }
+
+  normalizeParsedMessageType(type) {
+    if (type == null || type === "") {
+      return null;
+    }
+
+    if (typeof type === "string" && !/^\d+$/.test(type)) {
+      if (["sys", "sys_notice", "function_message"].includes(type)) {
+        return "system_notice";
+      }
+      return type;
+    }
+
+    const numericType = Number(type);
+    if (!Number.isFinite(numericType)) {
+      return null;
+    }
+
+    return this.normalizeMessageType({ real_msg_type: numericType });
+  }
+
+  cardPayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    if (parsed) {
+      const parsedType = this.normalizeParsedMessageType(parsed.type);
+      if (parsedType && parsedType !== "quote") {
+        return parsed;
+      }
+    }
+
+    return this.parseWxXmlMessage(msg?.content || "");
+  }
+
+  voipPayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    if (parsed && this.normalizeParsedMessageType(parsed.type) === "voip") {
+      return parsed;
+    }
+
+    return this.parseWxVoipMessage(msg?.content || "");
+  }
+
+  chatHistoryPayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    if (parsed && this.normalizeParsedMessageType(parsed.type) === "chat_history") {
+      return {
+        ...parsed,
+        items: Array.isArray(parsed.items) ? parsed.items.map((item) => ({
+          type: this.normalizeParsedMessageType(item?.type) || item?.type || "text",
+          senderName: this.payloadValue(item, "senderName", "sender_name") || "",
+          time: this.payloadValue(item, "time") || "",
+          content: this.payloadValue(item, "content") || ""
+        })) : []
+      };
+    }
+
+    return this.parseWxChatHistoryMessage(msg?.content || "");
+  }
+
+  filePayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    if (parsed && this.normalizeParsedMessageType(parsed.type) === "file_message") {
+      return parsed;
+    }
+
+    return this.parseWxFileAttachment(msg?.content || "") || {};
+  }
+
+  quotePayloadFor(msg) {
+    const parsed = this.parsedMessageFor(msg);
+    const preview = this.payloadValue(parsed, "quote_preview", "quotePreview");
+
+    return {
+      title: this.payloadValue(parsed, "title") || "",
+      referNewMsgId: this.normalizeReferenceId(
+        this.payloadValue(parsed, "refer_new_msg_id", "referNewMsgId")
+      ),
+      quotePreview: preview && typeof preview === "object" ? {
+        type: this.normalizeParsedMessageType(
+          this.payloadValue(preview, "type")
+        ) || this.payloadValue(preview, "type"),
+        content: this.payloadValue(preview, "content") || "",
+        displayName: this.payloadValue(preview, "display_name", "displayName") || "",
+        senderUserName: this.payloadValue(preview, "sender_user_name", "senderUserName") || "",
+        fromUserName: this.payloadValue(preview, "from_user_name", "fromUserName") || "",
+        serverId: this.normalizeReferenceId(
+          this.payloadValue(preview, "server_id", "serverId")
+        )
+      } : null
+    };
+  }
+
   renderMessages(options = {}) {
     if (!this.hasMessageListTarget) {
       return;
@@ -1221,34 +1368,39 @@ export default class extends Controller {
   renderCardMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
     const template = this.cloneTemplate("message-template-card");
     const cardBubble = template || bubble;
-    const parsed = this.parseWxXmlMessage(msg.content || "");
+    const parsed = this.cardPayloadFor(msg);
     const link = cardBubble.querySelector("[data-role='card-link']");
     const cover = cardBubble.querySelector("[data-role='card-cover']");
     const title = cardBubble.querySelector("[data-role='card-title']");
     const desc = cardBubble.querySelector("[data-role='card-desc']");
     const source = cardBubble.querySelector("[data-role='card-source']");
+    const parsedUrl = this.payloadValue(parsed, "url");
+    const parsedCover = this.payloadValue(parsed, "cover");
+    const parsedTitle = this.payloadValue(parsed, "title");
+    const parsedDesc = this.payloadValue(parsed, "desc");
+    const parsedSource = this.payloadValue(parsed, "source");
 
     if (link) {
-      if (parsed.url) {
-        link.href = parsed.url;
+      if (parsedUrl) {
+        link.href = parsedUrl;
       } else {
         link.removeAttribute("href");
         link.classList.add("pointer-events-none");
       }
     }
     if (cover) {
-      cover.innerHTML = parsed.cover
-        ? `<img src="${parsed.cover}" class="max-h-48 w-full object-cover" referrerpolicy="no-referrer"/>`
+      cover.innerHTML = parsedCover
+        ? `<img src="${parsedCover}" class="max-h-48 w-full object-cover" referrerpolicy="no-referrer"/>`
         : "";
     }
     if (title) {
-      title.textContent = parsed.title || "";
+      title.textContent = parsedTitle || "";
     }
     if (desc) {
-      desc.textContent = parsed.desc || "";
+      desc.textContent = parsedDesc || "";
     }
     if (source) {
-      source.textContent = parsed.source ? `来自：${parsed.source}` : "";
+      source.textContent = parsedSource ? `来自：${parsedSource}` : "";
     }
 
     return this.applyBubbleStyle(cardBubble, msg, isNewGroup, senderInfo,
@@ -1258,7 +1410,7 @@ export default class extends Controller {
   renderVoipMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
     const template = this.cloneTemplate("message-template-voip");
     const voipBubble = template || bubble;
-    const parsed = this.parseWxVoipMessage(msg.content || "");
+    const parsed = this.voipPayloadFor(msg);
     const title = voipBubble.querySelector("[data-role='voip-title']");
     const meta = voipBubble.querySelector("[data-role='voip-meta']");
 
@@ -1277,7 +1429,7 @@ export default class extends Controller {
     isFirstMessage) {
     const template = this.cloneTemplate("message-template-video-account");
     const accountBubble = template || bubble;
-    const parsed = this.parseWxXmlMessage(msg.content || "");
+    const parsed = this.cardPayloadFor(msg);
     const link = accountBubble.querySelector("[data-role='video-account-link']");
     const coverShell = accountBubble.querySelector(
       "[data-role='video-account-cover-shell']");
@@ -1289,7 +1441,9 @@ export default class extends Controller {
     const duration = accountBubble.querySelector(
       "[data-role='video-account-duration']");
 
-    const targetUrl = parsed.url || parsed.mediaUrl || "";
+    const targetUrl = this.payloadValue(parsed, "url")
+      || this.payloadValue(parsed, "media_url", "mediaUrl")
+      || "";
     if (link) {
       if (targetUrl) {
         link.href = targetUrl;
@@ -1300,11 +1454,12 @@ export default class extends Controller {
     }
 
     if (coverShell && cover) {
-      if (parsed.cover) {
+      const parsedCover = this.payloadValue(parsed, "cover");
+      if (parsedCover) {
         cover.addEventListener("load", () => {
           this.stickToBottomIfNeeded();
         }, { once: true });
-        cover.src = parsed.cover;
+        cover.src = parsedCover;
         cover.classList.remove("hidden");
       } else {
         coverShell.classList.add("hidden");
@@ -1312,18 +1467,21 @@ export default class extends Controller {
     }
 
     if (title) {
-      title.textContent = parsed.title || "视频号分享";
+      title.textContent = this.payloadValue(parsed, "title") || "视频号分享";
     }
     if (desc) {
-      desc.textContent = parsed.desc || "";
-      desc.classList.toggle("hidden", !parsed.desc);
+      const parsedDesc = this.payloadValue(parsed, "desc") || "";
+      desc.textContent = parsedDesc;
+      desc.classList.toggle("hidden", !parsedDesc);
     }
     if (source) {
-      source.textContent = parsed.source || "视频号";
+      source.textContent = this.payloadValue(parsed, "source") || "视频号";
     }
     if (duration) {
-      if (parsed.durationSeconds) {
-        duration.textContent = this.formatVideoDuration(parsed.durationSeconds);
+      const durationSeconds = Number(this.payloadValue(parsed,
+        "duration_seconds", "durationSeconds") || 0);
+      if (durationSeconds) {
+        duration.textContent = this.formatVideoDuration(durationSeconds);
         duration.classList.remove("hidden");
       } else {
         duration.classList.add("hidden");
@@ -1341,7 +1499,7 @@ export default class extends Controller {
     const desc = historyBubble.querySelector("[data-role='history-desc']");
     const items = historyBubble.querySelector("[data-role='history-items']");
     const footer = historyBubble.querySelector("[data-role='history-footer']");
-    const parsed = this.parseWxChatHistoryMessage(msg.content || "");
+    const parsed = this.chatHistoryPayloadFor(msg);
 
     if (title) {
       title.textContent = parsed.title || "聊天记录";
@@ -1527,7 +1685,7 @@ export default class extends Controller {
     const downloadLink = fileBubble.querySelector(
       "[data-role='file-download']");
 
-    const fileInfo = this.parseWxFileAttachment(msg.content || "") || {};
+    const fileInfo = this.filePayloadFor(msg);
     const title = fileInfo.title || msg.refer_title || msg.content || "文件";
     const sizeLabel = fileInfo.totallen ? this.formatFileSize(fileInfo.totallen)
       : "";
@@ -1948,9 +2106,14 @@ export default class extends Controller {
       "[data-role='refer-quoted-content']");
 
     const parsed = this.parseWxXmlMessage(msg.content || "");
-    const title = (msg.refer_title || parsed.title || "引用的消息").trim();
+    const quotePayload = this.quotePayloadFor(msg);
+    const quotePreview = quotePayload.quotePreview || null;
+    const title = (msg.refer_title || quotePayload.title || parsed.title
+      || "引用的消息").trim();
     const referNewMsgId = this.normalizeReferenceId(msg.refer_new_msg_id)
+      || quotePayload.referNewMsgId
       || this.normalizeReferenceId(parsed.refServerId)
+      || quotePreview?.serverId
       || this.normalizeReferenceId(msg.referenced_message?.wx_message?.new_msg_id);
     if (body) {
       body.textContent = title;
@@ -2021,7 +2184,22 @@ export default class extends Controller {
         };
       }
 
-      if (parsed.refContent) {
+      if (quotedMeta) {
+        const previewType = this.normalizeParsedMessageType(quotePreview?.type)
+          || quotePreview?.type || "quote";
+        const previewSender = quotePreview?.displayName || quotePreview?.senderUserName
+          || quotePreview?.fromUserName || "";
+        const typeLabel = this.humanizeMessageType(previewType);
+        quotedMeta.textContent = previewSender
+          ? `${previewSender} · ${typeLabel}`
+          : `引用的${typeLabel}消息`;
+      }
+
+      if (quotePreview?.content) {
+        if (quotedContent) {
+          quotedContent.textContent = quotePreview.content;
+        }
+      } else if (parsed.refContent) {
         if (quotedContent) {
           quotedContent.textContent = parsed.refContent;
         }
@@ -2847,6 +3025,7 @@ export default class extends Controller {
       this.quoteComposerTarget.classList.remove("flex");
       this.quoteComposerMetaTarget.textContent = "";
       this.quoteComposerContentTarget.textContent = "";
+      this.scheduleComposerLayoutSync();
       return;
     }
 
@@ -2854,6 +3033,7 @@ export default class extends Controller {
     this.quoteComposerContentTarget.textContent = pending.content || "[消息]";
     this.quoteComposerTarget.classList.remove("hidden");
     this.quoteComposerTarget.classList.add("flex");
+    this.scheduleComposerLayoutSync();
   }
 
   normalizeReferenceId(value) {
@@ -3429,6 +3609,29 @@ export default class extends Controller {
             return;
           }
 
+          if (expectedMessageId) {
+            this.fetchMessageById(expectedMessageId)
+              .then((loaded) => {
+                if (loaded) {
+                  this.renderMessages({
+                    forceScrollToBottom: this.autoScrollPinnedToBottom
+                  });
+                  return;
+                }
+
+                if (attempt >= 3) {
+                  this.loadMessages();
+                  return;
+                }
+
+                this.refreshRoomFromNotification(payload, attempt + 1);
+              })
+              .catch((error) => {
+                console.error("按通知消息补拉失败:", error);
+              });
+            return;
+          }
+
           if (attempt >= 3) {
             this.loadMessages();
             return;
@@ -3439,7 +3642,7 @@ export default class extends Controller {
         .catch((error) => {
           console.error("刷新当前聊天室失败:", error);
         });
-    }, attempt === 0 ? 40 : 180 * (attempt + 1));
+    }, attempt === 0 ? 16 : 120 * (attempt + 1));
   }
 
   loadNewMessages(msg) {
@@ -4183,6 +4386,13 @@ export default class extends Controller {
   }
 
   normalizeMessageType(msg) {
+    const parsedType = this.normalizeParsedMessageType(
+      this.parsedMessageFor(msg)?.type
+    );
+    if (parsedType) {
+      return parsedType;
+    }
+
     const rawStringType = (() => {
       const realType = msg?.real_msg_type;
       if (realType && realType !== "unknown") {
@@ -4201,17 +4411,17 @@ export default class extends Controller {
           msg = { ...msg, real_msg_type: mappedNumericType };
         }
       } else {
-      if (["sys", "sys_notice", "function_message"].includes(stringType)) {
-        return "system_notice";
-      }
-      if ((stringType === "refer" || stringType === "unknown")
-        && msg?.content) {
-        const parsed = this.parseWxXmlMessage(msg.content);
-        if (parsed?.detectedType) {
-          return parsed.detectedType;
+        if (["sys", "sys_notice", "function_message"].includes(stringType)) {
+          return "system_notice";
         }
-      }
-      return stringType;
+        if ((stringType === "refer" || stringType === "unknown")
+          && msg?.content) {
+          const parsed = this.parseWxXmlMessage(msg.content);
+          if (parsed?.detectedType) {
+            return parsed.detectedType;
+          }
+        }
+        return stringType;
       }
     }
 
@@ -4253,32 +4463,34 @@ export default class extends Controller {
           asLinkedText: true
         };
       case "quote": {
-        const parsed = this.parseWxXmlMessage(msg?.content || "");
+        const parsed = this.quotePayloadFor(msg);
         return {
           type,
-          content: msg?.refer_title || parsed.title || parsed.refContent
+          content: msg?.refer_title || parsed.title || parsed.quotePreview?.content
             || "[引用消息]",
           asLinkedText: false
         };
       }
       case "card": {
-        const parsed = this.parseWxXmlMessage(msg?.content || "");
+        const parsed = this.cardPayloadFor(msg);
         return {
           type,
-          content: parsed.title || "[卡片消息]",
+          content: this.payloadValue(parsed, "title") || "[卡片消息]",
           asLinkedText: false
         };
       }
       case "video_account": {
-        const parsed = this.parseWxXmlMessage(msg?.content || "");
+        const parsed = this.cardPayloadFor(msg);
         return {
           type,
-          content: parsed.desc || parsed.title || "[视频号消息]",
+          content: this.payloadValue(parsed, "desc")
+            || this.payloadValue(parsed, "title")
+            || "[视频号消息]",
           asLinkedText: false
         };
       }
       case "chat_history": {
-        const parsed = this.parseWxChatHistoryMessage(msg?.content || "");
+        const parsed = this.chatHistoryPayloadFor(msg);
         return {
           type,
           content: parsed.desc || parsed.title || "[聊天记录]",
@@ -4286,7 +4498,7 @@ export default class extends Controller {
         };
       }
       case "file_message": {
-        const fileInfo = this.parseWxFileAttachment(msg?.content || "") || {};
+        const fileInfo = this.filePayloadFor(msg);
         return {
           type,
           content: fileInfo.title || msg?.refer_title || "[文件消息]",
@@ -4294,7 +4506,7 @@ export default class extends Controller {
         };
       }
       case "voip": {
-        const parsed = this.parseWxVoipMessage(msg?.content || "");
+        const parsed = this.voipPayloadFor(msg);
         return {
           type,
           content: parsed.summary || "[通话消息]",

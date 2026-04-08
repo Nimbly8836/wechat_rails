@@ -471,6 +471,7 @@ body.tg-mobile-app {
 }
 
 .telegram-chat-room {
+  --tg-composer-height: 76px;
   background: linear-gradient(180deg, #e7eef6 0%, #dfe8f1 100%);
 }
 
@@ -482,6 +483,8 @@ body.tg-mobile-app {
 
 .telegram-chat-room .telegram-message-list {
   position: relative;
+  padding-bottom: calc(var(--tg-composer-height) + 1rem);
+  scroll-padding-bottom: calc(var(--tg-composer-height) + 1rem);
   background:
     linear-gradient(180deg, rgba(236, 242, 247, 0.96), rgba(222, 233, 241, 0.98));
 }
@@ -504,7 +507,9 @@ body.tg-mobile-app {
 }
 
 .telegram-chat-room .telegram-composer {
-  position: relative;
+  position: sticky;
+  bottom: 0;
+  flex-shrink: 0;
   z-index: 20;
   border-top: 1px solid rgba(203, 213, 225, 0.88);
   background: rgba(255, 255, 255, 0.9);
@@ -570,22 +575,15 @@ body.tg-mobile-app {
   }
 
   .telegram-chat-room .telegram-message-list {
-    padding: 1rem 1rem 1.25rem;
+    padding: 1rem 1rem calc(var(--tg-composer-height) + 1rem);
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-    scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(var(--tg-composer-height) + env(safe-area-inset-bottom) + 0.5rem);
   }
 
   .telegram-chat-room .telegram-composer {
+    padding-top: 0.5rem;
     padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
-  }
-
-  html.tg-composer-active .telegram-chat-room .telegram-message-list {
-    padding-bottom: calc(1.75rem + env(safe-area-inset-bottom));
-  }
-
-  html.tg-composer-active .telegram-chat-room .telegram-composer {
-    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
   }
 
   .tg-section-switcher {

@@ -56,17 +56,21 @@ module WechatModels
     end
 
     def self.parse_refer_app_msg(content)
-      doc = Nokogiri::XML(content)
+      metadata = WxMessage.parse_quote_metadata(content)
+      return nil if metadata.blank?
 
       {
-        title: doc.at_xpath("//appmsg/title")&.text,
-        type: doc.at_xpath("//refermsg/type")&.text&.to_i,
-        from_user_name: doc.at_xpath("//refermsg/fromusr")&.text,
-        display_name: doc.at_xpath("//refermsg/displayname")&.text,
-        content: doc.at_xpath("//refermsg/content")&.text,
-        srv_id: doc.at_xpath("//refermsg/svrid")&.text&.to_i,
-        create_time: doc.at_xpath("//refermsg/createtime")&.text&.to_i
-      }
+        title: metadata[:title],
+        type: metadata[:refer_type],
+        refer_type: metadata[:refer_type],
+        from_user_name: metadata[:from_user_name],
+        sender_user_name: metadata[:sender_user_name],
+        display_name: metadata[:display_name],
+        content: metadata[:content],
+        preview_content: metadata[:preview_content],
+        srv_id: metadata[:srv_id],
+        create_time: metadata[:create_time]
+      }.compact
     end
 
     def self.parse_emoji(content)
