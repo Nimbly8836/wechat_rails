@@ -116,7 +116,7 @@ class MessagesController < ApplicationController
       return head :ok
     end
 
-    sync_service.persist_payload(source_payload, full_backfill: true)
+    sync_service.persist_payload(source_payload, full_backfill: true, inline_save: true)
     head :ok
   end
 

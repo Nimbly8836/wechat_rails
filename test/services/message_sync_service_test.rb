@@ -64,4 +64,35 @@ class MessageSyncServiceTest < ActiveSupport::TestCase
       end
     end
   end
+
+  test "persist_payload can save messages inline for realtime callback" do
+    owner_wxid = "owner-#{SecureRandom.hex(4)}"
+    remote_wxid = "friend-#{SecureRandom.hex(4)}"
+    payload = {
+      "Success" => true,
+      "Data" => {
+        "AddMsgs" => [ {
+          "MsgId" => 303,
+          "NewMsgId" => 404,
+          "MsgSeq" => 1,
+          "CreateTime" => Time.current.to_i,
+          "MsgType" => 1,
+          "Content" => { "string" => "hello" },
+          "FromUserName" => { "string" => remote_wxid },
+          "ToUserName" => { "string" => owner_wxid }
+        } ]
+      }
+    }
+
+    save_now_calls = []
+
+    SaveChatRoomMessageJob.stub(:perform_now, ->(*args) { save_now_calls << args }) do
+      SaveChatRoomMessageJob.stub(:perform_later, ->(*) { flunk("expected inline save") }) do
+        MessageSyncService.new(owner_wxid).persist_payload(payload, inline_save: true)
+      end
+    end
+
+    assert_equal 1, save_now_calls.size
+    assert_equal owner_wxid, save_now_calls.first[1]
+  end
 end
