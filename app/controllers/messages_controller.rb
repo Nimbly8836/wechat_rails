@@ -339,6 +339,37 @@ class MessagesController < ApplicationController
       render json: { error: true, message: "file metadata missing" }, status: :unprocessable_content and return
     end
 
+    raw_message_content = wx_message.content.to_s
+
+    resolved_user_name = file_meta[:from_user_name].presence
+    resolved_user_name ||= raw_message_content[/<fromusername><!\[CDATA\[(.*?)\]\]><\/fromusername>/m, 1].presence
+    resolved_user_name ||= raw_message_content[/<fromusername>([^<]+)<\/fromusername>/m, 1].presence
+    resolved_user_name ||= raw_message_content[/<fromuser><!\[CDATA\[(.*?)\]\]><\/fromuser>/m, 1].presence
+    resolved_user_name ||= raw_message_content[/<fromuser>([^<]+)<\/fromuser>/m, 1].presence
+    resolved_user_name ||= wx_message.self_send ? wx_message.to_user_name : wx_message.from_user_name
+    resolved_user_name ||= wx_message.from_user_name.presence || wx_message.to_user_name.presence
+
+    resolved_app_id = file_meta[:app_id].presence
+    resolved_app_id ||= raw_message_content[/\bappid=["']([^"']+)["']/, 1].presence
+    resolved_app_id ||= raw_message_content[/<appid><!\[CDATA\[(.*?)\]\]><\/appid>/m, 1].presence
+    resolved_app_id ||= raw_message_content[/<appid>([^<]+)<\/appid>/m, 1].presence
+    resolved_attach_id = file_meta[:attach_id].presence
+    resolved_total_len = file_meta[:totallen].to_i
+
+    if resolved_app_id.blank? || resolved_attach_id.blank? || resolved_user_name.blank? || resolved_total_len <= 0
+      Rails.logger.warn do
+        "file download metadata incomplete: message_id=#{message.id} app_id=#{resolved_app_id.inspect} attach_id=#{resolved_attach_id.inspect} user_name=#{resolved_user_name.inspect} total_len=#{resolved_total_len}"
+      end
+      render json: { error: true, message: "file metadata incomplete" }, status: :unprocessable_content and return
+    end
+
+    file_meta = file_meta.merge(
+      app_id: resolved_app_id,
+      attach_id: resolved_attach_id,
+      from_user_name: resolved_user_name,
+      totallen: resolved_total_len
+    )
+
 
     contact = Contact.find(message.chat_room&.contact_id)
     unless contact.own_wxid.present?
@@ -362,7 +393,7 @@ class MessagesController < ApplicationController
 
     send_file(file_path, type: mime, disposition: "attachment", filename: filename)
   rescue ActiveRecord::RecordNotFound
-    Rails.logger.error { "file message find error: #{e}" }
+    Rails.logger.error { "file message not found: id=#{params[:id]}" }
     render json: { error: true, message: "file message not found" }, status: :not_found
   rescue => e
     Rails.logger.error { "file download error: #{e}" }

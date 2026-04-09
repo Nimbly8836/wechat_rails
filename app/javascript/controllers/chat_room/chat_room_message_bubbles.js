@@ -462,7 +462,21 @@ export function renderVideoMessageAttachment(controller, bubble, msg, isNewGroup
 
 export function downloadFile(controller, url, filename) {
   fetch(url, { headers: { "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content } })
-    .then((res) => { if (!res.ok) throw new Error(`下载失败: ${res.statusText}`); return res.blob(); })
+    .then(async (res) => {
+      if (res.ok) {
+        return res.blob();
+      }
+
+      let detail = res.statusText;
+      try {
+        const payload = await res.json();
+        detail = payload?.message || payload?.error || detail;
+      } catch (_error) {
+        // ignore non-json error body
+      }
+
+      throw new Error(`下载失败: ${detail}`);
+    })
     .then((blob) => {
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
