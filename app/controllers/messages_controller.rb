@@ -348,7 +348,7 @@ class MessagesController < ApplicationController
     end
 
     tools_api = ToolsApiService.new(contact.own_wxid)
-    data = download_file_chunks(tools_api, file_meta)
+    data = download_file_chunks(tools_api, message, wx_message, file_meta)
     unless data
       render json: { error: true, message: "file download failed" }, status: :bad_gateway and return
     end
@@ -737,16 +737,24 @@ class MessagesController < ApplicationController
     { data: data, mime: mime }
   end
 
-  def download_file_chunks(api_service, file_meta)
+  def download_file_chunks(api_service, message, wx_message, file_meta)
     total_size = file_meta[:totallen].to_i
     return nil if total_size <= 0
+
+    user_name = resolve_file_download_user_name(message, wx_message, file_meta)
+    if user_name.blank?
+      Rails.logger.warn do
+        "file download missing user_name wx_message_id=#{wx_message.id} msg_id=#{wx_message.msg_id} new_msg_id=#{wx_message.new_msg_id}"
+      end
+      return nil
+    end
 
     data = download_chunks(total_size) do |section|
       api_service.download_file_chunk(
         app_id: file_meta[:app_id],
         data_len: file_meta[:totallen],
         section: section,
-        user_name: file_meta[:from_user_name],
+        user_name: user_name,
         attach_id: file_meta[:attach_id],
       )
     end
@@ -762,7 +770,10 @@ class MessagesController < ApplicationController
     buffer_node = data_node&.[]("data") || data_node&.[](:data) || data_node
     buffer_base64 = buffer_node&.[]("buffer") || buffer_node&.[](:buffer)
     length_value = buffer_node&.[]("iLen") || buffer_node&.[](:iLen) || data_node&.[]("iLen") || data_node&.[](:iLen)
-    return nil unless buffer_base64.present?
+    unless buffer_base64.present?
+      Rails.logger.warn { "chunk payload missing buffer: #{payload.inspect}" }
+      return nil
+    end
 
     decoded = Base64.decode64(buffer_base64)
     decoded.force_encoding(Encoding::BINARY)
@@ -784,6 +795,9 @@ class MessagesController < ApplicationController
       current_size = [ requested_size, total - downloaded ].min
       section = { start_pos: downloaded, data_len: current_size }
       response = yield(section)
+      unless response.is_a?(Hash) && (response["Success"] == true || response[:Success] == true || response["Data"].present? || response[:Data].present?)
+        Rails.logger.warn { "chunk download upstream response: #{response.inspect}" }
+      end
       payload = extract_chunk_payload(response)
       return nil unless payload
 
@@ -850,6 +864,19 @@ class MessagesController < ApplicationController
 
   def locate_cached_media(storage_dir, basename)
     Dir.glob(storage_dir.join("#{basename}.*")).first
+  end
+
+  def resolve_file_download_user_name(message, wx_message, file_meta)
+    return file_meta[:from_user_name] if file_meta[:from_user_name].present?
+
+    chat_room_wxid = message.chat_room&.wx_id
+    return chat_room_wxid if chat_room_wxid.present?
+
+    if wx_message.self_send?
+      wx_message.to_user_name.presence || wx_message.from_user_name.presence
+    else
+      wx_message.from_user_name.presence || wx_message.to_user_name.presence
+    end
   end
 
   def sanitize_filename(name, default: "file")

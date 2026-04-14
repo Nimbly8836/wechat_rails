@@ -8,6 +8,12 @@ module WechatRequest
     # 文件下载
     class DownloadFile < Base
       params { [ :appId, :attachId, :dataLen, :section, :userName ] }
+
+      def self.api_key_for(name)
+        return "AppID" if name.to_sym == :appId
+
+        super
+      end
     end
 
     # 高清图片下载
