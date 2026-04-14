@@ -88,6 +88,15 @@ export function createSendMessage(controller, type, message) {
     tempMsg.msg_type = 6;
     tempMsg.wx_message.real_msg_type = "file_message";
   }
+  if (type === "voice") {
+    const voiceTime = Number(message?.extra?.voice_time || 0);
+    tempMsg.msg_type = 34;
+    tempMsg.wx_message.real_msg_type = "voice";
+    tempMsg.wx_message.content = `<msg><voicemsg voicelength="${voiceTime}" length="0" endflag="1" voiceformat="2" /></msg>`;
+    tempMsg.extra = {
+      voice_time: voiceTime
+    };
+  }
 
   return tempMsg;
 }
@@ -109,13 +118,16 @@ export function sendMessage(controller, type, message) {
 
   let body;
   let headers;
-  const usesFormData = type === "file";
+  const usesFormData = type === "file" || type === "voice";
   if (usesFormData) {
     const formData = new FormData();
     formData.append("chat_room_id", controller.idValue);
     formData.append("msg_type", msg.msg_type);
     formData.append("content", msg.wx_message.content || "");
     formData.append("file", message?.file);
+    Object.entries(msg.extra || {}).forEach(([key, value]) => {
+      formData.append(`extra[${key}]`, value);
+    });
     body = formData;
 
     headers = {

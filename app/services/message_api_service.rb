@@ -102,4 +102,17 @@ class MessageApiService
     @api_service.post(path, params)
   end
 
+  def send_voice(to_wxid, base64, type:, voice_time:)
+    path = WechatApis::Message.send_voice
+    params = WechatRequest::Message::SendVoice.new(
+      wxid: @wx_id,
+      toWxid: to_wxid,
+      base64: base64,
+      type: type,
+      voiceTime: voice_time
+    ).to_h
+
+    @api_service.post(path, params)
+  end
+
 end

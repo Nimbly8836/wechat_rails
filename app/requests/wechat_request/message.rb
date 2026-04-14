@@ -52,7 +52,14 @@ module WechatRequest
 
     # 发送语音
     class SendVoice < Base
-      params { [ :toWxid, :content, :voiceType, :voiceTime ] }
+      params { [ :toWxid, :base64, :type, :voiceTime ] }
+
+      def self.api_key_for(name)
+        return "Base64" if name.to_sym == :base64
+        return "Type" if name.to_sym == :type
+
+        super
+      end
     end
 
     # 分享名片

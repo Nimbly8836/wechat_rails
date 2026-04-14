@@ -2,6 +2,7 @@
 require "base64"
 require "digest/md5"
 require "cgi"
+require "fileutils"
 
 class MessageSender
   MESSAGE_TYPES = {
@@ -46,6 +47,18 @@ class MessageSender
 
       @message_content = build_quote_xml(reference_message, @message_content.to_s)
       res = message_api_service.send_quote(@chat_room.wx_id, @message_content)
+    when MESSAGE_TYPES[:voice]
+      payload = voice_payload
+      return payload if payload.is_a?(Hash) && payload[:success] == false
+
+      @extra ||= {}
+      @extra[:voice_time] = payload[:voice_time]
+      @extra[:voice_binary] = payload[:binary]
+      @message_content = build_voice_content(payload[:voice_time], payload[:binary].bytesize)
+      res = message_api_service.send_voice(@chat_room.wx_id,
+                                           payload[:base64],
+                                           type: payload[:voice_format_type],
+                                           voice_time: payload[:voice_time])
     when MESSAGE_TYPES[:file]
       res = send_file
     else
@@ -59,6 +72,7 @@ class MessageSender
     save_send_image(result[:data]&.dig("id"), extra_value(:base64)) if @message_type.to_i ==
     MESSAGE_TYPES[:image]
     save_send_emoji(extra_value(:file_md5), extra_value(:base64)) if @message_type == MESSAGE_TYPES[:emoji]
+    save_send_voice(result[:data]&.dig("id"), extra_value(:voice_binary)) if @message_type == MESSAGE_TYPES[:voice]
     save_send_file(result[:data]&.dig("id"), @file) if @message_type == MESSAGE_TYPES[:file]
     result
   end
@@ -203,6 +217,16 @@ class MessageSender
     file_path.to_s
   end
 
+  def save_send_voice(message_id, binary)
+    return if message_id.blank? || binary.blank?
+
+    storage_dir = Rails.root.join("storage", "voices")
+    FileUtils.mkdir_p(storage_dir)
+    file_path = storage_dir.join("#{message_id}.mp3")
+    File.binwrite(file_path, binary)
+    file_path.to_s
+  end
+
   def save_send_emoji(file_md5, emoji_base64)
     return if file_md5.blank?
     payload = decode_base64_payload(emoji_base64)
@@ -233,6 +257,25 @@ class MessageSender
                                       size,
                                       id,
                                       name&.split(".")&.last)
+  end
+
+  def voice_payload
+    return { success: false, message: "缺少语音文件" } unless @file.respond_to?(:tempfile)
+
+    voice_time = extra_value(:voice_time).to_i
+    voice_time = 1000 if voice_time <= 0
+
+    transcoded = AudioTranscodingService.new(@file).transcode_to_mp3!
+    {
+      success: true,
+      base64: transcoded[:base64],
+      binary: transcoded[:binary],
+      voice_time: voice_time,
+      voice_format_type: 2
+    }
+  rescue AudioTranscodingService::TranscodingError => e
+    Rails.logger.error("voice transcode failed: #{e.message}")
+    { success: false, message: "语音转码失败: #{e.message}" }
   end
 
   def emoji_payload
@@ -347,6 +390,18 @@ class MessageSender
           <fromusr>#{CGI.escapeHTML(@chat_room.wx_id.to_s)}</fromusr>
         </refermsg>
       </appmsg>
+    XML
+  end
+
+  def build_voice_content(voice_time, data_length)
+    <<~XML.gsub(/\n\s*/, "").strip
+      <msg>
+        <voicemsg voicelength="#{voice_time.to_i}"
+                  length="#{data_length.to_i}"
+                  endflag="1"
+                  voiceformat="2"
+                  fromusername="#{CGI.escapeHTML(@chat_room.contact&.own_wxid.to_s)}" />
+      </msg>
     XML
   end
 

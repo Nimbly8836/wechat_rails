@@ -172,7 +172,8 @@ export default class extends Controller {
     "fontSelect", "fontCustomInput", "attachmentSelect", "quoteComposer",
     "quoteComposerMeta", "quoteComposerContent", "searchPanel",
     "searchInput", "searchResults", "searchEmpty", "membersPanel",
-    "memberSearchInput", "memberResults", "memberEmpty"];
+    "memberSearchInput", "memberResults", "memberEmpty", "voiceRecorder",
+    "voiceRecorderStatus", "voiceRecorderTimer"];
   static values = {
     currentWxid: String,
     ownerWxid: String,
@@ -228,6 +229,13 @@ export default class extends Controller {
     this.pendingNotifyRefreshTimer = null;
     this.autoRefreshTimer = null;
     this.voiceBlobUrls = new Map();
+    this.mediaRecorder = null;
+    this.voiceRecordingStream = null;
+    this.voiceRecordingChunks = [];
+    this.voiceRecordingStartedAt = null;
+    this.voiceRecordingTimer = null;
+    this.voiceRecordingShouldSend = false;
+    this.pendingRecordedMimeType = null;
     this.currentVoicePlayback = null;
     this.voicePlaybackRates = new Map();
     this.pendingVoiceSeeks = new Map();
@@ -475,6 +483,9 @@ export default class extends Controller {
       clearInterval(this.autoRefreshTimer);
       this.autoRefreshTimer = null;
     }
+
+    this.stopVoiceRecordingTimer();
+    this.releaseVoiceRecordingStream();
 
     if (typeof this.cleanupEmojiPreview === "function") {
       this.cleanupEmojiPreview();
@@ -1952,6 +1963,8 @@ export default class extends Controller {
       acceptTypes = ".gif,image/gif";
     } else if (uploadType === "file") {
       acceptTypes = "*/*";
+    } else if (uploadType === "video") {
+      acceptTypes = "video/*";
     }
 
     this.fileInputTarget.accept = acceptTypes || "";
@@ -1980,10 +1993,161 @@ export default class extends Controller {
       if (uploadType === "file") {
         sendMsg.file = file
       }
+      if (uploadType === "voice") {
+        sendMsg.file = file
+        sendMsg.extra.voice_time = 1000
+      }
       this.sendMessage(uploadType, sendMsg)
     }
     event.target.value = "";
 
+  }
+
+  async startVoiceRecording(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    this.hideAttachmentSelect();
+
+    if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert("当前浏览器不支持录音");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = this.preferredVoiceMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
+      this.voiceRecordingStream = stream;
+      this.mediaRecorder = recorder;
+      this.voiceRecordingChunks = [];
+      this.voiceRecordingStartedAt = Date.now();
+      this.voiceRecordingShouldSend = false;
+      this.pendingRecordedMimeType = recorder.mimeType || mimeType || "audio/webm";
+
+      recorder.addEventListener("dataavailable", (captureEvent) => {
+        if (captureEvent.data && captureEvent.data.size > 0) {
+          this.voiceRecordingChunks.push(captureEvent.data);
+        }
+      });
+
+      recorder.addEventListener("stop", () => {
+        const shouldSend = this.voiceRecordingShouldSend;
+        const durationMs = Math.max(1000, Date.now() - (this.voiceRecordingStartedAt || Date.now()));
+        const chunks = [ ...this.voiceRecordingChunks ];
+        const mime = this.pendingRecordedMimeType || "audio/webm";
+
+        this.mediaRecorder = null;
+        this.voiceRecordingChunks = [];
+        this.voiceRecordingStartedAt = null;
+        this.pendingRecordedMimeType = null;
+        this.stopVoiceRecordingTimer();
+        this.hideVoiceRecorder();
+        this.releaseVoiceRecordingStream();
+
+        if (!shouldSend || chunks.length === 0) {
+          return;
+        }
+
+        const extension = mime.includes("ogg") ? "ogg" : mime.includes("mp4") ? "m4a" : "webm";
+        const blob = new Blob(chunks, { type: mime });
+        const file = new File([ blob ], `voice-recording.${extension}`, { type: mime });
+        this.sendMessage("voice", {
+          file,
+          extra: {
+            voice_time: durationMs
+          }
+        });
+      });
+
+      recorder.start();
+      this.showVoiceRecorder();
+      this.startVoiceRecordingTimer();
+    } catch (error) {
+      console.error("启动录音失败", error);
+      alert("无法启动录音，请检查麦克风权限");
+      this.releaseVoiceRecordingStream();
+    }
+  }
+
+  finishVoiceRecording(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    if (!this.mediaRecorder || this.mediaRecorder.state !== "recording") {
+      return;
+    }
+    this.voiceRecordingShouldSend = true;
+    this.mediaRecorder.stop();
+  }
+
+  cancelVoiceRecording(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    if (!this.mediaRecorder || this.mediaRecorder.state !== "recording") {
+      this.hideVoiceRecorder();
+      return;
+    }
+    this.voiceRecordingShouldSend = false;
+    this.mediaRecorder.stop();
+  }
+
+  preferredVoiceMimeType() {
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/mp4"
+    ];
+    return candidates.find((mimeType) => window.MediaRecorder?.isTypeSupported?.(mimeType)) || "";
+  }
+
+  showVoiceRecorder() {
+    if (!this.hasVoiceRecorderTarget) {
+      return;
+    }
+    this.voiceRecorderTarget.classList.remove("hidden");
+    if (this.hasVoiceRecorderStatusTarget) {
+      this.voiceRecorderStatusTarget.textContent = "请讲话，结束后发送。";
+    }
+    if (this.hasVoiceRecorderTimerTarget) {
+      this.voiceRecorderTimerTarget.textContent = "00:00";
+    }
+  }
+
+  hideVoiceRecorder() {
+    if (this.hasVoiceRecorderTarget) {
+      this.voiceRecorderTarget.classList.add("hidden");
+    }
+  }
+
+  startVoiceRecordingTimer() {
+    this.stopVoiceRecordingTimer();
+    this.voiceRecordingTimer = window.setInterval(() => {
+      if (!this.hasVoiceRecorderTimerTarget || !this.voiceRecordingStartedAt) {
+        return;
+      }
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - this.voiceRecordingStartedAt) / 1000));
+      const minutes = String(Math.floor(elapsedSeconds / 60)).padStart(2, "0");
+      const seconds = String(elapsedSeconds % 60).padStart(2, "0");
+      this.voiceRecorderTimerTarget.textContent = `${minutes}:${seconds}`;
+    }, 250);
+  }
+
+  stopVoiceRecordingTimer() {
+    if (this.voiceRecordingTimer) {
+      clearInterval(this.voiceRecordingTimer);
+      this.voiceRecordingTimer = null;
+    }
+  }
+
+  releaseVoiceRecordingStream() {
+    if (this.voiceRecordingStream) {
+      this.voiceRecordingStream.getTracks().forEach((track) => track.stop());
+      this.voiceRecordingStream = null;
+    }
   }
 
   escapeHtml(value) {

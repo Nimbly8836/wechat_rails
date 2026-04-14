@@ -87,6 +87,10 @@ module WechatApis
     def self.send_emoji
       "/Msg/SendEmoji"
     end
+
+    def self.send_voice
+      "/Msg/SendVoice"
+    end
   end
 
   # 联系人相关API路径
