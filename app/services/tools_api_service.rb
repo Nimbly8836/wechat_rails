@@ -84,13 +84,10 @@ class ToolsApiService
     }
 
     path = WechatApis::Tools.download_file
-    # This endpoint is inconsistent across upstream builds. Send both documented and observed aliases.
     params = {
       AppID: app_id,
-      AppId: app_id,
       AttachId: attach_id,
       DataLen: data_len.to_i,
-      TotalLen: data_len.to_i,
       Section: section_payload,
       UserName: user_name
     }
