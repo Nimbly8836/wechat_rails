@@ -60,6 +60,9 @@ module WechatApis
 
   # 消息相关API路径
   module Message
+    def self.query_local
+      "/Msg/QueryLocal"
+    end
 
     def self.revoke
       "/Msg/Revoke"

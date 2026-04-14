@@ -125,28 +125,30 @@ class MessagesController < ApplicationController
     return render json: { success: false, message: "wxid is required" }, status: :bad_request if requested_wxid.blank?
 
     sync_service = MessageSyncService.new(requested_wxid)
-    payload = sync_service.sync_payload
-    unless sync_service.success_response?(payload)
-      Rails.logger.warn do
-        "message sync failed: requested_wxid=#{requested_wxid} sync_wxid=#{sync_service.sync_wxid} payload=#{payload.inspect}"
-      end
-      return render json: {
-        success: false,
-        message: "sync failed",
-        requested_wxid: requested_wxid,
-        sync_wxid: sync_service.sync_wxid,
-        payload: payload
-      }, status: :bad_gateway
-    end
-
-    result = sync_service.persist_payload(payload, full_backfill: true)
+    result = sync_service.sync_and_persist!(full_backfill: true, local_backfill: true, inline_save: true)
 
     render json: {
       success: true,
       requested_wxid: requested_wxid,
-      sync_wxid: sync_service.sync_wxid,
-      synced_count: result[:synced_count]
+      sync_wxid: result[:sync_wxid],
+      target_talker: result[:target_talker],
+      synced_count: result[:synced_count],
+      sync_synced_count: result[:sync_synced_count],
+      local_synced_count: result[:local_synced_count]
     }
+  rescue MessageSyncService::SyncError => e
+    payload = e.payload
+    Rails.logger.warn do
+      "message sync failed: requested_wxid=#{requested_wxid} sync_wxid=#{sync_service.sync_wxid} payload=#{payload.inspect}"
+    end
+    render json: {
+      success: false,
+      message: "sync failed",
+      requested_wxid: requested_wxid,
+      sync_wxid: sync_service.sync_wxid,
+      target_talker: sync_service.target_talker,
+      payload: payload
+    }, status: :bad_gateway
   end
 
   def send_image_message

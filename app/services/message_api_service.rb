@@ -16,6 +16,25 @@ class MessageApiService
     @api_service.post(path, params)
   end
 
+  def query_local_messages(talker:, sender_user_name: nil, msg_type: nil, keyword: nil,
+                           start_create_time: nil, end_create_time: nil, limit: 200, offset: 0, desc: false)
+    path = WechatApis::Message.query_local
+    params = WechatRequest::Message::QueryLocal.new(
+      wxid: @wx_id,
+      talker: talker,
+      senderUserName: sender_user_name,
+      msgType: msg_type,
+      keyword: keyword,
+      startCreateTime: start_create_time,
+      endCreateTime: end_create_time,
+      limit: limit,
+      offset: offset,
+      desc: desc
+    ).to_h
+
+    @api_service.post(path, params)
+  end
+
   def send_text(to_wxid, content, at)
     path = WechatApis::Message.send_text
     params = WechatRequest::Message::SendText.new(wxid: @wx_id,

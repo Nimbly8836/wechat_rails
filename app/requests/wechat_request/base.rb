@@ -2,6 +2,7 @@ module WechatRequest
   class Base
     # 参数配置表
     PARAM_CONFIGS = {
+      query_local: { defaults: { desc: false, limit: 200, offset: 0 }, required: [ :talker ] },
       sync: { defaults: { scene: 0, synckey: "" }, required: [] },
       send_text: { defaults: { at: "", type: 0 }, required: [ :toWxid, :content ] },
       send_app: { defaults: { type: 0 }, required: [ :toWxid, :xml ] },

@@ -57,6 +57,9 @@ class MessageSyncServiceTest < ActiveSupport::TestCase
     fake_message_service.define_singleton_method(:sync_messages) do |_wxid|
       { "Success" => false, "Message" => "failed" }
     end
+    fake_message_service.define_singleton_method(:query_local_messages) do |**_params|
+      { "Success" => false, "Message" => "failed" }
+    end
 
     MessageApiService.stub(:new, fake_message_service) do
       assert_raises(MessageSyncService::SyncError) do
@@ -94,5 +97,56 @@ class MessageSyncServiceTest < ActiveSupport::TestCase
 
     assert_equal 1, save_now_calls.size
     assert_equal owner_wxid, save_now_calls.first[1]
+  end
+
+  test "sync_and_persist falls back to local query for target talker" do
+    owner_wxid = "owner-#{SecureRandom.hex(4)}"
+    talker_wxid = "room-#{SecureRandom.hex(4)}@chatroom"
+    remote_wxid = "friend-#{SecureRandom.hex(4)}"
+
+    contact = Contact.create!(
+      user_name: talker_wxid,
+      own_wxid: owner_wxid,
+      nick_name: "测试会话"
+    )
+    ChatRoom.create!(
+      wx_id: talker_wxid,
+      name: "测试会话",
+      contact: contact
+    )
+
+    fake_message_service = Object.new
+    fake_message_service.define_singleton_method(:sync_messages) do |_wxid|
+      { "Success" => false, "Message" => "failed" }
+    end
+    fake_message_service.define_singleton_method(:query_local_messages) do |**params|
+      raise "unexpected talker #{params[:talker]}" unless params[:talker] == talker_wxid
+
+      {
+        "Success" => true,
+        "Data" => {
+          "Messages" => [ {
+            "Talker" => talker_wxid,
+            "SenderUserName" => remote_wxid,
+            "MsgType" => 1,
+            "Content" => "hello from local",
+            "CreateTime" => Time.current.to_i
+          } ]
+        }
+      }
+    end
+
+    result = nil
+
+    MessageApiService.stub(:new, fake_message_service) do
+      assert_difference("WxMessage.count", 1) do
+        result = MessageSyncService.new(talker_wxid).sync_and_persist!(inline_save: true)
+      end
+    end
+
+    assert_equal owner_wxid, result[:sync_wxid]
+    assert_equal talker_wxid, result[:target_talker]
+    assert_equal 1, result[:local_synced_count]
+    assert_equal 1, result[:synced_count]
   end
 end

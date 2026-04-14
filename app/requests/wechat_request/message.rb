@@ -1,5 +1,10 @@
 module WechatRequest
   module Message
+    class QueryLocal < Base
+      params(desc: false, limit: 200, offset: 0, senderUserName: nil, msgType: nil, keyword: nil,
+             startCreateTime: nil, endCreateTime: nil) { [ :talker ] }
+    end
+
     # 同步消息请求
     class Sync < Base
       params scene: 0, synckey: ""

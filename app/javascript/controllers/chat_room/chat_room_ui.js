@@ -440,7 +440,7 @@ export function openSidebar(controller, event = null) {
 export function syncMessages(controller, event = null) {
   event?.stopPropagation();
   closeMenu(controller);
-  const syncWxid = controller.ownerWxidValue || controller.currentWxidValue;
+  const syncWxid = controller.currentWxidValue || controller.ownerWxidValue;
   fetch(`/message/sync/${encodeURIComponent(syncWxid)}`, {
     method: "POST",
     headers: {
