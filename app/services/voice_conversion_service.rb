@@ -20,6 +20,10 @@ class VoiceConversionService
     STORAGE_DIR.join(@identifier + OUTPUT_EXTENSION)
   end
 
+  def cached_source_path
+    STORAGE_DIR.join(@identifier + ".silk")
+  end
+
   def cached_file_available?
     File.exist?(cached_file_path)
   end
@@ -29,28 +33,31 @@ class VoiceConversionService
     ensure_storage_directory!
 
     decoded = decode_buffer(base64_buffer)
-    silk_path = STORAGE_DIR.join(@identifier + ".silk")
+    silk_path = cached_source_path
 
     File.binwrite(silk_path, decoded)
 
-    stdout, stderr, status = Open3.capture3("sh", CONVERTER_SCRIPT.to_s, silk_path.to_s, OUTPUT_FORMAT)
+    stdout, stderr, status = Open3.capture3("bash", CONVERTER_SCRIPT.to_s, silk_path.to_s, OUTPUT_FORMAT)
 
     Rails.logger.debug { "silk2mp3 stdout: #{stdout}" } unless stdout.blank?
     Rails.logger.warn { "silk2mp3 stderr: #{stderr}" } unless stderr.blank?
 
     unless status.success?
-      raise ConversionError, "silk2mp3 exited with status #{status.exitstatus}"
+      raise ConversionError,
+            "silk2mp3 exited with status #{status.exitstatus} source=#{silk_path} output=#{cached_file_path}"
     end
 
     mp3_path = cached_file_path
 
     unless File.exist?(mp3_path)
-      raise ConversionError, "conversion succeeded but output file missing"
+      raise ConversionError,
+            "conversion succeeded but output file missing source=#{silk_path} output=#{mp3_path} " \
+            "stdout=#{stdout.to_s.strip.inspect} stderr=#{stderr.to_s.strip.inspect}"
     end
 
+    File.delete(silk_path) if File.exist?(silk_path)
+
     mp3_path
-  ensure
-    File.delete(silk_path) if defined?(silk_path) && File.exist?(silk_path)
   end
 
   def mime_type

@@ -185,7 +185,9 @@ class MessagesController < ApplicationController
       file_path = converter.convert_and_store!(buffer)
       send_file(file_path, type: converter.mime_type, disposition: "inline")
     rescue VoiceConversionService::ConversionError => e
-      Rails.logger.error { "Voice conversion failed: #{e.message}" }
+      Rails.logger.error do
+        "Voice conversion failed: #{e.message} source=#{converter.cached_source_path} output=#{converter.cached_file_path}"
+      end
       render json: { error: true, message: "voice conversion failed" }, status: :unprocessable_content
     end
   end
