@@ -84,15 +84,16 @@ class ToolsApiService
     }
 
     path = WechatApis::Tools.download_file
-    params = WechatRequest::Tools::DownloadFile
-               .new(
-                 wxid: @wx_id,
-                 appId: app_id,
-                 dataLen: data_len,
-                 section: section_payload,
-                 userName: user_name,
-                 attachId: attach_id
-               ).to_h
+    # This endpoint is inconsistent across upstream builds. Send both documented and observed aliases.
+    params = {
+      AppID: app_id,
+      AppId: app_id,
+      AttachId: attach_id,
+      DataLen: data_len.to_i,
+      TotalLen: data_len.to_i,
+      Section: section_payload,
+      UserName: user_name
+    }
     @api_service.post(path, params)
   end
 end

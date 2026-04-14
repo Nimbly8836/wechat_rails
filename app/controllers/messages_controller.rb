@@ -748,8 +748,8 @@ class MessagesController < ApplicationController
     total_size = file_meta[:totallen].to_i
     return nil if total_size <= 0
 
-    user_name = resolve_file_download_user_name(message, wx_message, file_meta)
-    if user_name.blank?
+    user_names = resolve_file_download_user_names(message, wx_message, file_meta)
+    if user_names.empty?
       Rails.logger.warn do
         "file download missing user_name wx_message_id=#{wx_message.id} msg_id=#{wx_message.msg_id} " \
         "new_msg_id=#{wx_message.new_msg_id} file_meta=#{file_meta.inspect}"
@@ -765,19 +765,26 @@ class MessagesController < ApplicationController
       return nil
     end
 
-    data = download_chunks(total_size) do |section|
-      api_service.download_file_chunk(
-        app_id: file_meta[:app_id],
-        data_len: file_meta[:totallen],
-        section: section,
-        user_name: user_name,
-        attach_id: file_meta[:attach_id],
-      )
+    user_names.each do |user_name|
+      Rails.logger.info do
+        "file download trying user_name=#{user_name.inspect} wx_message_id=#{wx_message.id} " \
+        "app_id=#{file_meta[:app_id].inspect} attach_id=#{file_meta[:attach_id].inspect} total_size=#{total_size}"
+      end
+
+      data = download_chunks(total_size) do |section|
+        api_service.download_file_chunk(
+          app_id: file_meta[:app_id],
+          data_len: file_meta[:totallen],
+          section: section,
+          user_name: user_name,
+          attach_id: file_meta[:attach_id],
+        )
+      end
+
+      return data if data.present?
     end
 
-    return nil unless data
-
-    data
+    nil
   end
 
   def extract_chunk_payload(response)
@@ -882,17 +889,16 @@ class MessagesController < ApplicationController
     Dir.glob(storage_dir.join("#{basename}.*")).first
   end
 
-  def resolve_file_download_user_name(message, wx_message, file_meta)
-    return file_meta[:from_user_name] if file_meta[:from_user_name].present?
-
-    chat_room_wxid = message.chat_room&.wx_id
-    return chat_room_wxid if chat_room_wxid.present?
-
-    if wx_message.self_send?
-      wx_message.to_user_name.presence || wx_message.from_user_name.presence
-    else
-      wx_message.from_user_name.presence || wx_message.to_user_name.presence
-    end
+  def resolve_file_download_user_names(message, wx_message, file_meta)
+    [
+      file_meta[:from_user_name],
+      message.chat_room&.wx_id,
+      wx_message.from_user_name,
+      wx_message.to_user_name,
+      message.chat_room&.contact&.own_wxid,
+      (wx_message.self_send? ? wx_message.to_user_name : wx_message.from_user_name),
+      (wx_message.self_send? ? wx_message.from_user_name : wx_message.to_user_name)
+    ].map { |value| value.to_s.strip.presence }.compact.uniq
   end
 
   def sanitize_filename(name, default: "file")
