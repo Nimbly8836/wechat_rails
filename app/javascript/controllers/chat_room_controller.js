@@ -1961,6 +1961,8 @@ export default class extends Controller {
       acceptTypes = "image/*";
     } else if (uploadType === "emoji") {
       acceptTypes = ".gif,image/gif";
+    } else if (uploadType === "voice") {
+      acceptTypes = "audio/*";
     } else if (uploadType === "file") {
       acceptTypes = "*/*";
     } else if (uploadType === "video") {
@@ -2011,8 +2013,18 @@ export default class extends Controller {
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
       return;
     }
-    if (!navigator.mediaDevices?.getUserMedia) {
-      alert("当前浏览器不支持录音");
+    if (!window.isSecureContext) {
+      alert("当前页面不是安全上下文，浏览器不会开放麦克风录音。请使用 HTTPS 或 localhost；现在将改为选择本地音频文件发送。");
+      this.currentUploadType = "voice";
+      this.fileInputTarget.accept = "audio/*";
+      this.fileInputTarget.click();
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      alert("当前浏览器不支持网页录音，将改为选择本地音频文件发送。");
+      this.currentUploadType = "voice";
+      this.fileInputTarget.accept = "audio/*";
+      this.fileInputTarget.click();
       return;
     }
 
