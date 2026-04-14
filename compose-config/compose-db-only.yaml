@@ -1,0 +1,34 @@
+services:
+  app:
+    container_name: wechat-rails-app
+    build: ..
+    ports:
+      - "41234:80"
+    volumes:
+      - ./config/database-all.yml:/rails/config/database.yml
+      - ./config/wechat_api.yml:/rails/config/wechat_api.yml
+      - ./config/seeds.rb:/rails/db/seeds.rb
+      - ../storage:/rails/storage
+    environment:
+      - RAILS_MAX_THREADS=10
+      - SECRET_KEY_BASE
+      - RAILS_MASTER_KEY
+      - RAILS_MASTER_KEY_FILE
+      - RAILS_CREDENTIALS_YML_ENC_BASE64
+      - RAILS_CREDENTIALS_YML_ENC_FILE
+      - RUN_DB_MERGE_SCRIPT=${RUN_DB_MERGE_SCRIPT:-0}
+      - DB_MERGE_SCRIPT_PATH=${DB_MERGE_SCRIPT_PATH:-/rails/bin/db-merge}
+    depends_on:
+      - db
+
+  db:
+    container_name: wechat-rails-db
+    image: groonga/pgroonga:4.0.6-alpine-17
+    volumes:
+      - ./db:/var/lib/postgresql/data
+      - ./sql/init-extensions.sql:/docker-entrypoint-initdb.d/001-init-extensions.sql:ro
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: wechat_rails
+      POSTGRES_DB: wechat_rails
+      PGDAT: /var/lib/postgresql/data/pgdata

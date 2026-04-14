@@ -23,7 +23,7 @@ services:
   # 数据库，如果你已经有 PG了，可以注释掉，记得配置好数据库密码
 #  db:
 #    container_name: wechat_rails_db
-#    image: postgres:17
+#    image: groonga/pgroonga:4.0.6-alpine-17
 #    volumes:
 #      # 挂载位置 记得修改
 #      - ./db:/var/lib/postgresql/data
