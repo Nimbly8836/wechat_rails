@@ -372,15 +372,24 @@ class WxMessage < ApplicationRecord
       return nil unless appmsg_node.at_xpath("type")&.text.to_i == 6
 
       attach_node = appmsg_node.at_xpath("appattach")
+      title = appmsg_node.at_xpath("title")&.text.to_s
+      app_id = appmsg_node["appid"].to_s
+      app_id = doc.at_xpath("//appinfo/appid")&.text.to_s if app_id.blank?
+      app_id = doc.at_xpath("//appmsg/wxappinfo/appid")&.text.to_s if app_id.blank?
+      attach_id = attach_node&.at_xpath("attachid")&.text.to_s
+      attach_id = attach_node&.at_xpath("cdnattachid")&.text.to_s if attach_id.blank?
+      from_user_name = doc.at_xpath("//fromusername")&.text.to_s
+      from_user_name = doc.at_xpath("//fromuser")&.text.to_s if from_user_name.blank?
+
       {
-        title: appmsg_node.at_xpath("title")&.text.to_s,
-        app_id: appmsg_node["appid"].to_s,
+        title: title,
+        app_id: app_id,
         totallen: attach_node&.at_xpath("totallen")&.text.to_s.to_i,
         fileext: attach_node&.at_xpath("fileext")&.text.to_s,
         cdn_attach_url: attach_node&.at_xpath("cdnattachurl")&.text.to_s,
         aes_key: attach_node&.at_xpath("aeskey")&.text.to_s,
-        attach_id: attach_node&.at_xpath("attachid")&.text.to_s,
-        from_user_name: doc.at_xpath("//fromusername")&.text.to_s
+        attach_id: attach_id,
+        from_user_name: from_user_name
       }
     end
 

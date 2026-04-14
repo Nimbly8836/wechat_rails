@@ -341,6 +341,13 @@ class MessagesController < ApplicationController
       render json: { error: true, message: "file metadata missing" }, status: :unprocessable_content and return
     end
 
+    Rails.logger.info do
+      "file download metadata message_id=#{message.id} wx_message_id=#{wx_message.id} " \
+      "app_id=#{file_meta[:app_id].inspect} attach_id=#{file_meta[:attach_id].inspect} " \
+      "totallen=#{file_meta[:totallen].inspect} from_user_name=#{file_meta[:from_user_name].inspect} " \
+      "chat_room_wxid=#{message.chat_room&.wx_id.inspect}"
+    end
+
 
     contact = Contact.find(message.chat_room&.contact_id)
     unless contact.own_wxid.present?
@@ -744,7 +751,16 @@ class MessagesController < ApplicationController
     user_name = resolve_file_download_user_name(message, wx_message, file_meta)
     if user_name.blank?
       Rails.logger.warn do
-        "file download missing user_name wx_message_id=#{wx_message.id} msg_id=#{wx_message.msg_id} new_msg_id=#{wx_message.new_msg_id}"
+        "file download missing user_name wx_message_id=#{wx_message.id} msg_id=#{wx_message.msg_id} " \
+        "new_msg_id=#{wx_message.new_msg_id} file_meta=#{file_meta.inspect}"
+      end
+      return nil
+    end
+
+    if file_meta[:app_id].blank? || file_meta[:attach_id].blank?
+      Rails.logger.warn do
+        "file download missing identifiers wx_message_id=#{wx_message.id} msg_id=#{wx_message.msg_id} " \
+        "app_id=#{file_meta[:app_id].inspect} attach_id=#{file_meta[:attach_id].inspect} file_meta=#{file_meta.inspect}"
       end
       return nil
     end
