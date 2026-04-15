@@ -7,8 +7,11 @@ require "tempfile"
 class AudioTranscodingService
   class TranscodingError < StandardError; end
 
-  UPLOAD_EXTENSION = ".wav"
-  UPLOAD_MIME_TYPE = "audio/wav"
+  SILK_DIR = Rails.root.join("lib", "silk2mp3", "silk").freeze
+  ENCODER_PATH = SILK_DIR.join("encoder").freeze
+  PCM_EXTENSION = ".pcm"
+  UPLOAD_EXTENSION = ".silk"
+  UPLOAD_MIME_TYPE = "audio/silk"
   PREVIEW_EXTENSION = ".mp3"
   PREVIEW_MIME_TYPE = "audio/mpeg"
 
@@ -18,13 +21,17 @@ class AudioTranscodingService
 
   def transcode_voice_assets!
     ensure_file_present!
+    ensure_encoder_available!
 
+    pcm_output = Tempfile.new([ "voice-pcm-", PCM_EXTENSION ])
+    pcm_output.close
     upload_output = Tempfile.new([ "voice-upload-", UPLOAD_EXTENSION ])
     upload_output.close
     preview_output = Tempfile.new([ "voice-preview-", PREVIEW_EXTENSION ])
     preview_output.close
 
-    transcode!(source_path, upload_output.path, "pcm_s16le", "24000")
+    transcode_to_pcm!(source_path, pcm_output.path)
+    encode_silk!(pcm_output.path, upload_output.path)
     transcode!(source_path, preview_output.path, "libmp3lame", "24000")
 
     upload_binary = File.binread(upload_output.path)
@@ -37,11 +44,61 @@ class AudioTranscodingService
       preview_mime_type: PREVIEW_MIME_TYPE
     }
   ensure
+    pcm_output.unlink if defined?(pcm_output) && pcm_output
     upload_output.unlink if defined?(upload_output) && upload_output
     preview_output.unlink if defined?(preview_output) && preview_output
   end
 
   private
+
+  def ensure_encoder_available!
+    return if File.exist?(ENCODER_PATH)
+
+    stdout, stderr, status = Open3.capture3("make", "encoder", chdir: SILK_DIR.to_s)
+    Rails.logger.debug { "silk encoder build stdout: #{stdout}" } unless stdout.blank?
+    Rails.logger.warn { "silk encoder build stderr: #{stderr}" } unless stderr.blank?
+
+    raise TranscodingError, "silk encoder build failed" unless status.success? && File.exist?(ENCODER_PATH)
+  end
+
+  def transcode_to_pcm!(input_path, output_path)
+    stdout, stderr, status = Open3.capture3(
+      "ffmpeg", "-y",
+      "-i", input_path,
+      "-vn",
+      "-f", "s16le",
+      "-acodec", "pcm_s16le",
+      "-ar", "24000",
+      "-ac", "1",
+      output_path
+    )
+
+    Rails.logger.debug { "voice pcm stdout: #{stdout}" } unless stdout.blank?
+    Rails.logger.warn { "voice pcm stderr: #{stderr}" } unless stderr.blank?
+
+    raise TranscodingError, "pcm conversion failed with status #{status.exitstatus}" unless status.success?
+    raise TranscodingError, "pcm output missing at #{output_path}" unless File.exist?(output_path) && File.size(output_path).positive?
+  end
+
+  def encode_silk!(pcm_path, output_path)
+    stdout, stderr, status = Open3.capture3(
+      ENCODER_PATH.to_s,
+      pcm_path,
+      output_path,
+      "-quiet",
+      "-tencent",
+      "-Fs_API", "24000",
+      "-Fs_maxInternal", "24000",
+      "-packetlength", "20",
+      "-rate", "25000"
+    )
+
+    Rails.logger.debug { "silk encode stdout: #{stdout}" } unless stdout.blank?
+    Rails.logger.warn { "silk encode stderr: #{stderr}" } unless stderr.blank?
+
+    raise TranscodingError, "silk encode failed with status #{status.exitstatus}" unless status.success?
+    raise TranscodingError, "silk output missing at #{output_path}" unless File.exist?(output_path) && File.size(output_path).positive?
+  end
 
   def transcode!(input_path, output_path, codec, sample_rate)
     stdout, stderr, status = Open3.capture3(

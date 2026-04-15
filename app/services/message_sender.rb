@@ -280,7 +280,7 @@ class MessageSender
       upload_binary: transcoded[:upload_binary],
       preview_binary: transcoded[:preview_binary],
       voice_time: voice_time,
-      voice_format_type: 3
+      voice_format_type: 4
     }
   rescue AudioTranscodingService::TranscodingError => e
     Rails.logger.error("voice transcode failed: #{e.message}")
