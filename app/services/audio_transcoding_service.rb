@@ -3,12 +3,14 @@
 require "base64"
 require "open3"
 require "tempfile"
+require "fileutils"
+require "digest/sha1"
 
 class AudioTranscodingService
   class TranscodingError < StandardError; end
 
   SILK_DIR = Rails.root.join("lib", "silk2mp3", "silk").freeze
-  ENCODER_PATH = SILK_DIR.join("encoder").freeze
+  BUILD_ROOT = Rails.root.join("tmp", "silk_encoder_build").freeze
   PCM_EXTENSION = ".pcm"
   UPLOAD_EXTENSION = ".silk"
   UPLOAD_MIME_TYPE = "audio/silk"
@@ -52,13 +54,14 @@ class AudioTranscodingService
   private
 
   def ensure_encoder_available!
-    return if File.exist?(ENCODER_PATH)
+    return if File.exist?(compiled_encoder_path)
 
-    stdout, stderr, status = Open3.capture3("make", "encoder", chdir: SILK_DIR.to_s)
+    prepare_build_workspace!
+    stdout, stderr, status = Open3.capture3("make", "encoder", chdir: build_dir.to_s)
     Rails.logger.debug { "silk encoder build stdout: #{stdout}" } unless stdout.blank?
     Rails.logger.warn { "silk encoder build stderr: #{stderr}" } unless stderr.blank?
 
-    raise TranscodingError, "silk encoder build failed" unless status.success? && File.exist?(ENCODER_PATH)
+    raise TranscodingError, "silk encoder build failed" unless status.success? && File.exist?(compiled_encoder_path)
   end
 
   def transcode_to_pcm!(input_path, output_path)
@@ -82,7 +85,7 @@ class AudioTranscodingService
 
   def encode_silk!(pcm_path, output_path)
     stdout, stderr, status = Open3.capture3(
-      ENCODER_PATH.to_s,
+      compiled_encoder_path.to_s,
       pcm_path,
       output_path,
       "-quiet",
@@ -126,5 +129,38 @@ class AudioTranscodingService
 
   def source_path
     @uploaded_file.tempfile.path
+  end
+
+  def build_dir
+    BUILD_ROOT.join(source_signature)
+  end
+
+  def compiled_encoder_path
+    build_dir.join("encoder")
+  end
+
+  def source_signature
+    @source_signature ||= begin
+      digest = Digest::SHA1.new
+      Dir.glob(SILK_DIR.join("**", "*")).sort.each do |path|
+        next if File.directory?(path)
+
+        digest.update(path.delete_prefix(SILK_DIR.to_s))
+        digest.update(File.binread(path))
+      end
+      digest.hexdigest
+    end
+  end
+
+  def prepare_build_workspace!
+    return if build_dir.exist?
+
+    FileUtils.mkdir_p(build_dir)
+
+    Dir.children(SILK_DIR).each do |entry|
+      source = SILK_DIR.join(entry)
+      destination = build_dir.join(entry)
+      FileUtils.cp_r(source, destination, preserve: true)
+    end
   end
 end
