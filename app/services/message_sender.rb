@@ -55,7 +55,7 @@ class MessageSender
       @extra ||= {}
       @extra[:voice_time] = payload[:voice_time]
       @extra[:voice_binary] = payload[:preview_binary]
-      @message_content = build_voice_content(payload[:voice_time], payload[:upload_binary].bytesize)
+      @message_content = build_voice_content(payload[:voice_time], payload[:upload_binary].bytesize, payload[:voice_format_type])
       res = message_api_service.send_voice(@chat_room.wx_id,
                                            payload[:upload_base64],
                                            type: payload[:voice_format_type],
@@ -406,13 +406,13 @@ class MessageSender
     XML
   end
 
-  def build_voice_content(voice_time, data_length)
+  def build_voice_content(voice_time, data_length, voice_format_type = 3)
     <<~XML.gsub(/\n\s*/, "").strip
       <msg>
         <voicemsg voicelength="#{voice_time.to_i}"
                   length="#{data_length.to_i}"
                   endflag="1"
-                  voiceformat="2"
+                  voiceformat="#{voice_format_type.to_i}"
                   fromusername="#{CGI.escapeHTML(@chat_room.contact&.own_wxid.to_s)}" />
       </msg>
     XML

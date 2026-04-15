@@ -24,7 +24,7 @@ class AudioTranscodingService
     preview_output = Tempfile.new([ "voice-preview-", PREVIEW_EXTENSION ])
     preview_output.close
 
-    transcode!(source_path, upload_output.path, "pcm_s16le", "16000")
+    transcode!(source_path, upload_output.path, "pcm_s16le", "24000")
     transcode!(source_path, preview_output.path, "libmp3lame", "24000")
 
     upload_binary = File.binread(upload_output.path)
