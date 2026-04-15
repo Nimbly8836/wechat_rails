@@ -92,9 +92,9 @@ class MessageSender
     timestamp = msg_res["servertime"] || msg_res["CreateTime"]
     msg_time = timestamp.to_i > 0 ? Time.at(timestamp.to_i) : Time.current
 
-    to_user_name = msg_res.dig("ToUserName", "string") ||
-                   msg_res.dig("toUserName") ||
-                   msg_res.dig("ToUsetName", "string") || # 兼容错误拼写
+    to_user_name = extract_string_field(msg_res["ToUserName"]) ||
+                   extract_string_field(msg_res["toUserName"]) ||
+                   extract_string_field(msg_res["ToUsetName"]) || # 兼容错误拼写
                    @chat_room.wx_id
 
     wx_message_attrs = {
@@ -157,6 +157,14 @@ class MessageSender
     return list.first if list.is_a?(Array) && list.first.is_a?(Hash)
 
     return data if data.is_a?(Hash)
+
+    nil
+  end
+
+  def extract_string_field(value)
+    return value if value.is_a?(String)
+    return value["string"] if value.is_a?(Hash) && value["string"].is_a?(String)
+    return value[:string] if value.is_a?(Hash) && value[:string].is_a?(String)
 
     nil
   end
