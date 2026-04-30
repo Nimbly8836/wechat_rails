@@ -3,6 +3,7 @@ require "base64"
 require "digest/md5"
 require "cgi"
 require "fileutils"
+require "securerandom"
 
 class MessageSender
   MESSAGE_TYPES = {
@@ -53,10 +54,10 @@ class MessageSender
 
       @extra ||= {}
       @extra[:voice_time] = payload[:voice_time]
-      @extra[:voice_binary] = payload[:binary]
-      @message_content = build_voice_content(payload[:voice_time], payload[:binary].bytesize)
+      @extra[:voice_binary] = payload[:preview_binary]
+      @message_content = build_voice_content(payload[:voice_time], payload[:upload_binary].bytesize, payload[:voice_format_type])
       res = message_api_service.send_voice(@chat_room.wx_id,
-                                           payload[:base64],
+                                           payload[:upload_base64],
                                            type: payload[:voice_format_type],
                                            voice_time: payload[:voice_time])
     when MESSAGE_TYPES[:file]
@@ -82,19 +83,18 @@ class MessageSender
 
     # 根据消息类型提取主数据节点
     msg_res = extract_message_response_data(res)
-
-    return unless msg_res.is_a?(Hash)
+    msg_res = {} unless msg_res.is_a?(Hash)
 
     # 统一提取字段，集中处理兼容性问题
-    msg_id = msg_res["Msgid"] || msg_res["ClientMsgid"] || msg_res["clientMsgId"] || msg_res["msgId"]
-    new_msg_id = msg_res["Newmsgid"] || msg_res["NewMsgId"] || msg_res["newMsgId"]
+    msg_id = msg_res["Msgid"] || msg_res["ClientMsgid"] || msg_res["clientMsgId"] || msg_res["msgId"] || synthetic_message_id
+    new_msg_id = msg_res["Newmsgid"] || msg_res["NewMsgId"] || msg_res["newMsgId"] || synthetic_message_id
 
     timestamp = msg_res["servertime"] || msg_res["CreateTime"]
     msg_time = timestamp.to_i > 0 ? Time.at(timestamp.to_i) : Time.current
 
-    to_user_name = msg_res.dig("ToUserName", "string") ||
-                   msg_res.dig("toUserName") ||
-                   msg_res.dig("ToUsetName", "string") || # 兼容错误拼写
+    to_user_name = extract_string_field(msg_res["ToUserName"]) ||
+                   extract_string_field(msg_res["toUserName"]) ||
+                   extract_string_field(msg_res["ToUsetName"]) || # 兼容错误拼写
                    @chat_room.wx_id
 
     wx_message_attrs = {
@@ -157,6 +157,14 @@ class MessageSender
     return list.first if list.is_a?(Array) && list.first.is_a?(Hash)
 
     return data if data.is_a?(Hash)
+
+    nil
+  end
+
+  def extract_string_field(value)
+    return value if value.is_a?(String)
+    return value["string"] if value.is_a?(Hash) && value["string"].is_a?(String)
+    return value[:string] if value.is_a?(Hash) && value[:string].is_a?(String)
 
     nil
   end
@@ -265,13 +273,14 @@ class MessageSender
     voice_time = extra_value(:voice_time).to_i
     voice_time = 1000 if voice_time <= 0
 
-    transcoded = AudioTranscodingService.new(@file).transcode_to_mp3!
+    transcoded = AudioTranscodingService.new(@file).transcode_voice_assets!
     {
       success: true,
-      base64: transcoded[:base64],
-      binary: transcoded[:binary],
+      upload_base64: transcoded[:upload_base64],
+      upload_binary: transcoded[:upload_binary],
+      preview_binary: transcoded[:preview_binary],
       voice_time: voice_time,
-      voice_format_type: 2
+      voice_format_type: 4
     }
   rescue AudioTranscodingService::TranscodingError => e
     Rails.logger.error("voice transcode failed: #{e.message}")
@@ -331,6 +340,10 @@ class MessageSender
     return nil unless @extra.respond_to?(:dig)
 
     @extra.dig(key) || @extra.dig(key.to_s)
+  end
+
+  def synthetic_message_id
+    Time.current.to_f.to_s.delete(".")[0, 16].to_i + SecureRandom.random_number(1000)
   end
 
   def quoted_reference_message
@@ -393,13 +406,13 @@ class MessageSender
     XML
   end
 
-  def build_voice_content(voice_time, data_length)
+  def build_voice_content(voice_time, data_length, voice_format_type = 3)
     <<~XML.gsub(/\n\s*/, "").strip
       <msg>
         <voicemsg voicelength="#{voice_time.to_i}"
                   length="#{data_length.to_i}"
                   endflag="1"
-                  voiceformat="2"
+                  voiceformat="#{voice_format_type.to_i}"
                   fromusername="#{CGI.escapeHTML(@chat_room.contact&.own_wxid.to_s)}" />
       </msg>
     XML
