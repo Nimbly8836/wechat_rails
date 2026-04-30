@@ -18,4 +18,8 @@ class ChatRoomMember < ApplicationRecord
   def display_name
     remark.presence || nick_name.presence || user_name
   end
+
+  def avatar_url
+    big_head_img_url.presence || small_head_img_url
+  end
 end

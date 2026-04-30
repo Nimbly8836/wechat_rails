@@ -36,6 +36,20 @@ export function buildMessageGroup(controller, msg, senderInfo) {
 
     const avatar = document.createElement("div");
     avatar.className = "tg-message-avatar-sticky w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden";
+    avatar.setAttribute("role", "button");
+    avatar.setAttribute("tabindex", "0");
+    avatar.title = senderName ? `查看 ${senderName} 的详情` : "查看成员详情";
+    avatar.classList.add("cursor-pointer", "transition", "hover:ring-2", "hover:ring-sky-300");
+    const openMember = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      controller.openMemberDetail(senderInfo?.wxid || msg.from_user_name);
+    };
+    avatar.addEventListener("click", openMember);
+    avatar.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      openMember(event);
+    });
 
     if (!senderAvatar) {
       const initial = senderInfo?.initial || msg.sender_initial || "?";
@@ -157,6 +171,8 @@ export function renderMessageBubble(controller, msg, isNewGroup, senderInfo, isF
       return renderVideoMessageAttachment(controller, bubble, msg, isNewGroup, senderInfo, isFirstMessage);
     case "file_message":
       return renderFileMessage(controller, bubble, msg, isNewGroup, senderInfo, isFirstMessage);
+    case "location":
+      return renderLocationMessage(controller, bubble, msg, isNewGroup, senderInfo, isFirstMessage);
     case "quote":
       return renderReferMessage(controller, bubble, msg, isNewGroup, senderInfo, isFirstMessage);
     case "system_notice":
@@ -411,6 +427,58 @@ export function renderFileMessage(controller, bubble, msg, isNewGroup, senderInf
     downloadLink.classList.add("opacity-60", "pointer-events-none");
   }
   return controller.applyBubbleStyle(fileBubble, msg, isNewGroup, senderInfo, isFirstMessage);
+}
+
+export function renderLocationMessage(controller, bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
+  const locationBubble = bubble;
+  const parsed = controller.locationPayloadFor(msg);
+  const title = controller.payloadValue(parsed, "title") || "位置";
+  const label = controller.payloadValue(parsed, "label") || "";
+  const latitude = controller.payloadValue(parsed, "latitude") || "";
+  const longitude = controller.payloadValue(parsed, "longitude") || "";
+  const mapUrl = controller.payloadValue(parsed, "map_url", "mapUrl") || "";
+  const coordinates = [latitude, longitude].filter(Boolean).join(", ");
+
+  locationBubble.classList.add("min-w-[14rem]", "max-w-[18rem]", "overflow-hidden");
+
+  const card = document.createElement(mapUrl ? "a" : "div");
+  if (mapUrl) {
+    card.href = mapUrl;
+    card.target = "_blank";
+    card.rel = "noopener noreferrer";
+  }
+  card.className = "block";
+
+  const map = document.createElement("div");
+  map.className = "relative h-28 overflow-hidden rounded-t-2xl bg-[linear-gradient(135deg,#dbeafe,#dcfce7)]";
+  map.innerHTML = `
+    <div class="absolute inset-0 opacity-60" style="background-image: linear-gradient(rgba(15,23,42,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,.08) 1px, transparent 1px); background-size: 28px 28px;"></div>
+    <div class="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-rose-500 text-white shadow-lg">
+      <span class="block h-3 w-3 rounded-full bg-white"></span>
+    </div>
+  `;
+
+  const body = document.createElement("div");
+  body.className = "space-y-1 px-4 py-3";
+  const titleEl = document.createElement("div");
+  titleEl.className = "text-sm font-semibold text-slate-900";
+  titleEl.textContent = title;
+  const labelEl = document.createElement("div");
+  labelEl.className = "text-xs text-slate-500";
+  labelEl.textContent = label && label !== title ? label : (coordinates || "点击打开地图");
+  const coordEl = document.createElement("div");
+  coordEl.className = "text-[11px] text-slate-400";
+  coordEl.textContent = coordinates;
+  coordEl.classList.toggle("hidden", !coordinates);
+
+  body.appendChild(titleEl);
+  body.appendChild(labelEl);
+  body.appendChild(coordEl);
+  card.appendChild(map);
+  card.appendChild(body);
+  locationBubble.appendChild(card);
+
+  return controller.applyBubbleStyle(locationBubble, msg, isNewGroup, senderInfo, isFirstMessage);
 }
 
 export function renderVideoMessageAttachment(controller, bubble, msg, isNewGroup, senderInfo, isFirstMessage) {

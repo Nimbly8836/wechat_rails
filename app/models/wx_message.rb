@@ -393,6 +393,34 @@ class WxMessage < ApplicationRecord
       }
     end
 
+    def parse_location_payload(raw)
+      doc = xml_document(raw)
+      return nil unless doc
+
+      location_node = doc.at_xpath("//location")
+      return nil unless location_node
+
+      latitude = location_node["x"].to_s.strip
+      longitude = location_node["y"].to_s.strip
+      label = location_node["label"].to_s.strip
+      poi_name = location_node["poiname"].to_s.strip
+      title = poi_name.presence || label.presence || "位置"
+      coordinates = [ latitude, longitude ].select(&:present?).join(",")
+
+      {
+        type: "location",
+        title: title,
+        label: label.presence,
+        poiname: poi_name.presence,
+        latitude: latitude.presence,
+        longitude: longitude.presence,
+        scale: location_node["scale"].to_i,
+        map_type: location_node["maptype"].to_s.presence,
+        city_name: location_node["cityname"].to_s.presence,
+        map_url: coordinates.present? ? "https://maps.google.com/?q=#{coordinates}" : nil
+      }.compact
+    end
+
     def format_duration(total_seconds)
       seconds = total_seconds.to_i
       minutes = seconds / 60
@@ -483,6 +511,12 @@ class WxMessage < ApplicationRecord
     self.class.parse_file_attachment_payload(content)
   end
 
+  def parse_location
+    return unless (get_real_msg_type.to_sym == :location) && content.present?
+
+    self.class.parse_location_payload(content)
+  end
+
   def extract_xml_body(raw)
     self.class.extract_xml_body(raw)
   end
@@ -518,6 +552,8 @@ class WxMessage < ApplicationRecord
       self.class.parse_chat_history_payload(content)
     when :voip
       self.class.parse_voip_payload(content)
+    when :location
+      parse_location
     when :card, :mini_app, :mini_game, :video_account, :transfer, :red_packet
       payload = self.class.parse_app_message_payload(content)
       payload&.merge(type: payload[:type].presence || message_type.to_s)
@@ -585,6 +621,11 @@ class WxMessage < ApplicationRecord
 
     if real_msg_type.to_sym == :video
       return "视频消息"
+    end
+
+    if real_msg_type.to_sym == :location
+      location = parse_location
+      return location&.dig(:title).present? ? "[位置] #{location[:title]}" : "[位置]"
     end
 
     # 3. 其它消息类型，默认返回 content

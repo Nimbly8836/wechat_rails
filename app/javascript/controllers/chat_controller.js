@@ -86,6 +86,7 @@ export default class extends Controller {
     this.maxWidth = 500
 
     this.boundHandleOpenChat = this.handleOpenChat.bind(this)
+    this.boundHandleOpenContact = this.handleOpenContact.bind(this)
     this.boundOpenSidebar = this.openSidebar.bind(this)
     this.boundCloseSidebar = this.closeSidebar.bind(this)
     this.boundHandleViewportChange = this.handleViewportChange.bind(this)
@@ -115,6 +116,7 @@ export default class extends Controller {
     this.bootstrapOnlineSessions()
 
     this.element.addEventListener("chat:open", this.boundHandleOpenChat)
+    this.element.addEventListener("chat:open-contact", this.boundHandleOpenContact)
     this.element.addEventListener("chat:sidebar:open", this.boundOpenSidebar)
     this.element.addEventListener("chat:sidebar:close", this.boundCloseSidebar)
     window.addEventListener("chat:local-message", this.boundLocalChatMessage)
@@ -138,6 +140,7 @@ export default class extends Controller {
     }
     this.teardownEventSource()
     this.element.removeEventListener("chat:open", this.boundHandleOpenChat)
+    this.element.removeEventListener("chat:open-contact", this.boundHandleOpenContact)
     this.element.removeEventListener("chat:sidebar:open", this.boundOpenSidebar)
     this.element.removeEventListener("chat:sidebar:close", this.boundCloseSidebar)
     window.removeEventListener("chat:local-message", this.boundLocalChatMessage)
@@ -750,8 +753,12 @@ export default class extends Controller {
     this.eventSource = source
 
     source.onmessage = (event) => this.handleEventSourceMessage(event)
+    source.onopen = () => {
+      window.dispatchEvent(new CustomEvent("chat:events:open"))
+    }
     source.addEventListener("ping", () => {})
     source.onerror = () => {
+      window.dispatchEvent(new CustomEvent("chat:events:error"))
       this.bootstrapOnlineSessions({ force: true })
       this.scheduleReconnect()
     }
@@ -1178,6 +1185,13 @@ export default class extends Controller {
     }
   }
 
+  handleOpenContact(event) {
+    const contactId = event.detail?.contactId
+    if (contactId) {
+      this.openContact(contactId)
+    }
+  }
+
   handleServiceWorkerMessage(event) {
     if (event?.data?.type !== "OPEN_CHAT_ROOM") {
       return
@@ -1235,6 +1249,28 @@ export default class extends Controller {
         }
 
         this.chatBoxTarget.innerHTML = '<div class="flex h-full items-center justify-center px-6 text-sm text-rose-500">聊天窗口加载失败</div>'
+      })
+  }
+
+  openContact(contactId) {
+    this.currentRoomId = null
+    this.updateMobileHeaderVisibility()
+    this.renderChatRoomList(this.chatRooms)
+    this.setMobileTitle("联系人详情")
+
+    fetch(`/contact/${contactId}`)
+      .then((resp) => {
+        if (!resp.ok) {
+          throw new Error(`联系人详情加载失败: ${resp.status}`)
+        }
+        return resp.text()
+      })
+      .then((html) => {
+        this.chatBoxTarget.innerHTML = html
+        this.closeSidebar()
+      })
+      .catch(() => {
+        this.chatBoxTarget.innerHTML = '<div class="flex h-full items-center justify-center px-6 text-sm text-rose-500">联系人详情加载失败</div>'
       })
   }
 

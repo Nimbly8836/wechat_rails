@@ -89,6 +89,23 @@ class ChatRoomController < ApplicationController
     render json: members.as_json(methods: [ :display_name ])
   end
 
+  def member_detail
+    member = ChatRoomMember.find_by(chat_room_id: params[:id], user_name: params[:user_name])
+
+    unless member
+      render json: { error: "member not found" }, status: :not_found and return
+    end
+
+    render json: member.as_json(
+      only: [
+        :id, :chat_room_id, :room_wxid, :user_name, :nick_name, :remark,
+        :alias, :signature, :country, :province, :city, :sex,
+        :phone_num_list, :big_head_img_url, :small_head_img_url
+      ],
+      methods: [ :display_name, :avatar_url ]
+    )
+  end
+
   private
 
   def limit_param(default)

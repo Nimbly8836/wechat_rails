@@ -30,6 +30,9 @@ export function normalizeParsedMessageType(_controller, type) {
     if (["sys", "sys_notice", "function_message"].includes(type)) {
       return "system_notice";
     }
+    if (type === "real_time_location") {
+      return "location";
+    }
     return type;
   }
 
@@ -86,6 +89,15 @@ export function filePayloadFor(controller, msg) {
   }
 
   return parseWxFileAttachment(controller, msg?.content || "") || {};
+}
+
+export function locationPayloadFor(controller, msg) {
+  const parsed = parsedMessageFor(controller, msg);
+  if (parsed && normalizeParsedMessageType(controller, parsed.type) === "location") {
+    return parsed;
+  }
+
+  return parseWxLocationMessage(controller, msg?.content || "") || {};
 }
 
 export function quotePayloadFor(controller, msg) {
@@ -379,6 +391,43 @@ export function parseWxFileAttachment(controller, xmlString) {
   }
 }
 
+export function parseWxLocationMessage(controller, xmlString) {
+  try {
+    const xml = parseXmlDocument(controller, xmlString);
+    if (!xml) {
+      return null;
+    }
+
+    const location = xml.querySelector("location");
+    if (!location) {
+      return null;
+    }
+
+    const latitude = location.getAttribute("x") || "";
+    const longitude = location.getAttribute("y") || "";
+    const label = location.getAttribute("label") || "";
+    const poiname = location.getAttribute("poiname") || "";
+    const title = poiname || label || "位置";
+    const coordinates = [latitude, longitude].filter(Boolean).join(",");
+
+    return {
+      type: "location",
+      title,
+      label,
+      poiname,
+      latitude,
+      longitude,
+      scale: Number(location.getAttribute("scale") || 0),
+      mapType: location.getAttribute("maptype") || "",
+      cityName: location.getAttribute("cityname") || "",
+      mapUrl: coordinates ? `https://maps.google.com/?q=${encodeURIComponent(coordinates)}` : ""
+    };
+  } catch (error) {
+    console.error("Location XML parse error:", error);
+    return null;
+  }
+}
+
 export function extractXmlPayload(_controller, xmlString = "") {
   const raw = String(xmlString || "").trim();
   if (!raw) {
@@ -575,6 +624,7 @@ export function normalizeMessageType(controller, msg) {
     50: "voip",
     43: "video",
     47: "emoji",
+    48: "location",
     49: "refer",
     57: "quote",
     62: "micro_video",
@@ -625,6 +675,10 @@ export function buildMessagePreview(controller, msg) {
     case "voip": {
       const parsed = voipPayloadFor(controller, msg);
       return { type, content: parsed.summary || "[通话消息]", asLinkedText: false };
+    }
+    case "location": {
+      const parsed = locationPayloadFor(controller, msg);
+      return { type, content: parsed.title ? `[位置] ${parsed.title}` : "[位置]", asLinkedText: false };
     }
     case "image":
     case "voice":
@@ -699,7 +753,7 @@ export function lookupSenderInfo(controller, msg, rawContent = "") {
     const name = resolveMemberName(controller, member, wxid);
     const avatar = resolveMemberAvatar(controller, member);
     const initial = (name || wxid || "?").slice(0, 1).toUpperCase();
-    return { key: `room:${wxid}`, name, avatar, initial };
+    return { key: `room:${wxid}`, name, avatar, initial, wxid, member };
   }
 
   const wxid = msg.from_user_name || msg.to_user_name || "contact";
@@ -729,6 +783,7 @@ export function humanizeMessageType(_controller, msgType) {
     card: "卡片",
     video_account: "视频号",
     html: "网页",
+    location: "位置",
     micro_video: "小视频"
   };
   return mapping[msgType] || "消息";

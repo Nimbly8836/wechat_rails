@@ -2,6 +2,7 @@
      data-controller="chat-room"
      data-chat-room-current-wxid-value="<%= @chat_room.wx_id %>"
      data-chat-room-owner-wxid-value="<%= @chat_room.contact&.own_wxid %>"
+     data-chat-room-contact-id-value="<%= @chat_room.contact_id %>"
      data-chat-room-id-value="<%= @chat_room.id %>"
      data-chat-room-name-value="<%= @chat_room.name.presence || "聊天窗口" %>"
      data-chat-room-members-value="<%= json_escape((@chat_room.members || []).to_json) %>"
@@ -44,11 +45,14 @@
               aria-label="返回联系人和会话列表">
         <img src="icon/back.svg" alt="" class="h-6 w-6 tg-ui-icon">
       </button>
-      <div class="h-11 w-11 overflow-hidden rounded-full bg-slate-200 shadow-sm">
+      <button type="button"
+              class="h-11 w-11 overflow-hidden rounded-full bg-slate-200 shadow-sm transition hover:ring-2 hover:ring-sky-300"
+              title="查看详情"
+              data-action="click->chat-room#openChatContactDetail">
         <img src='data:image/png;base64,<%= @chat_room.avatar_base64 %>' class='w-full h-full
         object-cover'
              alt='avatar'/>
-      </div>
+      </button>
       <div class="min-w-0 leading-tight">
         <div class="truncate font-semibold text-slate-900"><%= @chat_room.name.presence || "聊天窗口" %></div>
         <div class="hidden text-xs text-slate-500 sm:block">实时消息</div>

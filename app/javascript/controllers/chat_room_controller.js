@@ -32,6 +32,7 @@ import {
   renderXmlMessage,
   renderImageMessage,
   renderFileMessage,
+  renderLocationMessage,
   renderVideoMessageAttachment,
   downloadFile,
   renderEmojiMessage,
@@ -69,6 +70,7 @@ import {
   voipPayloadFor,
   chatHistoryPayloadFor,
   filePayloadFor,
+  locationPayloadFor,
   quotePayloadFor,
   parseWxXmlMessage,
   parseWxVideoMessage,
@@ -80,6 +82,7 @@ import {
   chatHistoryTypeLabel,
   formatVoipDuration,
   parseWxFileAttachment,
+  parseWxLocationMessage,
   extractXmlPayload,
   parseXmlDocument,
   mapAppMessageType,
@@ -162,7 +165,6 @@ import {
   formatVoiceDuration
 } from "controllers/chat_room/chat_room_voice_player";
 
-const AUTO_REFRESH_INTERVAL_MS = 800;
 const EMOJI_REQUEST_VERSION = "20260330b";
 
 export default class extends Controller {
@@ -177,6 +179,7 @@ export default class extends Controller {
   static values = {
     currentWxid: String,
     ownerWxid: String,
+    contactId: Number,
     id: Number,
     name: String,
     members: String
@@ -227,7 +230,6 @@ export default class extends Controller {
     }
 
     this.pendingNotifyRefreshTimer = null;
-    this.autoRefreshTimer = null;
     this.voiceBlobUrls = new Map();
     this.mediaRecorder = null;
     this.voiceRecordingStream = null;
@@ -299,7 +301,14 @@ export default class extends Controller {
       this.loadMessages();
     }
 
-    this.startAutoRefreshTimer();
+    this.boundVisibilityRefresh = () => {
+      if (document.visibilityState === "visible") {
+        this.loadNewMessages();
+      }
+    };
+    this.boundEventSourceOpen = () => this.loadNewMessages();
+    document.addEventListener("visibilitychange", this.boundVisibilityRefresh);
+    window.addEventListener("chat:events:open", this.boundEventSourceOpen);
 
     this.applyTheme({ refreshBubbles: false });
     this.syncThemeInputs();
@@ -479,10 +488,8 @@ export default class extends Controller {
       this.pendingNotifyRefreshTimer = null;
     }
 
-    if (this.autoRefreshTimer) {
-      clearInterval(this.autoRefreshTimer);
-      this.autoRefreshTimer = null;
-    }
+    document.removeEventListener("visibilitychange", this.boundVisibilityRefresh);
+    window.removeEventListener("chat:events:open", this.boundEventSourceOpen);
 
     this.stopVoiceRecordingTimer();
     this.releaseVoiceRecordingStream();
@@ -509,6 +516,8 @@ export default class extends Controller {
     if (document.body.style.overflow === "hidden") {
       document.body.style.overflow = this.mediaPreviewPreviousBodyOverflow || "";
     }
+
+    this.closeMemberDetail();
 
 
   }
@@ -598,20 +607,6 @@ export default class extends Controller {
       });
   }
 
-  startAutoRefreshTimer() {
-    if (this.autoRefreshTimer) {
-      clearInterval(this.autoRefreshTimer);
-    }
-
-    this.autoRefreshTimer = setInterval(() => {
-      if (!this.element?.isConnected || document.visibilityState === "hidden") {
-        return;
-      }
-
-      this.loadNewMessages();
-    }, AUTO_REFRESH_INTERVAL_MS);
-  }
-
   fetchJson(url, { emptyOnNotModified = null } = {}) {
     return fetch(url, {
       cache: "no-store",
@@ -674,6 +669,7 @@ export default class extends Controller {
   voipPayloadFor(msg) { return voipPayloadFor(this, msg); }
   chatHistoryPayloadFor(msg) { return chatHistoryPayloadFor(this, msg); }
   filePayloadFor(msg) { return filePayloadFor(this, msg); }
+  locationPayloadFor(msg) { return locationPayloadFor(this, msg); }
   quotePayloadFor(msg) { return quotePayloadFor(this, msg); }
   parseWxXmlMessage(xmlString) { return parseWxXmlMessage(this, xmlString); }
   parseWxVideoMessage(xmlString) { return parseWxVideoMessage(this, xmlString); }
@@ -685,6 +681,7 @@ export default class extends Controller {
   chatHistoryTypeLabel(dataType) { return chatHistoryTypeLabel(this, dataType); }
   formatVoipDuration(totalSeconds) { return formatVoipDuration(this, totalSeconds); }
   parseWxFileAttachment(xmlString) { return parseWxFileAttachment(this, xmlString); }
+  parseWxLocationMessage(xmlString) { return parseWxLocationMessage(this, xmlString); }
   extractXmlPayload(xmlString = "") { return extractXmlPayload(this, xmlString); }
   parseXmlDocument(xmlString) { return parseXmlDocument(this, xmlString); }
   mapAppMessageType(msgType) { return mapAppMessageType(this, msgType); }
@@ -734,6 +731,7 @@ export default class extends Controller {
   renderXmlMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderXmlMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
   renderImageMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderImageMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
   renderFileMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderFileMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
+  renderLocationMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderLocationMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
   renderVideoMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderVideoMessageAttachment(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
   downloadFile(url, filename) { return downloadFile(this, url, filename); }
   renderEmojiMessage(bubble, msg, isNewGroup, senderInfo, isFirstMessage) { return renderEmojiMessage(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
@@ -1257,6 +1255,131 @@ export default class extends Controller {
   syncMessages(event = null) { return syncMessages(this, event); }
   syncContact(event = null) { return syncContact(this, event); }
   loadMore() { return loadMore(this); }
+
+  openChatContactDetail(event = null) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!this.contactIdValue) {
+      return;
+    }
+
+    const chatShell = this.element.closest('[data-controller~="chat"]');
+    if (chatShell) {
+      this.element.dispatchEvent(new CustomEvent("chat:open-contact", {
+        bubbles: true,
+        detail: { contactId: this.contactIdValue }
+      }));
+      return;
+    }
+
+    window.location.href = `/contact/${this.contactIdValue}`;
+  }
+
+  openMemberDetail(userName) {
+    const normalizedUserName = String(userName || "").trim();
+    if (!normalizedUserName) {
+      return;
+    }
+
+    fetch(`/chat_room/${this.idValue}/member_detail?user_name=${encodeURIComponent(normalizedUserName)}`, {
+      headers: { "Accept": "application/json" }
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`成员详情加载失败: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((member) => this.renderMemberDetail(member))
+      .catch((error) => {
+        console.error("成员详情加载失败", error);
+      });
+  }
+
+  closeMemberDetail(event = null) {
+    if (event?.target && this.memberDetailCard?.contains(event.target)) {
+      return;
+    }
+
+    this.memberDetailOverlay?.remove();
+    this.memberDetailOverlay = null;
+    this.memberDetailCard = null;
+  }
+
+  renderMemberDetail(member) {
+    this.closeMemberDetail();
+
+    const overlay = document.createElement("div");
+    overlay.className = "absolute inset-0 z-50 flex items-end justify-center bg-slate-950/20 px-4 py-4 backdrop-blur-[2px] sm:items-center";
+    overlay.addEventListener("click", (event) => this.closeMemberDetail(event));
+
+    const card = document.createElement("div");
+    card.className = "w-full max-w-sm overflow-hidden rounded-[1.75rem] bg-white shadow-2xl ring-1 ring-slate-200";
+    this.memberDetailCard = card;
+
+    const avatarUrl = member.avatar_url || member.big_head_img_url || member.small_head_img_url || "";
+    const displayName = member.display_name || member.remark || member.nick_name || member.user_name || "成员";
+    const location = [member.country, member.province, member.city].filter(Boolean).join(" ");
+    const fields = [
+      ["微信号", member.user_name],
+      ["别名", member.alias],
+      ["地区", location],
+      ["签名", member.signature],
+      ["手机号", member.phone_num_list]
+    ].filter(([, value]) => String(value || "").trim());
+
+    const header = document.createElement("div");
+    header.className = "bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.18),_transparent_58%),linear-gradient(135deg,#f8fafc,#e2e8f0)] px-6 py-6 text-center";
+    const avatar = document.createElement("div");
+    avatar.className = "mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-[1.35rem] bg-slate-200 text-2xl font-bold text-slate-600 shadow-lg";
+    if (avatarUrl) {
+      const img = document.createElement("img");
+      img.src = avatarUrl;
+      img.alt = displayName;
+      img.className = "h-full w-full object-cover";
+      avatar.appendChild(img);
+    } else {
+      avatar.textContent = displayName.slice(0, 1) || "?";
+    }
+    const name = document.createElement("div");
+    name.className = "mt-4 text-lg font-semibold text-slate-900";
+    name.textContent = displayName;
+    const user = document.createElement("div");
+    user.className = "mt-1 break-all text-xs text-slate-500";
+    user.textContent = member.user_name || "";
+    header.appendChild(avatar);
+    header.appendChild(name);
+    header.appendChild(user);
+
+    const body = document.createElement("div");
+    body.className = "space-y-3 px-5 py-5 text-sm";
+    fields.forEach(([label, value]) => {
+      const row = document.createElement("div");
+      row.className = "rounded-2xl bg-slate-50 px-4 py-3";
+      const labelEl = document.createElement("div");
+      labelEl.className = "text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400";
+      labelEl.textContent = label;
+      const valueEl = document.createElement("div");
+      valueEl.className = "mt-1 break-words text-slate-800";
+      valueEl.textContent = value;
+      row.appendChild(labelEl);
+      row.appendChild(valueEl);
+      body.appendChild(row);
+    });
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "mx-5 mb-5 w-[calc(100%-2.5rem)] rounded-full bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700";
+    close.textContent = "关闭";
+    close.addEventListener("click", () => this.closeMemberDetail());
+
+    card.appendChild(header);
+    card.appendChild(body);
+    card.appendChild(close);
+    overlay.appendChild(card);
+    this.element.appendChild(overlay);
+    this.memberDetailOverlay = overlay;
+  }
 
   matchesCurrentRoom(payload) {
     return String(payload?.chat_room_id || "") === String(this.idValue);
