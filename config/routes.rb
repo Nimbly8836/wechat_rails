@@ -48,6 +48,11 @@ Rails.application.routes.draw do
       get :chat_members
       get :member_detail
       put :sync_chat_contact
+      post :upload_background_image
+      get "background_image/:filename",
+          action: :background_image,
+          as: :background_image,
+          constraints: { filename: /[^\/]+/ }
     end
   end
 

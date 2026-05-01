@@ -1,4 +1,7 @@
+require "fileutils"
+require "marcel"
 require "open-uri"
+require "securerandom"
 
 class ChatRoomController < ApplicationController
   def index
@@ -112,6 +115,52 @@ class ChatRoomController < ApplicationController
     )
   end
 
+  def upload_background_image
+    chat_room = ChatRoom.find(params[:id])
+    image = params[:image]
+
+    unless valid_background_upload?(image)
+      render json: { success: false, error: "请选择图片文件" }, status: :unprocessable_entity
+      return
+    end
+
+    filename = background_filename(image)
+    directory = background_directory(chat_room)
+    path = directory.join(filename)
+
+    FileUtils.mkdir_p(directory)
+    image.tempfile.rewind if image.tempfile.respond_to?(:rewind)
+    File.open(path, "wb") do |file|
+      IO.copy_stream(image.tempfile, file)
+    end
+
+    render json: {
+      success: true,
+      url: background_image_chat_room_path(chat_room, filename: filename)
+    }
+  rescue StandardError => e
+    Rails.logger.error("chat background upload failed chat_room_id=#{params[:id]}: #{e.class} #{e.message}")
+    render json: { success: false, error: "背景图片保存失败" }, status: :internal_server_error
+  end
+
+  def background_image
+    chat_room = ChatRoom.find(params[:id])
+    filename = params[:filename].to_s
+
+    unless filename.present? && filename == File.basename(filename)
+      head :not_found
+      return
+    end
+
+    path = background_directory(chat_room).join(filename)
+    unless File.file?(path)
+      head :not_found
+      return
+    end
+
+    send_file path, disposition: "inline", type: Marcel::MimeType.for(Pathname.new(path), name: filename)
+  end
+
   private
 
   def limit_param(default)
@@ -135,5 +184,28 @@ class ChatRoomController < ApplicationController
       "chat room avatar fetch failed contact_id=#{contact.id}: #{e.class} #{e.message}"
     )
     nil
+  end
+
+  def valid_background_upload?(image)
+    image.respond_to?(:content_type) &&
+      image.respond_to?(:tempfile) &&
+      image.tempfile.present? &&
+      image.content_type.to_s.start_with?("image/")
+  end
+
+  def background_directory(chat_room)
+    Rails.root.join("storage", "chat_backgrounds", chat_room.id.to_s)
+  end
+
+  def background_filename(image)
+    "#{SecureRandom.hex(16)}#{background_extension(image)}"
+  end
+
+  def background_extension(image)
+    extension = File.extname(image.original_filename.to_s).downcase if image.respond_to?(:original_filename)
+    return extension if extension.present?
+
+    subtype = image.content_type.to_s.split("/", 2).last.to_s.gsub(/[^a-z0-9]/i, "")
+    subtype.present? ? ".#{subtype.downcase}" : ".img"
   end
 end

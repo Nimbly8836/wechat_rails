@@ -1,4 +1,5 @@
 require "test_helper"
+require "fileutils"
 require "securerandom"
 
 class ChatRoomControllerTest < ActionDispatch::IntegrationTest
@@ -43,6 +44,12 @@ class ChatRoomControllerTest < ActionDispatch::IntegrationTest
       real_msg_type: 1,
       content: "聊天室列表搜索命中"
     )
+
+    FileUtils.rm_rf(Rails.root.join("storage", "chat_backgrounds", @chat_room.id.to_s))
+  end
+
+  teardown do
+    FileUtils.rm_rf(Rails.root.join("storage", "chat_backgrounds", @chat_room.id.to_s)) if @chat_room
   end
 
   test "chat_members supports keyword search" do
@@ -88,5 +95,52 @@ class ChatRoomControllerTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body)
     assert_equal contact.id, payload["contact_id"]
     assert_equal contact.user_name, payload["wx_id"]
+  end
+
+  test "upload_background_image stores image and returns url" do
+    image = fixture_file_upload("files/background.png", "image/png")
+
+    post upload_background_image_chat_room_path(@chat_room), params: { image: image }
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal true, payload["success"]
+    assert_match %r{\A/chat_room/#{@chat_room.id}/background_image/[^/]+\.png\z}, payload["url"]
+
+    filename = File.basename(payload["url"])
+    stored_path = Rails.root.join("storage", "chat_backgrounds", @chat_room.id.to_s, filename)
+    assert_path_exists stored_path
+    assert_equal File.binread(file_fixture("background.png")), File.binread(stored_path)
+  end
+
+  test "upload_background_image rejects non image files" do
+    file = fixture_file_upload("files/not-image.txt", "text/plain")
+
+    post upload_background_image_chat_room_path(@chat_room), params: { image: file }
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal false, payload["success"]
+    assert_equal "请选择图片文件", payload["error"]
+    assert_empty Dir.glob(Rails.root.join("storage", "chat_backgrounds", @chat_room.id.to_s, "*"))
+  end
+
+  test "background_image serves stored image" do
+    filename = "stored.png"
+    directory = Rails.root.join("storage", "chat_backgrounds", @chat_room.id.to_s)
+    FileUtils.mkdir_p(directory)
+    File.binwrite(directory.join(filename), File.binread(file_fixture("background.png")))
+
+    get background_image_chat_room_path(@chat_room, filename: filename)
+
+    assert_response :success
+    assert_equal "image/png", response.media_type
+    assert_equal File.binread(file_fixture("background.png")), response.body
+  end
+
+  test "background_image rejects traversal filenames" do
+    get "/chat_room/#{@chat_room.id}/background_image/%2E%2E%2Fsecret.png"
+
+    assert_response :not_found
   end
 end
