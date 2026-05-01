@@ -13,6 +13,7 @@ class MessagesController < ApplicationController
     query = params[:q].to_s.strip
     before_id = params[:before_id] # 可选，用于加载更多消息
     after_id = params[:after_id]
+    include_id = params[:include_id]
 
     if query.present?
       messages = search_messages_scope(chat_room_id, query)
@@ -20,14 +21,23 @@ class MessagesController < ApplicationController
       return
     end
 
-    messages = messages_scope(chat_room_id)
+    base_scope = messages_scope(chat_room_id)
+    messages = base_scope
 
     # 如果前端传了 before_id，就取更早的消息
     messages = messages.where("id < ?", before_id) if before_id.present?
     messages = messages.where("id > ?", after_id) if after_id.present?
 
     messages = messages.order(id: :desc).limit(100).to_a
-    render json: serialize_messages(messages.reverse, chat_room_id)
+    if include_id.present?
+      included_message = base_scope.find_by(id: include_id)
+      already_included = included_message &&
+        messages.any? { |message| message.id == included_message.id }
+      messages << included_message if included_message && !already_included
+    end
+
+    messages.sort_by!(&:id)
+    render json: serialize_messages(messages, chat_room_id)
   end
 
   def show

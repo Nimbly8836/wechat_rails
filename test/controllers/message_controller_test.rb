@@ -218,6 +218,24 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     assert_equal "no-cache", response.headers["Pragma"]
   end
 
+  test "index includes notified message id when after id is already ahead" do
+    notified = create_message!(
+      new_msg_id: 9_000_000_000_000_001_410,
+      content: "通知补拉测试"
+    )
+    newer = create_message!(
+      new_msg_id: 9_000_000_000_000_001_411,
+      content: "本地缓存较新的消息"
+    )
+
+    get chat_room_messages_path(@chat_room),
+      params: { after_id: newer.id, include_id: notified.id }
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal [notified.id], payload.map { |item| item["id"] }
+  end
+
   test "index serializes and backfills emoji md5 for emoji messages" do
     emoji_md5 = SecureRandom.hex(16)
     emoji_message = create_message!(

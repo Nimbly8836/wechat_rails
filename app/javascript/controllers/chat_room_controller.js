@@ -624,13 +624,16 @@ export default class extends Controller {
     });
   }
 
-  fetchMessages({ beforeId = null, afterId = null } = {}) {
+  fetchMessages({ beforeId = null, afterId = null, includeId = null } = {}) {
     const params = new URLSearchParams();
     if (beforeId != null) {
       params.set("before_id", beforeId);
     }
     if (afterId != null) {
       params.set("after_id", afterId);
+    }
+    if (includeId != null) {
+      params.set("include_id", includeId);
     }
 
     const query = params.toString();
@@ -1473,7 +1476,7 @@ export default class extends Controller {
       return this.loadMessages();
     }
 
-    return this.fetchMessages({ afterId: lastMsgId })
+    return this.fetchMessages({ afterId: lastMsgId, includeId: msg?.message_id })
       .then(data => {
         if (!data.length) {
           return 0;
