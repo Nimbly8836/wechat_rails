@@ -12,6 +12,19 @@
   <%= csp_meta_tag %>
 
   <%= yield :head %>
+  <script>
+    (() => {
+      try {
+        const raw = window.localStorage.getItem("wechat-rails:v2:global-theme");
+        const theme = raw ? JSON.parse(raw)?.data : "light";
+        document.documentElement.classList.toggle("tg-theme-dark", theme === "dark");
+        document.documentElement.classList.toggle("tg-theme-light", theme !== "dark");
+        document.documentElement.style.colorScheme = theme === "dark" ? "dark" : "light";
+      } catch (_) {
+        document.documentElement.classList.add("tg-theme-light");
+      }
+    })();
+  </script>
 
   <%= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
   <link rel="icon" href="/fly.svg" type="image/svg">

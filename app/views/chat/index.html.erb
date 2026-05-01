@@ -10,6 +10,18 @@
        data-chat-target="sidebar">
     <div class="tg-folder-rail">
       <div class="min-h-0 flex-1 overflow-hidden" data-chat-target="folderBar"></div>
+      <div class="tg-global-theme-control">
+        <button type="button"
+                class="tg-global-theme-toggle"
+                data-chat-target="globalThemeToggle"
+                data-action="click->chat#toggleGlobalTheme"
+                aria-label="切换全局日夜主题"
+                aria-pressed="false"
+                title="切换到黑夜模式">
+          <span class="tg-global-theme-icon" data-chat-target="globalThemeIcon">☾</span>
+          <span class="tg-global-theme-label" data-chat-target="globalThemeLabel">黑夜</span>
+        </button>
+      </div>
     </div>
 
     <div class="tg-sidebar-panel flex min-w-0 flex-1 flex-col">
@@ -215,12 +227,12 @@
 
             <div class="flex items-center gap-2">
               <button type="button"
-                      class="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                      class="tg-secondary-action-button"
                       data-action="click->chat#requestNotificationPermission">
                 请求权限
               </button>
               <button type="button"
-                      class="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
+                      class="tg-primary-action-button"
                       data-action="click->chat#sendTestNotification">
                 测试通知
               </button>

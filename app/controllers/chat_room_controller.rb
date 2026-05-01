@@ -5,20 +5,26 @@ class ChatRoomController < ApplicationController
   end
 
   def create
-    Contact.find(params[:contact_id]).then do |contact|
-      chat_room = ChatRoom.create({
-                                    contact_id: contact.id,
-                                    name: contact.remark || contact.nick_name,
-                                    wx_id: contact.user_name,
-                                    avatar: URI.open(contact.avatar_url).read,
-                                    members: contact.member_list.as_json
-                                  })
+    contact = Contact.find(params[:contact_id])
+    chat_room = ChatRoom.find_or_initialize_by(contact_id: contact.id)
+    created = chat_room.new_record?
+
+    if created
+      chat_room.assign_attributes(
+        name: contact.display_name,
+        wx_id: contact.user_name,
+        avatar: contact_avatar_bytes(contact),
+        members: contact.member_list.as_json
+      )
+      chat_room.save!
+
       SyncChatRoomMembersJob.perform_later(chat_room.id,
                                            contact.user_name,
                                            contact.own_wxid,
                                            contact.member_list.as_json)
-      render json: chat_room.as_json(only: [:id, :name, :contact_id])
     end
+
+    render json: chat_room.as_json(only: [ :id, :name, :contact_id, :wx_id ])
   end
 
   def new
@@ -117,5 +123,17 @@ class ChatRoomController < ApplicationController
 
   def new_chat_room_params
     params.except(:contact_id, :name, :avatar_url, :wx_id)
+  end
+
+  def contact_avatar_bytes(contact)
+    avatar_url = contact.avatar_url.to_s.strip
+    return nil if avatar_url.blank?
+
+    URI.open(avatar_url, read_timeout: 3).read
+  rescue OpenURI::HTTPError, SocketError, IOError, SystemCallError, URI::InvalidURIError => e
+    Rails.logger.warn(
+      "chat room avatar fetch failed contact_id=#{contact.id}: #{e.class} #{e.message}"
+    )
+    nil
   end
 end

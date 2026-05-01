@@ -61,4 +61,32 @@ class ChatRoomControllerTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body)
     assert_includes payload.map { |room| room["id"] }, @chat_room.id
   end
+
+  test "create returns existing chat room for contact id" do
+    post chat_room_index_path, params: { contact_id: @contact.id }, as: :json
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal @chat_room.id, payload["id"]
+    assert_equal @contact.id, payload["contact_id"]
+  end
+
+  test "create builds chat room for contact without avatar url" do
+    contact = Contact.create!(
+      user_name: "friend-#{SecureRandom.hex(4)}",
+      own_wxid: "owner-#{SecureRandom.hex(4)}",
+      nick_name: "新联系人",
+      big_head_img_url: nil,
+      small_head_img_url: nil
+    )
+
+    assert_difference("ChatRoom.count", 1) do
+      post chat_room_index_path, params: { contact_id: contact.id }, as: :json
+    end
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal contact.id, payload["contact_id"]
+    assert_equal contact.user_name, payload["wx_id"]
+  end
 end

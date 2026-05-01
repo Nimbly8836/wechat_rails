@@ -141,34 +141,33 @@
 
   <!-- 二级菜单 -->
   <div data-chat-room-target="menu"
-       class="hidden absolute right-3 top-14 w-60 bg-slate-900/95 text-slate-100 shadow-2xl
-       rounded-2xl ring-1 ring-white/10 overflow-hidden z-100 backdrop-blur">
+       class="tg-room-actions-menu hidden absolute right-3 top-14 w-60 overflow-hidden z-100">
     <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm font-medium transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            class="tg-room-actions-menu-item"
             data-action="click->chat-room#openAppearanceSettings">
       <span aria-hidden="true">🎨</span>
       <span>外观设置</span>
     </button>
     <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            class="tg-room-actions-menu-item"
             data-action="click->chat-room#handleMenuClose">
       <span aria-hidden="true">⚙️</span>
       <span>设置界面</span>
     </button>
     <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            class="tg-room-actions-menu-item"
             data-action="click->chat-room#syncMessages">
       <span aria-hidden="true">🔄</span>
       <span>同步信息</span>
     </button>
     <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            class="tg-room-actions-menu-item"
             data-action="click->chat-room#syncMembers">
       <span aria-hidden="true">👥</span>
       <span>同步群组联系人</span>
     </button>
     <button type="button"
-            class="flex items-center gap-2 w-full px-4 py-3 text-sm transition-colors duration-150 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none"
+            class="tg-room-actions-menu-item"
             data-action="click->chat-room#syncContact">
       <span aria-hidden="true">🧭</span>
       <span>更新聊天室信息</span>

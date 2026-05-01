@@ -1,6 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 import { chatStorageKeys, readCache, writeCache } from "utils/chat_storage"
 import { DEFAULT_BADGE_LABELS, badgeLabelFor, loadBadgeLabels } from "utils/chat_badges"
+import {
+  applyGlobalTheme,
+  readGlobalTheme,
+  toggleGlobalThemeValue,
+  writeGlobalTheme
+} from "utils/global_theme"
 
 const DEFAULT_NOTIFICATION_SETTINGS = {
   enabled: true,
@@ -55,7 +61,10 @@ export default class extends Controller {
     "notificationToggle",
     "notificationHiddenOnly",
     "groupBadgeInput",
-    "officialBadgeInput"
+    "officialBadgeInput",
+    "globalThemeToggle",
+    "globalThemeIcon",
+    "globalThemeLabel"
   ]
 
   connect() {
@@ -73,6 +82,7 @@ export default class extends Controller {
     this.collapsedContactGroups = this.loadCollapsedContactGroups()
     this.notificationSettings = this.loadNotificationSettings()
     this.badgeLabels = loadBadgeLabels()
+    this.globalTheme = applyGlobalTheme(readGlobalTheme())
     this.currentRoomId = null
     this.sidebarSearchTimer = null
     this.sidebarSearchRequestId = 0
@@ -99,6 +109,7 @@ export default class extends Controller {
     this.ensureActiveFolder()
     this.syncNotificationUi()
     this.syncBadgeLabelUi()
+    this.syncGlobalThemeUi()
     this.applyContactGroupVisibility()
     this.renderFolderBar()
     this.refreshChatFolders()
@@ -685,6 +696,28 @@ export default class extends Controller {
     this.notificationSettings.onlyWhenHidden = !!event?.target?.checked
     this.persistNotificationSettings()
     this.syncNotificationUi()
+  }
+
+  toggleGlobalTheme(event = null) {
+    event?.stopPropagation()
+    this.globalTheme = applyGlobalTheme(writeGlobalTheme(
+      toggleGlobalThemeValue(this.globalTheme)
+    ))
+    this.syncGlobalThemeUi()
+  }
+
+  syncGlobalThemeUi() {
+    const dark = this.globalTheme === "dark"
+    if (this.hasGlobalThemeToggleTarget) {
+      this.globalThemeToggleTarget.setAttribute("aria-pressed", String(dark))
+      this.globalThemeToggleTarget.title = dark ? "切换到白天模式" : "切换到黑夜模式"
+    }
+    if (this.hasGlobalThemeIconTarget) {
+      this.globalThemeIconTarget.textContent = dark ? "☀" : "☾"
+    }
+    if (this.hasGlobalThemeLabelTarget) {
+      this.globalThemeLabelTarget.textContent = dark ? "白天" : "黑夜"
+    }
   }
 
   async requestNotificationPermission(event = null) {

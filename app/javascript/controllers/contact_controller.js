@@ -30,32 +30,30 @@ export default class extends Controller {
   }
 
   toChatRoom() {
-    fetch(`/chat_room/${this.contactValue.id}`)
+    fetch("/chat_room", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+      },
+      body: JSON.stringify({
+        contact_id: this.contactValue.id
+      })
+    })
       .then((resp) => {
-        if (resp.ok) {
-          this.openChat(this.contactValue.id)
-          return null
+        if (!resp.ok) {
+          throw new Error(`发起聊天失败: ${resp.status}`)
         }
-
-        return fetch("chat_room", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
-          },
-          body: JSON.stringify({
-            contact_id: this.contactValue.id,
-            wx_id: this.contactValue.user_name,
-            name: this.contactValue.remark || this.contactValue.nick_name,
-            ...this.contactValue
-          }),
-        }).then((createResp) => createResp.json())
+        return resp.json()
       })
       .then((data) => {
         if (data?.id) {
           this.openChat(data.id)
         }
+      })
+      .catch((error) => {
+        console.error("发起聊天失败", error)
       })
   }
 
