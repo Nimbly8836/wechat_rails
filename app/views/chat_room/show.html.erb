@@ -55,7 +55,7 @@
       </button>
       <div class="min-w-0 leading-tight">
         <div class="truncate font-semibold text-slate-900"><%= @chat_room.name.presence || "聊天窗口" %></div>
-        <div class="hidden text-xs text-slate-500 sm:block">实时消息</div>
+        <div class="hidden text-xs text-slate-500 sm:block"></div>
       </div>
     </div>
     <div class="flex items-center gap-3 text-slate-500">
@@ -84,10 +84,6 @@
        class="hidden absolute right-3 top-16 z-40 w-[min(26rem,calc(100%-1.5rem))] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white/95 shadow-2xl backdrop-blur">
     <div class="border-b border-slate-100 px-4 py-3">
       <div class="flex items-center justify-between gap-3">
-        <div>
-          <div class="text-sm font-semibold text-slate-900">搜索聊天记录</div>
-          <div class="mt-1 text-xs text-slate-500">支持中文、日文、韩文和拼音缩写检索。</div>
-        </div>
         <button type="button"
                 class="rounded-full px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
                 data-action="click->chat-room#closeSearchPanel">
@@ -105,7 +101,7 @@
     </div>
     <div class="max-h-[22rem] overflow-y-auto px-2 py-2" data-chat-room-target="searchResults">
       <div class="px-4 py-8 text-center text-sm text-slate-400" data-chat-room-target="searchEmpty">
-        输入关键词后开始搜索聊天记录
+        搜索聊天记录
       </div>
     </div>
   </div>
