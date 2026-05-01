@@ -125,6 +125,25 @@ class ChatRoomControllerTest < ActionDispatch::IntegrationTest
     assert_empty Dir.glob(Rails.root.join("storage", "chat_backgrounds", @chat_room.id.to_s, "*"))
   end
 
+  test "upload_background_image rejects forged image content type" do
+    tempfile = file_fixture("not-image.txt").open
+    file = ActionDispatch::Http::UploadedFile.new(
+      filename: "forged.png",
+      type: "image/png",
+      tempfile: tempfile
+    )
+
+    post upload_background_image_chat_room_path(@chat_room), params: { image: file }
+
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal false, payload["success"]
+    assert_equal "请选择图片文件", payload["error"]
+    assert_empty Dir.glob(Rails.root.join("storage", "chat_backgrounds", @chat_room.id.to_s, "*"))
+  ensure
+    tempfile&.close
+  end
+
   test "background_image serves stored image" do
     filename = "stored.png"
     directory = Rails.root.join("storage", "chat_backgrounds", @chat_room.id.to_s)
@@ -138,9 +157,22 @@ class ChatRoomControllerTest < ActionDispatch::IntegrationTest
     assert_equal File.binread(file_fixture("background.png")), response.body
   end
 
-  test "background_image rejects traversal filenames" do
+  test "background_image returns 404 for encoded slash traversal filename" do
     get "/chat_room/#{@chat_room.id}/background_image/%2E%2E%2Fsecret.png"
 
     assert_response :not_found
+  end
+
+  test "background_image does not serve same basename from sibling directory" do
+    filename = "shared.png"
+    sibling_directory = Rails.root.join("storage", "chat_backgrounds", "#{@chat_room.id}-sibling")
+    FileUtils.mkdir_p(sibling_directory)
+    File.binwrite(sibling_directory.join(filename), File.binread(file_fixture("background.png")))
+
+    get background_image_chat_room_path(@chat_room, filename: filename)
+
+    assert_response :not_found
+  ensure
+    FileUtils.rm_rf(sibling_directory) if sibling_directory
   end
 end
