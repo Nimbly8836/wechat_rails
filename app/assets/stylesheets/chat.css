@@ -660,6 +660,39 @@ body.tg-mobile-app {
   font-size: 16px;
 }
 
+.tg-app-shell.tg-has-chat-background .tg-folder-rail,
+.tg-app-shell.tg-has-chat-background .tg-sidebar-panel,
+.tg-app-shell.tg-has-chat-background .tg-main-panel,
+.tg-app-shell.tg-has-chat-background .telegram-chat-room {
+  background: rgba(248, 250, 252, 0.58);
+  backdrop-filter: blur(10px);
+}
+
+.tg-app-shell.tg-has-chat-background .telegram-message-list {
+  background: transparent;
+}
+
+.tg-app-shell.tg-has-chat-background .telegram-message-list::before {
+  opacity: 0.12;
+}
+
+.tg-app-shell.tg-has-chat-background .telegram-chat-header,
+.tg-app-shell.tg-has-chat-background .telegram-composer {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+html.tg-theme-dark .tg-app-shell.tg-has-chat-background .tg-folder-rail,
+html.tg-theme-dark .tg-app-shell.tg-has-chat-background .tg-sidebar-panel,
+html.tg-theme-dark .tg-app-shell.tg-has-chat-background .tg-main-panel,
+html.tg-theme-dark .tg-app-shell.tg-has-chat-background .telegram-chat-room {
+  background: rgba(15, 23, 42, 0.62);
+}
+
+html.tg-theme-dark .tg-app-shell.tg-has-chat-background .telegram-chat-header,
+html.tg-theme-dark .tg-app-shell.tg-has-chat-background .telegram-composer {
+  background: rgba(15, 23, 42, 0.74);
+}
+
 .tg-ui-icon {
   object-fit: contain;
   filter: saturate(1.18) contrast(1.14);

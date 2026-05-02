@@ -282,6 +282,7 @@ export function applyTheme(controller, { refreshBubbles = true } = {}) {
   const shell = controller.element?.closest(".tg-app-shell");
   const backgroundTarget = shell || controller.element;
 
+  shell?.classList.toggle("tg-has-chat-background", !!backgroundImageValue);
   applyBackgroundStyles(backgroundTarget, backgroundColor, backgroundImageValue);
 
   if (controller.element) {
