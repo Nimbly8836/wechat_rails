@@ -54,6 +54,7 @@ export default class extends Controller {
     "mobileHeader",
     "mobileTitle",
     "sidebarTitle",
+    "desktopSidebarToggle",
     "resizer",
     "notificationPanel",
     "notificationButton",
@@ -79,6 +80,7 @@ export default class extends Controller {
     this.chatFolders = this.loadChatFolders()
     this.activeChatFolderId = this.loadActiveChatFolderId()
     this.activeChatSection = this.loadActiveChatSection()
+    this.desktopSidebarCollapsed = this.readDesktopSidebarCollapsed()
     this.collapsedContactGroups = this.loadCollapsedContactGroups()
     this.notificationSettings = this.loadNotificationSettings()
     this.badgeLabels = loadBadgeLabels()
@@ -532,15 +534,38 @@ export default class extends Controller {
     document.documentElement.style.setProperty("--tg-keyboard-offset", `${Math.round(keyboardOffset)}px`)
   }
 
+  readDesktopSidebarCollapsed() {
+    const [namespace, identifier] = chatStorageKeys.desktopSidebarCollapsed()
+    return readCache(namespace, identifier, false) === true
+  }
+
+  persistDesktopSidebarCollapsed() {
+    const [namespace, identifier] = chatStorageKeys.desktopSidebarCollapsed()
+    writeCache(namespace, identifier, this.desktopSidebarCollapsed === true)
+  }
+
   applySidebarState() {
     if (this.isMobileViewport()) {
+      this.sidebarTarget.classList.remove("tg-sidebar-collapsed")
       this.sidebarTarget.classList.toggle("-translate-x-full", !this.isSidebarOpen)
       this.overlayTarget.classList.toggle("hidden", !this.isSidebarOpen)
       this.resizerTarget.classList.add("hidden")
+      if (this.hasDesktopSidebarToggleTarget) {
+        this.desktopSidebarToggleTarget.classList.add("hidden")
+      }
     } else {
       this.sidebarTarget.classList.remove("-translate-x-full")
       this.overlayTarget.classList.add("hidden")
-      this.resizerTarget.classList.remove("hidden")
+      this.sidebarTarget.classList.toggle("tg-sidebar-collapsed", this.desktopSidebarCollapsed)
+      this.resizerTarget.classList.toggle("hidden", this.desktopSidebarCollapsed)
+      if (this.hasDesktopSidebarToggleTarget) {
+        this.desktopSidebarToggleTarget.classList.toggle("hidden", !this.desktopSidebarCollapsed)
+      }
+      if (this.desktopSidebarCollapsed) {
+        this.sidebarTarget.style.width = "0px"
+      } else if (this.sidebarTarget.style.width === "0px") {
+        this.sidebarTarget.style.width = ""
+      }
     }
 
     this.updateToggleButton()
@@ -579,6 +604,18 @@ export default class extends Controller {
   toggleSidebar(event = null) {
     event?.stopPropagation()
     this.isSidebarOpen = !this.isSidebarOpen
+    this.applySidebarState()
+  }
+
+  toggleDesktopSidebar(event = null) {
+    event?.stopPropagation()
+    if (this.isMobileViewport()) {
+      this.toggleSidebar(event)
+      return
+    }
+
+    this.desktopSidebarCollapsed = !this.desktopSidebarCollapsed
+    this.persistDesktopSidebarCollapsed()
     this.applySidebarState()
   }
 
@@ -1340,7 +1377,7 @@ export default class extends Controller {
   }
 
   startResize(event) {
-    if (this.isMobileViewport()) {
+    if (this.isMobileViewport() || this.desktopSidebarCollapsed) {
       return
     }
 

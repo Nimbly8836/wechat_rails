@@ -536,6 +536,37 @@ body.tg-mobile-app {
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.98) 100%);
 }
 
+.tg-desktop-sidebar-toggle {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 35;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  background: rgba(255, 255, 255, 0.88);
+  color: #475569;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+@media (min-width: 640px) {
+  .tg-desktop-sidebar-toggle:not(.hidden) {
+    display: flex;
+  }
+
+  #sidebar.tg-sidebar-collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    pointer-events: none;
+    box-shadow: none;
+  }
+}
+
 .tg-chat-empty-state {
   position: relative;
   overflow: hidden;

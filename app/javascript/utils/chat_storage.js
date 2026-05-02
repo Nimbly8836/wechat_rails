@@ -82,6 +82,7 @@ export const chatStorageKeys = {
   chatRoomList: () => ["chat-room-list", ""],
   activeChatFolder: () => ["active-chat-folder", ""],
   activeChatSection: () => ["active-chat-section", ""],
+  desktopSidebarCollapsed: () => ["desktop-sidebar-collapsed", ""],
   collapsedContactGroups: () => ["collapsed-contact-groups", ""],
   chatRoomTheme: (roomId) => ["chat-room-theme", String(roomId)],
   chatRoomMessages: (roomId) => ["chat-room-messages", String(roomId)],
