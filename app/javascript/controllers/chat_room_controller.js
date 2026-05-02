@@ -115,6 +115,8 @@ import {
   updateBubbleColor,
   updateBackgroundImage,
   clearBackgroundImage,
+  openBackgroundUpload,
+  uploadBackgroundImage,
   resetTheme,
   updateFontFamily,
   updateCustomFont,
@@ -170,7 +172,8 @@ const EMOJI_REQUEST_VERSION = "20260330b";
 export default class extends Controller {
   static targets = ["messageList", "input", "emptyMessage", "menu",
     "showMore", "themePanel", "backgroundInput", "bubbleInput",
-    "backgroundImageInput", "fileInput", "uploadStatus",
+    "backgroundImageInput", "backgroundUploadInput", "backgroundUploadStatus",
+    "fileInput", "uploadStatus",
     "fontSelect", "fontCustomInput", "attachmentSelect", "quoteComposer",
     "quoteComposerMeta", "quoteComposerContent", "searchPanel",
     "searchInput", "searchResults", "searchEmpty", "membersPanel",
@@ -1246,6 +1249,8 @@ export default class extends Controller {
   updateBubbleColor(event) { return updateBubbleColor(this, event); }
   updateBackgroundImage(event) { return updateBackgroundImage(this, event); }
   clearBackgroundImage(event) { return clearBackgroundImage(this, event); }
+  openBackgroundUpload(event) { return openBackgroundUpload(this, event); }
+  uploadBackgroundImage(event) { return uploadBackgroundImage(this, event); }
   resetTheme(event = null) { return resetTheme(this, event); }
   updateFontFamily(event) { return updateFontFamily(this, event); }
   updateCustomFont(event) { return updateCustomFont(this, event); }

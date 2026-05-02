@@ -201,7 +201,21 @@
                class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                data-chat-room-target="backgroundImageInput"
                data-action="input->chat-room#updateBackgroundImage"/>
-        <p class="mt-2 text-xs text-slate-500">支持网络图片链接，留空可恢复纯色背景。</p>
+        <div class="mt-2 flex items-center gap-2">
+          <input type="file"
+                 accept="image/*"
+                 class="hidden"
+                 data-chat-room-target="backgroundUploadInput"
+                 data-action="change->chat-room#uploadBackgroundImage"/>
+          <button type="button"
+                  class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                  data-action="click->chat-room#openBackgroundUpload">
+            上传图片
+          </button>
+          <span class="min-w-0 truncate text-xs text-slate-400"
+                data-chat-room-target="backgroundUploadStatus"></span>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">支持网络图片链接或上传图片，留空可恢复纯色背景。</p>
       </div>
       <div>
         <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400">
