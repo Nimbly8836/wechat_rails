@@ -770,9 +770,9 @@ export default class extends Controller {
     if (this.hasGlobalThemeIconTarget) {
       this.globalThemeIconTarget.textContent = dark ? "☀" : "☾"
     }
-    if (this.hasGlobalThemeLabelTarget) {
-      this.globalThemeLabelTarget.textContent = dark ? "白天" : "黑夜"
-    }
+    // if (this.hasGlobalThemeLabelTarget) {
+    //   this.globalThemeLabelTarget.textContent = dark ? "白天" : "黑夜"
+    // }
   }
 
   updateGlobalBackgroundImage(event) {
