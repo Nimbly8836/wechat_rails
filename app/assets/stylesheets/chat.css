@@ -559,7 +559,12 @@ body.tg-mobile-app {
   }
 
   .tg-app-shell.tg-sidebar-rail-only .tg-desktop-sidebar-toggle {
-    left: 102px;
+    top: 50%;
+    left: 88px;
+    width: 32px;
+    height: 56px;
+    border-radius: 0 16px 16px 0;
+    transform: translateY(-50%);
   }
 
   #sidebar.tg-sidebar-collapsed {
@@ -669,7 +674,7 @@ body.tg-mobile-app {
 
 .tg-app-shell.tg-has-chat-background .telegram-message-list {
   background-color: transparent;
-  background-size: cover;
+  background-size: auto;
   background-repeat: no-repeat;
   background-position: center;
 }

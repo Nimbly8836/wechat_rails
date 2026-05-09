@@ -88,7 +88,7 @@ function applyBackgroundStyles(element, backgroundColor, backgroundImageValue) {
   element.style.backgroundColor = backgroundColor;
   if (backgroundImageValue) {
     element.style.backgroundImage = backgroundImageValue;
-    element.style.backgroundSize = "cover";
+    element.style.backgroundSize = "auto";
     element.style.backgroundRepeat = "no-repeat";
     element.style.backgroundPosition = "center";
   } else {
@@ -306,7 +306,7 @@ export function applyTheme(controller, { refreshBubbles = true } = {}) {
     const list = controller.messageListTarget;
     if (backgroundImageValue) {
       applyBackgroundStyles(list, backgroundColor, backgroundImageValue);
-      list.style.backgroundAttachment = "local";
+      list.style.backgroundAttachment = "fixed";
     } else {
       list.style.backgroundColor = backgroundColor;
       list.style.backgroundImage = "";

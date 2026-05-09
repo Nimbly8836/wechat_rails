@@ -77,4 +77,25 @@ class ChatControllerTest < ActionDispatch::IntegrationTest
     assert_match(/globalBackgroundImage/, chat_controller)
     assert_match(/data-chat-target="globalBackgroundImageInput"/, chat_view)
   end
+
+  test "chat background image is not scaled or scrolled with messages" do
+    css = Rails.root.join("app/assets/stylesheets/chat.css").read
+    chat_room_theme = Rails.root.join("app/javascript/controllers/chat_room/chat_room_theme.js").read
+
+    assert_match(/\.tg-app-shell\.tg-has-chat-background \.telegram-message-list\s*\{[^}]*background-size:\s*auto/m,
+      css)
+    assert_match(/list\.style\.backgroundAttachment\s*=\s*"fixed"/, chat_room_theme)
+    assert_no_match(/list\.style\.backgroundAttachment\s*=\s*"local"/, chat_room_theme)
+  end
+
+  test "collapsed sidebar toggle avoids chat header avatar area" do
+    css = Rails.root.join("app/assets/stylesheets/chat.css").read
+
+    assert_match(/\.tg-app-shell\.tg-sidebar-rail-only \.tg-desktop-sidebar-toggle\s*\{[^}]*left:\s*88px/m,
+      css)
+    assert_match(/\.tg-app-shell\.tg-sidebar-rail-only \.tg-desktop-sidebar-toggle\s*\{[^}]*top:\s*50%/m,
+      css)
+    assert_no_match(/\.tg-app-shell\.tg-sidebar-rail-only \.tg-desktop-sidebar-toggle\s*\{[^}]*left:\s*102px/m,
+      css)
+  end
 end
