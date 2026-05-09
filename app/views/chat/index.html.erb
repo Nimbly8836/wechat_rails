@@ -258,6 +258,25 @@
             <div class="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
               <div class="flex items-center justify-between gap-3">
                 <div>
+                  <div class="text-sm font-semibold text-slate-900">聊天背景图片</div>
+                  <div class="mt-1 text-xs text-slate-500">没有单独背景的聊天会使用这里的图片。</div>
+                </div>
+                <button type="button"
+                        class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                        data-action="click->chat#clearGlobalBackgroundImage">
+                  清除
+                </button>
+              </div>
+              <input type="url"
+                     class="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                     placeholder="输入图片链接，例如 https://example.com/bg.jpg"
+                     data-chat-target="globalBackgroundImageInput"
+                     data-action="input->chat#updateGlobalBackgroundImage">
+            </div>
+
+            <div class="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+              <div class="flex items-center justify-between gap-3">
+                <div>
                   <div class="text-sm font-semibold text-slate-900">标签展示</div>
                   <div class="mt-1 text-xs text-slate-500">统一群聊和公众号标签样式，文案可直接修改，留空会回到默认值。</div>
                 </div>

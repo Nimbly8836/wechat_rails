@@ -53,4 +53,28 @@ class ChatControllerTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body)
     assert_includes payload["rooms"].map { |room| room["id"] }, @message_chat_room.id
   end
+
+  test "collapsed desktop sidebar keeps folder rail visible" do
+    css = Rails.root.join("app/assets/stylesheets/chat.css").read
+    js = Rails.root.join("app/javascript/controllers/chat_controller.js").read
+
+    assert_no_match(/#sidebar\.tg-sidebar-collapsed\s*\{[^}]*width:\s*0\s*!important/m, css)
+    assert_match(/#sidebar\.tg-sidebar-collapsed\s+\.tg-sidebar-panel\s*\{[^}]*display:\s*none/m, css)
+    assert_match(/sidebarTarget\.style\.width\s*=\s*"88px"/, js)
+  end
+
+  test "chat background image is limited to message list and has global setting" do
+    css = Rails.root.join("app/assets/stylesheets/chat.css").read
+    chat_room_theme = Rails.root.join("app/javascript/controllers/chat_room/chat_room_theme.js").read
+    chat_controller = Rails.root.join("app/javascript/controllers/chat_controller.js").read
+    chat_view = Rails.root.join("app/views/chat/index.html.erb").read
+
+    assert_no_match(/tg-has-chat-background \.tg-folder-rail/, css)
+    assert_no_match(/applyBackgroundStyles\(backgroundTarget, backgroundColor, backgroundImageValue\)/,
+      chat_room_theme)
+    assert_match(/applyBackgroundStyles\(list, backgroundColor, backgroundImageValue\)/,
+      chat_room_theme)
+    assert_match(/globalBackgroundImage/, chat_controller)
+    assert_match(/data-chat-target="globalBackgroundImageInput"/, chat_view)
+  end
 end

@@ -65,7 +65,8 @@ export default class extends Controller {
     "officialBadgeInput",
     "globalThemeToggle",
     "globalThemeIcon",
-    "globalThemeLabel"
+    "globalThemeLabel",
+    "globalBackgroundImageInput"
   ]
 
   connect() {
@@ -85,6 +86,7 @@ export default class extends Controller {
     this.notificationSettings = this.loadNotificationSettings()
     this.badgeLabels = loadBadgeLabels()
     this.globalTheme = applyGlobalTheme(readGlobalTheme())
+    this.globalBackgroundImage = this.readGlobalBackgroundImage()
     this.currentRoomId = null
     this.sidebarSearchTimer = null
     this.sidebarSearchRequestId = 0
@@ -112,6 +114,7 @@ export default class extends Controller {
     this.syncNotificationUi()
     this.syncBadgeLabelUi()
     this.syncGlobalThemeUi()
+    this.syncGlobalBackgroundImageUi()
     this.applyContactGroupVisibility()
     this.renderFolderBar()
     this.refreshChatFolders()
@@ -179,6 +182,19 @@ export default class extends Controller {
   persistNotificationSettings() {
     const [namespace, identifier] = chatStorageKeys.notificationSettings()
     writeCache(namespace, identifier, this.notificationSettings)
+  }
+
+  readGlobalBackgroundImage() {
+    const [namespace, identifier] = chatStorageKeys.globalBackgroundImage()
+    return readCache(namespace, identifier, "") || ""
+  }
+
+  persistGlobalBackgroundImage() {
+    const [namespace, identifier] = chatStorageKeys.globalBackgroundImage()
+    writeCache(namespace, identifier, this.globalBackgroundImage || "")
+    window.dispatchEvent(new CustomEvent("chat:global-background-image:change", {
+      detail: { backgroundImage: this.globalBackgroundImage || "" }
+    }))
   }
 
   persistBadgeLabels() {
@@ -547,6 +563,7 @@ export default class extends Controller {
   applySidebarState() {
     if (this.isMobileViewport()) {
       this.sidebarTarget.classList.remove("tg-sidebar-collapsed")
+      this.element.classList.remove("tg-sidebar-rail-only")
       this.sidebarTarget.classList.toggle("-translate-x-full", !this.isSidebarOpen)
       this.overlayTarget.classList.toggle("hidden", !this.isSidebarOpen)
       this.resizerTarget.classList.add("hidden")
@@ -557,13 +574,14 @@ export default class extends Controller {
       this.sidebarTarget.classList.remove("-translate-x-full")
       this.overlayTarget.classList.add("hidden")
       this.sidebarTarget.classList.toggle("tg-sidebar-collapsed", this.desktopSidebarCollapsed)
+      this.element.classList.toggle("tg-sidebar-rail-only", this.desktopSidebarCollapsed)
       this.resizerTarget.classList.toggle("hidden", this.desktopSidebarCollapsed)
       if (this.hasDesktopSidebarToggleTarget) {
         this.desktopSidebarToggleTarget.classList.toggle("hidden", !this.desktopSidebarCollapsed)
       }
       if (this.desktopSidebarCollapsed) {
-        this.sidebarTarget.style.width = "0px"
-      } else if (this.sidebarTarget.style.width === "0px") {
+        this.sidebarTarget.style.width = "88px"
+      } else if (this.sidebarTarget.style.width === "0px" || this.sidebarTarget.style.width === "88px") {
         this.sidebarTarget.style.width = ""
       }
     }
@@ -754,6 +772,26 @@ export default class extends Controller {
     }
     if (this.hasGlobalThemeLabelTarget) {
       this.globalThemeLabelTarget.textContent = dark ? "白天" : "黑夜"
+    }
+  }
+
+  updateGlobalBackgroundImage(event) {
+    this.globalBackgroundImage = String(event?.target?.value || "").trim()
+    this.persistGlobalBackgroundImage()
+    this.syncGlobalBackgroundImageUi()
+  }
+
+  clearGlobalBackgroundImage(event = null) {
+    event?.preventDefault()
+    this.globalBackgroundImage = ""
+    this.persistGlobalBackgroundImage()
+    this.syncGlobalBackgroundImageUi()
+  }
+
+  syncGlobalBackgroundImageUi() {
+    if (this.hasGlobalBackgroundImageInputTarget
+      && this.globalBackgroundImageInputTarget.value !== this.globalBackgroundImage) {
+      this.globalBackgroundImageInputTarget.value = this.globalBackgroundImage || ""
     }
   }
 

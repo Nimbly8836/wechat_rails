@@ -104,6 +104,11 @@ export function readChatRoomTheme(controller) {
   return readCache(namespace, identifier, {}) || {};
 }
 
+export function readGlobalBackgroundImage() {
+  const [namespace, identifier] = chatStorageKeys.globalBackgroundImage();
+  return readCache(namespace, identifier, "") || "";
+}
+
 export function normalizeThemeConfig(_controller, rawTheme) {
   const theme = rawTheme && typeof rawTheme === "object" ? { ...rawTheme } : {};
   const migratePairs = [
@@ -122,6 +127,9 @@ export function normalizeThemeConfig(_controller, rawTheme) {
 
   if (!theme.fontFamily) {
     theme.fontFamily = DEFAULT_THEME.fontFamily;
+  }
+  if (!Object.prototype.hasOwnProperty.call(theme, "backgroundImage")) {
+    theme.backgroundImage = readGlobalBackgroundImage();
   }
 
   return theme;
@@ -280,10 +288,15 @@ export function applyTheme(controller, { refreshBubbles = true } = {}) {
 
   const backgroundImageValue = resolveBackgroundImage(backgroundImage);
   const shell = controller.element?.closest(".tg-app-shell");
-  const backgroundTarget = shell || controller.element;
 
   shell?.classList.toggle("tg-has-chat-background", !!backgroundImageValue);
-  applyBackgroundStyles(backgroundTarget, backgroundColor, backgroundImageValue);
+  if (controller.element) {
+    controller.element.style.backgroundColor = backgroundColor;
+    controller.element.style.backgroundImage = "";
+    controller.element.style.backgroundSize = "";
+    controller.element.style.backgroundRepeat = "";
+    controller.element.style.backgroundPosition = "";
+  }
 
   if (controller.element) {
     controller.element.style.fontFamily = fontFamily;
@@ -292,12 +305,8 @@ export function applyTheme(controller, { refreshBubbles = true } = {}) {
   if (controller.hasMessageListTarget) {
     const list = controller.messageListTarget;
     if (backgroundImageValue) {
-      list.style.backgroundColor = "transparent";
-      list.style.backgroundImage = "";
-      list.style.backgroundAttachment = "";
-      list.style.backgroundSize = "";
-      list.style.backgroundRepeat = "";
-      list.style.backgroundPosition = "";
+      applyBackgroundStyles(list, backgroundColor, backgroundImageValue);
+      list.style.backgroundAttachment = "local";
     } else {
       list.style.backgroundColor = backgroundColor;
       list.style.backgroundImage = "";

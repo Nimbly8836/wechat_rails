@@ -279,12 +279,22 @@ export default class extends Controller {
         this.refreshRoomFromNotification(payload);
       }
     };
+    this.boundGlobalBackgroundImageChange = () => {
+      this.theme = {
+        ...this.theme,
+        ...this.normalizeThemeConfig(this.readChatRoomTheme())
+      };
+      this.applyTheme({ refreshBubbles: false });
+      this.syncThemeInputs();
+    };
     this.boundComposerFocus = this.handleComposerFocus.bind(this);
     this.boundComposerBlur = this.handleComposerBlur.bind(this);
     this.boundComposerViewportChange = this.handleComposerViewportChange.bind(this);
     this.boundAutoResize = this.autoResize.bind(this);
 
     window.addEventListener("chat:notify", this.boundChatNotify);
+    window.addEventListener("chat:global-background-image:change",
+      this.boundGlobalBackgroundImageChange);
 
     this.messageState = new ChatRoomMessageState(this.idValue);
     this.messages = this.messageState.messages;
@@ -466,6 +476,10 @@ export default class extends Controller {
 
     if (this.boundChatNotify) {
       window.removeEventListener("chat:notify", this.boundChatNotify);
+    }
+    if (this.boundGlobalBackgroundImageChange) {
+      window.removeEventListener("chat:global-background-image:change",
+        this.boundGlobalBackgroundImageChange);
     }
     this.inputTarget.removeEventListener("focus", this.boundComposerFocus);
     this.inputTarget.removeEventListener("blur", this.boundComposerBlur);

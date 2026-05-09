@@ -558,12 +558,19 @@ body.tg-mobile-app {
     display: flex;
   }
 
+  .tg-app-shell.tg-sidebar-rail-only .tg-desktop-sidebar-toggle {
+    left: 102px;
+  }
+
   #sidebar.tg-sidebar-collapsed {
-    width: 0 !important;
-    min-width: 0 !important;
-    max-width: 0 !important;
-    pointer-events: none;
+    width: 88px !important;
+    min-width: 88px !important;
+    max-width: 88px !important;
     box-shadow: none;
+  }
+
+  #sidebar.tg-sidebar-collapsed .tg-sidebar-panel {
+    display: none;
   }
 }
 
@@ -660,16 +667,11 @@ body.tg-mobile-app {
   font-size: 16px;
 }
 
-.tg-app-shell.tg-has-chat-background .tg-folder-rail,
-.tg-app-shell.tg-has-chat-background .tg-sidebar-panel,
-.tg-app-shell.tg-has-chat-background .tg-main-panel,
-.tg-app-shell.tg-has-chat-background .telegram-chat-room {
-  background: rgba(248, 250, 252, 0.58);
-  backdrop-filter: blur(10px);
-}
-
 .tg-app-shell.tg-has-chat-background .telegram-message-list {
-  background: transparent;
+  background-color: transparent;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 .tg-app-shell.tg-has-chat-background .telegram-message-list::before {
@@ -679,13 +681,6 @@ body.tg-mobile-app {
 .tg-app-shell.tg-has-chat-background .telegram-chat-header,
 .tg-app-shell.tg-has-chat-background .telegram-composer {
   background: rgba(255, 255, 255, 0.72);
-}
-
-html.tg-theme-dark .tg-app-shell.tg-has-chat-background .tg-folder-rail,
-html.tg-theme-dark .tg-app-shell.tg-has-chat-background .tg-sidebar-panel,
-html.tg-theme-dark .tg-app-shell.tg-has-chat-background .tg-main-panel,
-html.tg-theme-dark .tg-app-shell.tg-has-chat-background .telegram-chat-room {
-  background: rgba(15, 23, 42, 0.62);
 }
 
 html.tg-theme-dark .tg-app-shell.tg-has-chat-background .telegram-chat-header,
