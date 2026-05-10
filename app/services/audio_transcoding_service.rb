@@ -65,7 +65,7 @@ class AudioTranscodingService
     return if File.exist?(compiled_encoder_path)
 
     prepare_build_workspace!
-    stdout, stderr, status = Open3.capture3("make", "encoder", chdir: build_dir.to_s)
+    stdout, stderr, status = Open3.capture3("make", "lib", "encoder", chdir: build_dir.to_s)
     Rails.logger.debug { "silk encoder build stdout: #{stdout}" } if stdout.present?
     Rails.logger.warn { "silk encoder build stderr: #{stderr}" } if stderr.present?
 
