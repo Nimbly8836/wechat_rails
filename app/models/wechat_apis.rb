@@ -129,6 +129,10 @@ module WechatApis
       "/Tools/CdnDownloadImage"
     end
 
+    def self.cdn_download_record_item
+      "/Tools/CdnDownloadRecordItem"
+    end
+
     def self.download_file
       "/Tools/DownloadFile"
     end

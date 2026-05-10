@@ -404,6 +404,76 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     FileUtils.rm_f(stored_file) if stored_file
   end
 
+  test "index serializes downloadable chat history record items" do
+    chat_history = create_message!(
+      new_msg_id: 9_000_000_000_000_001_460,
+      msg_type: :refer,
+      real_msg_type: :chat_history,
+      content: chat_history_xml
+    )
+
+    get chat_room_messages_path(@chat_room)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    parsed = payload.find { |item| item["id"] == chat_history.id }.dig("wx_message", "parsed_message")
+
+    assert_equal "chat_history", parsed["type"]
+    assert_equal 2, parsed["items"].length
+    image_item = parsed["items"].find { |item| item["data_id"] == "image-data-id" }
+    file_item = parsed["items"].find { |item| item["data_id"] == "file-data-id" }
+    assert_equal "image", image_item["type"]
+    assert_equal "/message/chat_history/#{chat_history.id}/attachment/image-data-id", image_item["download_url"]
+    assert_equal "file_message", file_item["type"]
+    assert_equal "report.pdf", file_item["title"]
+    assert_equal "pdf", file_item["format"]
+    assert_equal "/message/chat_history/#{chat_history.id}/attachment/file-data-id", file_item["download_url"]
+  end
+
+  test "download_chat_history_attachment calls upstream record item api and caches file" do
+    chat_history = create_message!(
+      new_msg_id: 9_000_000_000_000_001_461,
+      msg_type: :refer,
+      real_msg_type: :chat_history,
+      content: chat_history_xml
+    )
+    expected_path = Rails.root.join("storage", "record_items", chat_history.id.to_s, "file-data-id.pdf")
+    FileUtils.rm_f(expected_path)
+    api_response = {
+      "Success" => true,
+      "Data" => {
+        "Image" => Base64.strict_encode64("%PDF-1.4\n")
+      }
+    }
+    calls = []
+
+    ToolsApiService.stub(:new, proc { |wxid|
+      assert_equal @contact.own_wxid, wxid
+      Object.new.tap do |api|
+        api.define_singleton_method(:cdn_download_record_item) do |**kwargs|
+          calls << kwargs
+          api_response
+        end
+      end
+    }) do
+      get "/message/chat_history/#{chat_history.id}/attachment/file-data-id"
+    end
+
+    assert_response :success
+    assert_equal "application/pdf", response.media_type
+    assert_equal "%PDF-1.4\n", response.body
+    assert_equal 1, calls.length
+    assert_equal "file-cdn-url", calls.first[:cdn_data_url]
+    assert_equal "file-cdn-key", calls.first[:cdn_data_key]
+    assert_equal "file-data-id", calls.first[:data_id]
+    assert_equal "file-md5", calls.first[:full_md5]
+    assert_equal 9, calls.first[:data_size]
+    assert_equal 0, calls.first[:is_thumb]
+    assert File.exist?(expected_path)
+  ensure
+    FileUtils.rm_rf(Rails.root.join("storage", "record_items", chat_history.id.to_s)) if chat_history
+  end
+
   test "callback resolves owner wxid before parsing group system messages" do
     ActiveJob::Base.queue_adapter = :test
     group_wxid = @chat_room.wx_id
@@ -552,6 +622,50 @@ class MessageControllerTest < ActionDispatch::IntegrationTest
     <<~XML
       <msg>
         <img md5="#{image_md5}" />
+      </msg>
+    XML
+  end
+
+  def chat_history_xml
+    record_xml = <<~XML
+      <recordinfo>
+        <title>聊天记录</title>
+        <desc>Hayek: [图片]&#x0A;Hayek: [文件] report.pdf</desc>
+        <datalist count="2">
+          <dataitem datatype="2" dataid="image-data-id">
+            <datadesc>[图片]</datadesc>
+            <cdndataurl>image-cdn-url</cdndataurl>
+            <cdndatakey>image-cdn-key</cdndatakey>
+            <fullmd5>image-md5</fullmd5>
+            <datasize>6</datasize>
+            <thumbwidth>100</thumbwidth>
+            <thumbheight>80</thumbheight>
+            <sourcename>Hayek</sourcename>
+            <sourcetime>2026-05-10 10:03:51</sourcetime>
+          </dataitem>
+          <dataitem datatype="8" dataid="file-data-id">
+            <datatitle>report.pdf</datatitle>
+            <cdndataurl>file-cdn-url</cdndataurl>
+            <cdndatakey>file-cdn-key</cdndatakey>
+            <fullmd5>file-md5</fullmd5>
+            <datasize>9</datasize>
+            <datafmt>pdf</datafmt>
+            <sourcename>Hayek</sourcename>
+            <sourcetime>2026-05-10 10:27:33</sourcetime>
+          </dataitem>
+        </datalist>
+      </recordinfo>
+    XML
+
+    <<~XML
+      <msg>
+        <appmsg>
+          <title>聊天记录</title>
+          <des>Hayek: [图片]
+      Hayek: [文件] report.pdf</des>
+          <type>19</type>
+          <recorditem><![CDATA[#{record_xml}]]></recorditem>
+        </appmsg>
       </msg>
     XML
   end

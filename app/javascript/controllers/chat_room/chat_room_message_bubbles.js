@@ -286,9 +286,13 @@ export function renderChatHistoryMessage(controller, bubble, msg, isNewGroup, se
   const historyBubble = template || bubble;
   const title = historyBubble.querySelector("[data-role='history-title']");
   const desc = historyBubble.querySelector("[data-role='history-desc']");
+  const toggle = historyBubble.querySelector("[data-role='history-toggle']");
+  const toggleLabel = historyBubble.querySelector("[data-role='history-toggle-label']");
+  const body = historyBubble.querySelector("[data-role='history-body']");
   const items = historyBubble.querySelector("[data-role='history-items']");
   const footer = historyBubble.querySelector("[data-role='history-footer']");
   const parsed = controller.chatHistoryPayloadFor(msg);
+  const itemCount = Number(parsed.count || parsed.items.length || 0);
 
   if (title) title.textContent = parsed.title || "聊天记录";
   if (desc) {
@@ -297,28 +301,80 @@ export function renderChatHistoryMessage(controller, bubble, msg, isNewGroup, se
   }
   if (items) {
     items.innerHTML = "";
-    parsed.items.slice(0, 4).forEach((item) => {
-      const row = document.createElement("div");
-      row.className = "rounded-xl bg-slate-50 px-3 py-2";
-      const meta = document.createElement("div");
-      meta.className = "text-[11px] text-slate-500";
-      meta.textContent = item.senderName ? `${item.senderName}${item.time ? ` · ${item.time}` : ""}` : (item.time || "");
-      const content = document.createElement("div");
-      content.className = "mt-0.5 text-sm text-slate-800 whitespace-pre-wrap break-words";
-      content.textContent = item.content || `[${controller.humanizeMessageType(item.type)}]`;
-      if (meta.textContent) row.appendChild(meta);
-      row.appendChild(content);
-      items.appendChild(row);
+    parsed.items.forEach((item) => {
+      items.appendChild(buildChatHistoryItem(controller, item));
     });
     items.classList.toggle("hidden", parsed.items.length === 0);
   }
   if (footer) {
-    const extraCount = parsed.count > parsed.items.length ? `等 ${parsed.count} 条记录` : (parsed.count > 0 ? `共 ${parsed.count} 条记录` : "");
+    const extraCount = itemCount > 0 ? `共 ${itemCount} 条记录` : "";
     footer.textContent = extraCount;
     footer.classList.toggle("hidden", !extraCount);
   }
+  if (toggle && body) {
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.addEventListener("click", () => {
+      const expanded = toggle.getAttribute("aria-expanded") === "true";
+      toggle.setAttribute("aria-expanded", expanded ? "false" : "true");
+      body.classList.toggle("hidden", expanded);
+      if (toggleLabel) toggleLabel.textContent = expanded ? "展开" : "收起";
+    });
+  }
 
   return controller.applyBubbleStyle(historyBubble, msg, isNewGroup, senderInfo, isFirstMessage);
+}
+
+function buildChatHistoryItem(controller, item) {
+  const row = document.createElement("div");
+  row.className = "rounded-xl bg-slate-50 px-3 py-2";
+  const meta = document.createElement("div");
+  meta.className = "text-[11px] text-slate-500";
+  meta.textContent = item.senderName ? `${item.senderName}${item.time ? ` · ${item.time}` : ""}` : (item.time || "");
+  const content = document.createElement("div");
+  content.className = "mt-0.5 text-sm text-slate-800 whitespace-pre-wrap break-words";
+  content.textContent = item.title || item.content || `[${controller.humanizeMessageType(item.type)}]`;
+
+  if (meta.textContent) row.appendChild(meta);
+  row.appendChild(content);
+
+  const actionLine = buildChatHistoryItemAction(controller, item);
+  if (actionLine) row.appendChild(actionLine);
+
+  if (Array.isArray(item.items) && item.items.length > 0) {
+    const nested = document.createElement("div");
+    nested.className = "mt-2 space-y-2 border-l border-slate-200 pl-2";
+    item.items.forEach((child) => nested.appendChild(buildChatHistoryItem(controller, child)));
+    row.appendChild(nested);
+  }
+
+  return row;
+}
+
+function buildChatHistoryItemAction(controller, item) {
+  if (!item.downloadUrl) return null;
+
+  const line = document.createElement("div");
+  line.className = "mt-2 flex items-center justify-between gap-3 text-xs";
+  const meta = document.createElement("span");
+  meta.className = "text-slate-400";
+  const sizeLabel = item.dataSize ? controller.formatFileSize(item.dataSize) : "";
+  meta.textContent = [item.format, sizeLabel].filter(Boolean).join(" · ");
+
+  const link = document.createElement("a");
+  link.href = item.downloadUrl;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.className = "shrink-0 text-blue-500 hover:text-blue-600";
+  link.textContent = item.type === "image" ? "查看图片" : "下载";
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    const filename = item.title || item.content || item.dataId || "record-item";
+    controller.downloadFile(item.downloadUrl, filename);
+  });
+
+  line.appendChild(meta);
+  line.appendChild(link);
+  return line;
 }
 
 export function renderXmlMessage(controller, bubble, msg, isNewGroup, senderInfo, isFirstMessage) {

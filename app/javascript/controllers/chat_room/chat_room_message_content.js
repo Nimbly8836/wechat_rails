@@ -74,7 +74,23 @@ export function chatHistoryPayloadFor(controller, msg) {
         type: normalizeParsedMessageType(controller, item?.type) || item?.type || "text",
         senderName: payloadValue(controller, item, "senderName", "sender_name") || "",
         time: payloadValue(controller, item, "time") || "",
-        content: payloadValue(controller, item, "content") || ""
+        content: payloadValue(controller, item, "content") || "",
+        title: payloadValue(controller, item, "title") || "",
+        dataId: payloadValue(controller, item, "dataId", "data_id") || "",
+        downloadUrl: payloadValue(controller, item, "downloadUrl", "download_url") || "",
+        dataSize: Number(payloadValue(controller, item, "dataSize", "data_size") || 0),
+        format: payloadValue(controller, item, "format") || "",
+        items: Array.isArray(item?.items) ? item.items.map((child) => ({
+          type: normalizeParsedMessageType(controller, child?.type) || child?.type || "text",
+          senderName: payloadValue(controller, child, "senderName", "sender_name") || "",
+          time: payloadValue(controller, child, "time") || "",
+          content: payloadValue(controller, child, "content") || "",
+          title: payloadValue(controller, child, "title") || "",
+          dataId: payloadValue(controller, child, "dataId", "data_id") || "",
+          downloadUrl: payloadValue(controller, child, "downloadUrl", "download_url") || "",
+          dataSize: Number(payloadValue(controller, child, "dataSize", "data_size") || 0),
+          format: payloadValue(controller, child, "format") || ""
+        })) : []
       })) : []
     };
   }
@@ -332,7 +348,11 @@ export function parseWxChatHistoryItem(controller, itemNode, fallbackLine = "") 
     ? fallbackContent
     : (rawContent || fallbackContent || chatHistoryTypeLabel(controller, dataType));
 
-  return { type: chatHistoryItemType(controller, dataType), senderName, time, content };
+  const title = itemNode?.querySelector("datatitle")?.textContent?.trim() || "";
+  const dataId = itemNode?.getAttribute("dataid") || "";
+  const format = itemNode?.querySelector("datafmt")?.textContent?.trim() || "";
+  const dataSize = Number(itemNode?.querySelector("datasize")?.textContent || 0);
+  return { type: chatHistoryItemType(controller, dataType), senderName, time, content, title, dataId, format, dataSize };
 }
 
 export function chatHistoryItemType(_controller, dataType) {
@@ -342,7 +362,10 @@ export function chatHistoryItemType(_controller, dataType) {
     case 4:
       return "video";
     case 6:
+    case 8:
       return "file_message";
+    case 17:
+      return "chat_history";
     default:
       return "text";
   }

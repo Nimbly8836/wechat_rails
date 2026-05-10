@@ -390,6 +390,54 @@ class MessagesController < ApplicationController
     render json: { error: true, message: "file download error" }, status: :bad_gateway
   end
 
+  def download_chat_history_attachment
+    message = Message.includes(:wx_message, :chat_room).find(params[:id])
+    wx_message = message.wx_message
+    item = wx_message&.chat_history_record_item(params[:data_id])
+    unless item && item[:download_url].present?
+      render json: { error: true, message: "chat history attachment not found" }, status: :not_found and return
+    end
+
+    storage_dir = Rails.root.join("storage", "record_items", message.id.to_s)
+    FileUtils.mkdir_p(storage_dir)
+    basename = sanitize_filename(item[:data_id], default: "record-item")
+    filename = chat_history_attachment_filename(item)
+
+    if (cached = locate_cached_media(storage_dir, basename))
+      mime = Marcel::MimeType.for(Pathname.new(cached), name: filename)
+      return send_file(cached, type: mime, disposition: chat_history_attachment_disposition(item), filename: filename)
+    end
+
+    contact = Contact.find(message.chat_room&.contact_id)
+    unless contact.own_wxid.present?
+      render json: { error: true, message: "contact wxid missing" }, status: :unprocessable_content and return
+    end
+
+    tools_api = ToolsApiService.new(contact.own_wxid)
+    response = tools_api.cdn_download_record_item(
+      cdn_data_url: item[:cdn_data_url],
+      cdn_data_key: item[:cdn_data_key],
+      data_id: item[:data_id],
+      full_md5: item[:full_md5],
+      data_size: item[:data_size],
+      is_thumb: 0
+    )
+    data = extract_record_item_payload(response)
+    unless data
+      render json: { error: true, message: "chat history attachment download failed" }, status: :bad_gateway and return
+    end
+
+    mime = detect_mime(data, name: filename, fallback: chat_history_attachment_fallback_mime(item))
+    extension_hint = File.extname(filename).presence || extension_for_mime(mime)
+    file_path = persist_binary(storage_dir, basename, data, extension_hint: extension_hint, fallback_extension: ".bin")
+    send_file(file_path, type: mime, disposition: chat_history_attachment_disposition(item), filename: filename)
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: true, message: "chat history message not found" }, status: :not_found
+  rescue => e
+    Rails.logger.error { "chat history attachment download error: #{e.message}" }
+    render json: { error: true, message: "chat history attachment download error" }, status: :bad_gateway
+  end
+
   def send_emoji_file(path, content_type = nil)
     mime_type = content_type || Marcel::MimeType.for(Pathname.new(path))
     response.headers["Cache-Control"] = "no-store, max-age=0"
@@ -624,6 +672,7 @@ class MessagesController < ApplicationController
     refer_new_msg_id = wx_message_json["refer_new_msg_id"].presence || quote_metadata[:srv_id]
     refer_title = wx_message_json["refer_title"].presence || quote_metadata[:title]
     parsed_message = wx_message&.parsed_message_payload
+    parsed_message = materialize_chat_history_download_urls(parsed_message, message) if parsed_message
 
     updates = {}
     if emoji_md5.present? && wx_message&.emoji_md5.blank?
@@ -646,6 +695,25 @@ class MessagesController < ApplicationController
       "emoji_url" => build_emoji_url(message: message, wx_message: wx_message, emoji_file_md5: emoji_file_md5, emoji_md5: emoji_md5),
       "parsed_message" => parsed_message&.deep_stringify_keys
     )
+  end
+
+  def materialize_chat_history_download_urls(payload, message)
+    return payload unless payload.is_a?(Hash) && payload[:type].to_s == "chat_history"
+
+    payload.deep_dup.tap do |copy|
+      materialize_chat_history_item_urls(copy[:items], message)
+    end
+  end
+
+  def materialize_chat_history_item_urls(items, message)
+    return unless items.is_a?(Array)
+
+    items.each do |item|
+      if item[:download_url].present?
+        item[:download_url] = item[:download_url].sub(":message_id", message.id.to_s)
+      end
+      materialize_chat_history_item_urls(item[:items], message)
+    end
   end
 
   def build_emoji_url(message: nil, wx_message: nil, emoji_file_md5: nil, emoji_md5: nil)
@@ -791,6 +859,41 @@ class MessagesController < ApplicationController
         attach_id: file_meta[:attach_id],
       )
     end
+  end
+
+  def extract_record_item_payload(response)
+    payload = response.is_a?(Hash) ? response : {}
+    data_node = payload["Data"] || payload[:Data]
+    encoded = data_node&.[]("Image") || data_node&.[](:Image) ||
+      data_node&.[]("File") || data_node&.[](:File) ||
+      data_node&.[]("Data") || data_node&.[](:Data)
+    unless encoded.present?
+      Rails.logger.warn { "record item payload missing data: #{payload.inspect}" }
+      return nil
+    end
+
+    data = Base64.decode64(encoded)
+    data.force_encoding(Encoding::BINARY)
+    data
+  rescue => e
+    Rails.logger.error { "record item payload parse error: #{e.message}" }
+    nil
+  end
+
+  def chat_history_attachment_filename(item)
+    title = item[:title].presence || item[:content].presence || item[:data_id].presence || "record-item"
+    base_name = sanitize_filename(title, default: "record-item")
+    extension_hint = item[:format].present? ? ".#{item[:format].to_s.downcase}" : nil
+    extension_hint ||= ".jpg" if item[:type].to_s == "image"
+    ensure_extension(base_name, extension_hint)
+  end
+
+  def chat_history_attachment_disposition(item)
+    item[:type].to_s == "image" ? "inline" : "attachment"
+  end
+
+  def chat_history_attachment_fallback_mime(item)
+    item[:type].to_s == "image" ? "image/jpeg" : "application/octet-stream"
   end
 
   def extract_chunk_payload(response)

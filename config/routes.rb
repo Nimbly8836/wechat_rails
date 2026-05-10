@@ -64,6 +64,7 @@ Rails.application.routes.draw do
   get "message/image/:id" => "messages#download_image"
   get "message/video/:id" => "messages#download_video"
   get "message/file/:id" => "messages#download_file"
+  get "message/chat_history/:id/attachment/:data_id" => "messages#download_chat_history_attachment"
   post "message/file" => "messages#upload_file"
 
   get "/notion/message", to: "message_events#events"

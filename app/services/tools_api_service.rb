@@ -39,6 +39,21 @@ class ToolsApiService
     @api_service.post(path, params)
   end
 
+  def cdn_download_record_item(cdn_data_url:, cdn_data_key:, data_id:, full_md5:, data_size:, is_thumb: 0)
+    path = WechatApis::Tools.cdn_download_record_item
+    params = WechatRequest::Tools::CdnDownloadRecordItem
+               .new(
+                 wxid: @wx_id,
+                 cdnDataUrl: cdn_data_url,
+                 cdnDataKey: cdn_data_key,
+                 dataId: data_id,
+                 fullMd5: full_md5,
+                 dataSize: data_size.to_i,
+                 isThumb: is_thumb.to_i
+               ).to_h
+    @api_service.post(path, params)
+  end
+
   def download_image_chunk(to_wxid:, msg_id:, data_len:, section:, compress_type: 0)
     section_payload = {
       StartPos: section[:start_pos].to_i,

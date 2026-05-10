@@ -5,6 +5,22 @@ module WechatRequest
       params { [ :fileAesKey, :fileNo ] } # 根据实际定义添加必填参数
     end
 
+    # 收藏/聊天记录 recorditem CDN 下载
+    class CdnDownloadRecordItem < Base
+      params { [ :cdnDataUrl, :cdnDataKey, :dataId, :fullMd5, :dataSize, :isThumb ] }
+
+      def self.api_key_for(name)
+        {
+          cdnDataUrl: "CdnDataUrl",
+          cdnDataKey: "CdnDataKey",
+          dataId: "DataId",
+          fullMd5: "FullMd5",
+          dataSize: "DataSize",
+          isThumb: "IsThumb"
+        }.fetch(name.to_sym) { super }
+      end
+    end
+
     # 文件下载
     class DownloadFile < Base
       params { [ :appId, :attachId, :dataLen, :section, :userName ] }

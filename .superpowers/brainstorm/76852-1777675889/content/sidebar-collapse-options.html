@@ -1,0 +1,46 @@
+<h2>桌面侧边栏完全收起方式</h2>
+<p class="subtitle">两种方案都会让背景图覆盖聊天区和侧边栏；区别是收起后入口的位置。</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="height:240px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#b7d8f0,#f6d7c6);display:flex;border:1px solid #d5dde8;">
+        <div style="width:54px;background:rgba(255,255,255,.72);backdrop-filter:blur(10px);display:flex;align-items:flex-start;justify-content:center;padding-top:14px;">
+          <div style="width:34px;height:34px;border-radius:11px;background:#fff;box-shadow:0 6px 16px rgba(15,23,42,.14);display:flex;align-items:center;justify-content:center;">☰</div>
+        </div>
+        <div style="flex:1;padding:18px;">
+          <div style="height:34px;width:52%;border-radius:10px;background:rgba(255,255,255,.76);margin-bottom:24px;"></div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="align-self:flex-start;width:38%;height:36px;border-radius:18px;background:#fff;"></div>
+            <div style="align-self:flex-end;width:46%;height:36px;border-radius:18px;background:#1f8b4c;"></div>
+            <div style="align-self:flex-start;width:50%;height:36px;border-radius:18px;background:#fff;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 留一个窄工具栏</h3>
+      <p>侧边栏内容完全收起，但保留 54px 宽入口，方便随时打开。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="height:240px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#b7d8f0,#f6d7c6);position:relative;border:1px solid #d5dde8;">
+        <div style="position:absolute;left:14px;top:14px;width:38px;height:38px;border-radius:12px;background:#fff;box-shadow:0 8px 20px rgba(15,23,42,.16);display:flex;align-items:center;justify-content:center;">☰</div>
+        <div style="height:100%;padding:18px 22px 18px 68px;">
+          <div style="height:34px;width:50%;border-radius:10px;background:rgba(255,255,255,.76);margin-bottom:24px;"></div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="align-self:flex-start;width:38%;height:36px;border-radius:18px;background:#fff;"></div>
+            <div style="align-self:flex-end;width:46%;height:36px;border-radius:18px;background:#1f8b4c;"></div>
+            <div style="align-self:flex-start;width:50%;height:36px;border-radius:18px;background:#fff;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 完全让给聊天区</h3>
+      <p>侧边栏宽度变成 0，只在左上角保留一个悬浮打开按钮。</p>
+    </div>
+  </div>
+</div>

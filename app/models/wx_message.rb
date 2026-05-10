@@ -314,22 +314,9 @@ class WxMessage < ApplicationRecord
       items = []
       if record_raw.present?
         record_doc = xml_document(record_raw)
-        item_nodes = record_doc&.xpath("//recordinfo/datalist/dataitem") || []
-        count = (record_doc&.at_xpath("//recordinfo/datalist")&.[]("count") || items.length).to_i
-        items = item_nodes.first(4).map do |item_node|
-          data_type = item_node["datatype"].to_i
-          {
-            type: case data_type
-              when 2 then "image"
-              when 4 then "video"
-              when 6 then "file_message"
-              else "text"
-              end,
-            sender_name: item_node.at_xpath("sourcename")&.text.to_s.strip.presence,
-            time: item_node.at_xpath("sourcetime")&.text.to_s.strip.presence,
-            content: item_node.at_xpath("datadesc")&.text.to_s.strip.presence || human_message_placeholder(data_type)
-          }.compact
-        end
+        datalist = record_doc&.at_xpath("/recordinfo/datalist")
+        count = (datalist&.[]("count") || 0).to_i
+        items = parse_chat_history_items(datalist)
       end
 
       payload.merge(
@@ -337,6 +324,64 @@ class WxMessage < ApplicationRecord
         count: count.positive? ? count : nil,
         items: items
       ).compact
+    end
+
+    def parse_chat_history_items(datalist)
+      return [] unless datalist
+
+      datalist.xpath("./dataitem").map do |item_node|
+        parse_chat_history_item(item_node)
+      end.compact
+    end
+
+    def parse_chat_history_item(item_node)
+      data_type = item_node["datatype"].to_i
+      nested_record = item_node.at_xpath("./recordxml/recordinfo/datalist")
+      title = item_node.at_xpath("./datatitle")&.text.to_s.strip.presence
+      content = item_node.at_xpath("./datadesc")&.text.to_s.strip.presence
+      payload = {
+        type: chat_history_item_type(data_type),
+        data_type: data_type,
+        data_id: item_node["dataid"].to_s.strip.presence,
+        sender_name: item_node.at_xpath("./sourcename")&.text.to_s.strip.presence,
+        time: item_node.at_xpath("./sourcetime")&.text.to_s.strip.presence,
+        title: title,
+        content: content || title || human_message_placeholder(data_type),
+        cdn_data_url: item_node.at_xpath("./cdndataurl")&.text.to_s.strip.presence,
+        cdn_data_key: item_node.at_xpath("./cdndatakey")&.text.to_s.strip.presence,
+        cdn_thumb_url: item_node.at_xpath("./cdnthumburl")&.text.to_s.strip.presence,
+        cdn_thumb_key: item_node.at_xpath("./cdnthumbkey")&.text.to_s.strip.presence,
+        full_md5: item_node.at_xpath("./fullmd5")&.text.to_s.strip.presence,
+        thumb_full_md5: item_node.at_xpath("./thumbfullmd5")&.text.to_s.strip.presence,
+        data_size: item_node.at_xpath("./datasize")&.text.to_s.to_i,
+        thumb_size: item_node.at_xpath("./thumbsize")&.text.to_s.to_i,
+        format: item_node.at_xpath("./datafmt")&.text.to_s.strip.presence,
+        thumb_width: item_node.at_xpath("./thumbwidth")&.text.to_s.to_i,
+        thumb_height: item_node.at_xpath("./thumbheight")&.text.to_s.to_i
+      }
+
+      payload[:items] = parse_chat_history_items(nested_record) if nested_record
+      if record_item_downloadable?(payload)
+        payload[:download_url] = "/message/chat_history/:message_id/attachment/#{ERB::Util.url_encode(payload[:data_id])}"
+      end
+      payload.compact
+    end
+
+    def chat_history_item_type(data_type)
+      case data_type
+      when 2 then "image"
+      when 4 then "video"
+      when 8 then "file_message"
+      when 17 then "chat_history"
+      else "text"
+      end
+    end
+
+    def record_item_downloadable?(payload)
+      payload[:data_id].present? &&
+        payload[:cdn_data_url].present? &&
+        payload[:cdn_data_key].present? &&
+        [ "image", "file_message" ].include?(payload[:type])
     end
 
     def parse_voip_payload(raw)
@@ -561,6 +606,23 @@ class WxMessage < ApplicationRecord
       payload = self.class.parse_app_message_payload(content)
       payload if payload&.dig(:type).present?
     end
+  end
+
+  def chat_history_record_item(data_id)
+    payload = self.class.parse_chat_history_payload(content)
+    self.class.find_chat_history_record_item(payload&.dig(:items), data_id)
+  end
+
+  def self.find_chat_history_record_item(items, data_id)
+    return nil if items.blank? || data_id.blank?
+
+    items.each do |item|
+      return item if item[:data_id].to_s == data_id.to_s
+
+      nested = find_chat_history_record_item(item[:items], data_id)
+      return nested if nested
+    end
+    nil
   end
 
   def get_real_msg_type
