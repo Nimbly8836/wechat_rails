@@ -55,7 +55,9 @@ class MessageSender
 
       @extra ||= {}
       @extra[:voice_time] = payload[:voice_time]
-      @extra[:voice_binary] = payload[:preview_binary]
+      @extra[:voice_preview_binary] = payload[:preview_binary]
+      @extra[:voice_upload_binary] = payload[:upload_binary]
+      @extra[:voice_format_type] = payload[:voice_format_type]
       @message_content = build_voice_content(payload[:voice_time], payload[:upload_binary].bytesize, payload[:voice_format_type])
       res = message_api_service.send_voice(@chat_room.wx_id,
                                            payload[:upload_base64],
@@ -74,7 +76,7 @@ class MessageSender
     save_send_image(result[:data]&.dig("id"), extra_value(:base64)) if @message_type.to_i ==
     MESSAGE_TYPES[:image]
     save_send_emoji(extra_value(:file_md5), extra_value(:base64)) if @message_type == MESSAGE_TYPES[:emoji] && extra_value(:cached_emoji_path).blank?
-    save_send_voice(result[:data]&.dig("id"), extra_value(:voice_binary)) if @message_type == MESSAGE_TYPES[:voice]
+    save_send_voice(result[:data]&.dig("id"), extra_value(:voice_preview_binary)) if @message_type == MESSAGE_TYPES[:voice]
     save_send_file(result[:data]&.dig("id"), @file) if @message_type == MESSAGE_TYPES[:file]
     result
   end
@@ -281,7 +283,7 @@ class MessageSender
       upload_binary: transcoded[:upload_binary],
       preview_binary: transcoded[:preview_binary],
       voice_time: voice_time,
-      voice_format_type: 4
+      voice_format_type: transcoded[:voice_format_type]
     }
   rescue AudioTranscodingService::TranscodingError => e
     Rails.logger.error("voice transcode failed: #{e.message}")

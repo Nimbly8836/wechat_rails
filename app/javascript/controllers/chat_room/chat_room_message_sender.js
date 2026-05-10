@@ -94,7 +94,7 @@ export function createSendMessage(controller, type, message) {
     const voiceTime = Number(message?.extra?.voice_time || 0);
     tempMsg.msg_type = 34;
     tempMsg.wx_message.real_msg_type = "voice";
-    tempMsg.wx_message.content = `<msg><voicemsg voicelength="${voiceTime}" length="0" endflag="1" voiceformat="2" /></msg>`;
+    tempMsg.wx_message.content = `<msg><voicemsg voicelength="${voiceTime}" length="0" endflag="1" voiceformat="4" /></msg>`;
     tempMsg.extra = {
       voice_time: voiceTime
     };

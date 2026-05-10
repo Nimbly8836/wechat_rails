@@ -137,6 +137,46 @@ class MessageSenderTest < ActiveSupport::TestCase
     FileUtils.rm_f(Rails.root.join("storage", "emojis", "#{expected_md5}.gif")) if defined?(expected_md5)
   end
 
+  test "send voice uploads silk payload and stores mp3 preview" do
+    tempfile = Tempfile.new(["voice", ".mp3"])
+    tempfile.binmode
+    tempfile.write("source-audio")
+    tempfile.rewind
+
+    uploaded = ActionDispatch::Http::UploadedFile.new(
+      tempfile: tempfile,
+      filename: "voice.mp3",
+      type: "audio/mpeg"
+    )
+    transcoder = FakeVoiceTranscoder.new
+    service = FakeVoiceMessageApiService.new(@chat_room.wx_id)
+    sender = MessageSender.new(@chat_room, 34, "", { voice_time: 1234 }, uploaded)
+
+    AudioTranscodingService.stub(:new, transcoder) do
+      sender.stub(:message_api_service, service) do
+        result = sender.send
+
+        assert_equal true, result[:success]
+        message_id = result[:data]["id"] || result[:data][:id]
+        preview_path = Rails.root.join("storage", "voices", "#{message_id}.mp3")
+        assert_equal "mp3-preview", File.binread(preview_path)
+      end
+    end
+
+    wx_message = WxMessage.order(:id).last
+    assert_equal :voice, wx_message.msg_type.to_sym
+    assert_equal :voice, wx_message.real_msg_type.to_sym
+    assert_includes wx_message.content, %(voicelength="1234")
+    assert_includes wx_message.content, %(length="11")
+    assert_includes wx_message.content, %(voiceformat="4")
+    assert_equal Base64.strict_encode64("silk-upload"), service.last_base64
+    assert_equal 4, service.last_type
+    assert_equal 1234, service.last_voice_time
+  ensure
+    tempfile.close! if defined?(tempfile)
+    FileUtils.rm_f(preview_path) if defined?(preview_path)
+  end
+
   private
 
   class RetryEmojiMessageApiService
@@ -173,6 +213,41 @@ class MessageSenderTest < ActiveSupport::TestCase
     def send_emoji(to_wxid, _base64, md5:, total_len:)
       @last_md5 = md5
       @last_total_len = total_len
+
+      {
+        "success" => true,
+        "Data" => {
+          "Msgid" => 123_456,
+          "Newmsgid" => 789_012,
+          "ToUserName" => { "string" => to_wxid },
+          "CreateTime" => Time.current.to_i
+        }
+      }
+    end
+  end
+
+  class FakeVoiceTranscoder
+    def transcode_voice_assets!
+      {
+        upload_binary: "silk-upload",
+        upload_base64: Base64.strict_encode64("silk-upload"),
+        preview_binary: "mp3-preview",
+        voice_format_type: 4
+      }
+    end
+  end
+
+  class FakeVoiceMessageApiService
+    attr_reader :last_base64, :last_type, :last_voice_time
+
+    def initialize(to_wxid)
+      @to_wxid = to_wxid
+    end
+
+    def send_voice(to_wxid, base64, type:, voice_time:)
+      @last_base64 = base64
+      @last_type = type
+      @last_voice_time = voice_time
 
       {
         "success" => true,

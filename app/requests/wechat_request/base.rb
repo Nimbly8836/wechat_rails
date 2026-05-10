@@ -12,7 +12,7 @@ module WechatRequest
       send_cdn_video: { defaults: {}, required: [ :toWxid, :content ] },
       send_emoji: { defaults: { base64: nil, md5: nil, totalLen: nil }, required: [ :toWxid ] },
       send_video: { defaults: {}, required: [ :toWxid, :content ] },
-      send_voice: { defaults: {}, required: [ :toWxid, :content, :voiceType, :voiceTime ] },
+      send_voice: { defaults: {}, required: [ :toWxid, :base64, :type, :voiceTime ] },
       share_card: { defaults: {}, required: [ :toWxid, :cardWxId, :cardNickName, :cardAlias ] },
       share_link: { defaults: {}, required: [ :toWxid, :type, :desc, :xml ] },
       share_location: { defaults: {}, required: [ :toWxid, :location ] },
