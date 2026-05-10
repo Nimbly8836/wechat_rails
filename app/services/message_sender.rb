@@ -40,8 +40,9 @@ class MessageSender
       @extra[:base64] = payload[:base64]
       @extra[:file_md5] = payload[:file_md5]
       @extra[:total_len] = payload[:total_len]
+      @extra[:cached_emoji_path] = payload[:cached_path]
       @message_content = build_emoji_content(payload[:file_md5])
-      res = message_api_service.send_emoji(@chat_room.wx_id, payload[:base64], md5: payload[:file_md5], total_len: payload[:total_len])
+      res = send_emoji_payload(payload)
     when MESSAGE_TYPES[:quote]
       reference_message = quoted_reference_message
       return { success: false, message: "引用消息不存在" } unless reference_message
@@ -72,7 +73,7 @@ class MessageSender
     result = save_send_message(res)
     save_send_image(result[:data]&.dig("id"), extra_value(:base64)) if @message_type.to_i ==
     MESSAGE_TYPES[:image]
-    save_send_emoji(extra_value(:file_md5), extra_value(:base64)) if @message_type == MESSAGE_TYPES[:emoji]
+    save_send_emoji(extra_value(:file_md5), extra_value(:base64)) if @message_type == MESSAGE_TYPES[:emoji] && extra_value(:cached_emoji_path).blank?
     save_send_voice(result[:data]&.dig("id"), extra_value(:voice_binary)) if @message_type == MESSAGE_TYPES[:voice]
     save_send_file(result[:data]&.dig("id"), @file) if @message_type == MESSAGE_TYPES[:file]
     result
@@ -288,6 +289,10 @@ class MessageSender
   end
 
   def emoji_payload
+    if (cached_payload = cached_emoji_payload)
+      return cached_payload
+    end
+
     base64 = extra_value(:base64)
 
     if base64.blank?
@@ -319,6 +324,30 @@ class MessageSender
     }
   rescue ArgumentError
     { success: false, message: "表情文件编码无效" }
+  end
+
+  def cached_emoji_payload
+    file_md5 = EmojiCache.normalize_md5(extra_value(:file_md5) || extra_value(:md5))
+    return nil if file_md5.blank?
+
+    cache_info = EmojiCache.info(file_md5)
+    return { success: false, message: "表情缓存不存在" } unless cache_info
+
+    {
+      base64: nil,
+      file_md5: cache_info[:file_md5],
+      total_len: (extra_value(:total_len).presence || cache_info[:total_len]).to_i,
+      cached_path: cache_info[:path]
+    }
+  end
+
+  def send_emoji_payload(payload)
+    res = message_api_service.send_emoji(@chat_room.wx_id, payload[:base64], md5: payload[:file_md5], total_len: payload[:total_len])
+    return res if res&.dig("success") || res&.dig("Success") || payload[:cached_path].blank? || payload[:base64].present?
+
+    payload[:base64] = EmojiCache.data_uri(payload[:cached_path])
+    @extra[:base64] = payload[:base64]
+    message_api_service.send_emoji(@chat_room.wx_id, payload[:base64], md5: payload[:file_md5], total_len: payload[:total_len])
   end
 
   def decode_base64_payload(base64)

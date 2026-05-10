@@ -81,6 +81,8 @@ export function createSendMessage(controller, type, message) {
     tempMsg.msg_type = 47;
     tempMsg.extra = {
       base64: message?.extra?.base64 || "",
+      file_md5: message?.extra?.file_md5 || message?.extra?.md5 || "",
+      total_len: message?.extra?.total_len || "",
       preview_url: message?.extra?.preview_url || "",
     };
   }

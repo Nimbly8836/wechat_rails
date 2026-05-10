@@ -66,6 +66,43 @@ class MessageSenderTest < ActiveSupport::TestCase
     tempfile.close!
   end
 
+  test "emoji_payload accepts cached md5 without base64" do
+    md5 = Digest::MD5.hexdigest("GIF89a")
+    path = Rails.root.join("storage", "emojis", "#{md5}.gif")
+    FileUtils.mkdir_p(path.dirname)
+    File.binwrite(path, "GIF89a")
+    sender = MessageSender.new(@chat_room, 47, "", { file_md5: md5 }, nil)
+
+    payload = sender.send(:emoji_payload)
+
+    assert_nil payload[:base64]
+    assert_equal md5, payload[:file_md5]
+    assert_equal 6, payload[:total_len]
+    assert_equal path.to_s, payload[:cached_path]
+  ensure
+    FileUtils.rm_f(path) if defined?(path)
+  end
+
+  test "send retries cached md5 emoji with server side base64 fallback" do
+    md5 = Digest::MD5.hexdigest("GIF89a")
+    path = Rails.root.join("storage", "emojis", "#{md5}.gif")
+    FileUtils.mkdir_p(path.dirname)
+    File.binwrite(path, "GIF89a")
+    service = RetryEmojiMessageApiService.new(@chat_room.wx_id)
+    sender = MessageSender.new(@chat_room, 47, "", { file_md5: md5 }, nil)
+
+    sender.stub(:message_api_service, service) do
+      result = sender.send
+      assert_equal true, result[:success]
+    end
+
+    assert_equal 2, service.calls.length
+    assert_nil service.calls.first[:base64]
+    assert_equal "data:image/gif;base64,R0lGODlh", service.calls.second[:base64]
+  ensure
+    FileUtils.rm_f(path) if defined?(path)
+  end
+
   test "send persists emoji metadata content for local echo" do
     tempfile = Tempfile.new(["emoji", ".gif"])
     tempfile.binmode
@@ -101,6 +138,30 @@ class MessageSenderTest < ActiveSupport::TestCase
   end
 
   private
+
+  class RetryEmojiMessageApiService
+    attr_reader :calls
+
+    def initialize(to_wxid)
+      @to_wxid = to_wxid
+      @calls = []
+    end
+
+    def send_emoji(to_wxid, base64, md5:, total_len:)
+      @calls << { to_wxid: to_wxid, base64: base64, md5: md5, total_len: total_len }
+      return { "success" => false, "message" => "md5 only unsupported" } if @calls.length == 1
+
+      {
+        "success" => true,
+        "Data" => {
+          "Msgid" => 123_456,
+          "Newmsgid" => 789_012,
+          "ToUserName" => { "string" => to_wxid },
+          "CreateTime" => Time.current.to_i
+        }
+      }
+    end
+  end
 
   class FakeEmojiMessageApiService
     attr_reader :last_md5, :last_total_len

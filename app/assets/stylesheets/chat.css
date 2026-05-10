@@ -503,6 +503,35 @@ body.tg-mobile-app {
   overflow: hidden;
 }
 
+.emoji-panel-body {
+  padding: 0.75rem;
+}
+
+.emoji-panel-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  border-top: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(248, 250, 252, 0.96);
+  padding: 0.55rem;
+}
+
+.emoji-panel-tab {
+  min-width: 5.5rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.emoji-panel-tab.is-active,
+.emoji-panel-tab:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
 .emoji-panel-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(2.75rem, 1fr));
@@ -525,6 +554,127 @@ body.tg-mobile-app {
   width: 100%;
   height: 2.75rem;
   min-width: 0;
+}
+
+.gif-sticker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+}
+
+.gif-sticker-upload {
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.gif-sticker-status {
+  min-width: 0;
+  flex: 1;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.gif-sticker-folders {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.625rem;
+  scrollbar-width: none;
+}
+
+.gif-sticker-folders::-webkit-scrollbar {
+  display: none;
+}
+
+.gif-sticker-folder {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.gif-sticker-folder.is-active,
+.gif-sticker-folder:hover {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.gif-sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.75rem, 1fr));
+  gap: 0.625rem;
+  max-height: min(22rem, 60vh);
+  min-width: min(20rem, calc(100vw - 1rem));
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-width: none;
+}
+
+.gif-sticker-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.gif-sticker-item {
+  position: relative;
+  min-height: 4.75rem;
+  border-radius: 1rem;
+  background: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.gif-sticker-item:hover {
+  background: #f1f5f9;
+}
+
+.gif-sticker-item img {
+  max-width: 100%;
+  max-height: 5.75rem;
+  object-fit: contain;
+}
+
+.gif-sticker-actions {
+  position: absolute;
+  left: 0.25rem;
+  right: 0.25rem;
+  bottom: 0.25rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.gif-sticker-item:hover .gif-sticker-actions {
+  opacity: 1;
+}
+
+.gif-sticker-action {
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: white;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.gif-sticker-empty {
+  padding: 2.5rem 1rem;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  text-align: center;
 }
 
 .emoji-preview-container {
@@ -810,6 +960,32 @@ html.tg-theme-dark .telegram-chat-room .telegram-message-list {
 html.tg-theme-dark .telegram-chat-room .telegram-composer-shell {
   border-color: rgba(51, 65, 85, 0.92);
   background: rgba(30, 41, 59, 0.94);
+}
+
+html.tg-theme-dark .emoji-panel {
+  border-color: rgba(51, 65, 85, 0.92);
+  background: rgba(15, 23, 42, 0.96);
+}
+
+html.tg-theme-dark .emoji-panel-tabs {
+  border-color: rgba(51, 65, 85, 0.92);
+  background: rgba(15, 23, 42, 0.98);
+}
+
+html.tg-theme-dark .emoji-panel-tab.is-active,
+html.tg-theme-dark .emoji-panel-tab:hover,
+html.tg-theme-dark .gif-sticker-folder.is-active,
+html.tg-theme-dark .gif-sticker-folder:hover {
+  background: rgba(37, 99, 235, 0.24);
+  color: #bfdbfe;
+}
+
+html.tg-theme-dark .gif-sticker-upload,
+html.tg-theme-dark .gif-sticker-folder,
+html.tg-theme-dark .gif-sticker-item {
+  border-color: rgba(51, 65, 85, 0.88);
+  background: rgba(30, 41, 59, 0.92);
+  color: #cbd5e1;
 }
 
 html.tg-theme-dark .tg-contact-detail {

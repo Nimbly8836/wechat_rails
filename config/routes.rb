@@ -28,6 +28,16 @@ Rails.application.routes.draw do
       patch :toggle_pin
     end
   end
+  resources :gif_emojis, only: [ :index, :create, :destroy ] do
+    member do
+      patch :touch
+    end
+  end
+  resources :gif_emoji_folders, only: [ :create, :destroy ] do
+    member do
+      patch :toggle_emoji
+    end
+  end
 
   # contact management
   get "contact" => "contact#index"

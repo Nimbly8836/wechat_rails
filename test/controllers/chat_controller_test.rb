@@ -117,4 +117,16 @@ class ChatControllerTest < ActionDispatch::IntegrationTest
     assert_match(/if \(item\.type === "image"\) \{\s*controller\.openMediaPreview/m, bubbles_js)
     assert_match(/controller\.downloadFile\(item\.downloadUrl, filename\)/, bubbles_js)
   end
+
+  test "emoji picker exposes emoji and stickers tabs" do
+    template = Rails.root.join("app/views/chat/_emoji_templates.html.erb").read
+    controller_js = Rails.root.join("app/javascript/controllers/emoji_controller.js").read
+    room_view = Rails.root.join("app/views/chat_room/show.html.erb").read
+
+    assert_match(/Emoji/, template)
+    assert_match(/Stickers/, template)
+    assert_match(/gif-sticker-grid/, template)
+    assert_match(/gif-emoji:select->chat-room#selectGifEmoji/, room_view)
+    assert_match(/fetch\("\/gif_emojis"/, controller_js)
+  end
 end

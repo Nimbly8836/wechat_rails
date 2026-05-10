@@ -635,6 +635,31 @@ export function renderEmojiMessage(controller, bubble, msg, isNewGroup, senderIn
     image.addEventListener("load", showImage, { once: true });
     image.addEventListener("click", (event) => { event.stopPropagation(); const previewUrl = image.currentSrc || image.src; if (!previewUrl) return; controller.openMediaPreview({ src: previewUrl, title: controller.buildMediaPreviewTitle(msg, "表情预览"), meta: "Esc 关闭" }); });
     image.addEventListener("keydown", (event) => { if (event.key !== "Enter" && event.key !== " ") return; event.preventDefault(); image.click(); });
+    const emojiCacheMd5 = (msg.emoji_file_md5 || msg.emoji_md5 || msg.extra?.file_md5 || msg.extra?.md5 || "").trim();
+    if (emojiCacheMd5) {
+      const favoriteButton = document.createElement("button");
+      favoriteButton.type = "button";
+      favoriteButton.className = "mt-1 rounded-full bg-white/80 px-2 py-0.5 text-[11px] text-slate-500 shadow-sm transition hover:bg-white hover:text-blue-500";
+      favoriteButton.textContent = "收藏";
+      favoriteButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        fetch("/gif_emojis", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content || ""
+          },
+          body: JSON.stringify({ file_md5: emojiCacheMd5, favorite: true })
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error("favorite failed");
+            favoriteButton.textContent = "已收藏";
+          })
+          .catch(() => { favoriteButton.textContent = "收藏失败"; });
+      });
+      content.appendChild(favoriteButton);
+    }
     const sources = emojiRenderSourcesFor(controller, msg);
     let currentSourceIndex = -1;
     const loadNextSource = () => { currentSourceIndex += 1; const nextSource = sources[currentSourceIndex]; if (!nextSource) { showFallback("[表情加载失败]"); return; } image.src = nextSource; };

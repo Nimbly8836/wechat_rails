@@ -785,6 +785,17 @@ export default class extends Controller {
     return sendMessage(this, type, message);
   }
 
+  selectGifEmoji(event) {
+    const detail = event.detail || {};
+    this.sendMessage("emoji", {
+      extra: {
+        file_md5: detail.fileMd5 || detail.file_md5,
+        total_len: detail.totalLen || detail.total_len,
+        preview_url: detail.previewUrl || detail.preview_url
+      }
+    });
+  }
+
   parseWxXmlMessage(xmlString) {
     try {
       const xml = this.parseXmlDocument(xmlString);

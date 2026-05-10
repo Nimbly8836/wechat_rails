@@ -1,18 +1,35 @@
 <template id="emoji-select">
-  <div class="emoji-panel hidden absolute bottom-full right-0 mb-3 border border-gray-200 bg-white shadow-xl rounded-2xl p-3 z-[140]"
+  <div class="emoji-panel hidden absolute bottom-full right-0 mb-3 border border-gray-200 bg-white shadow-xl rounded-2xl z-[140]"
        data-action="mouseenter->emoji#panelMouseenter mouseleave->emoji#panelMouseleave">
-    <div class="emoji-panel-grid">
-      <% Dir.glob(Rails.root.join("public/emoji/*.webp")).each do |path| %>
-        <% filename = File.basename(path, ".webp") %>
-        <% name = filename %>
-        <button
-          type="button"
-          class="emoji-item flex items-center justify-center rounded-xl p-1 transition hover:bg-gray-100"
-          data-emoji-name="<%= name %>"
-          data-action="click->emoji#insert">
-          <img src="/emoji/<%= filename %>.webp" alt="<%= name %>" class="h-full w-full object-contain"/>
-        </button>
-      <% end %>
+    <div class="emoji-panel-body" data-emoji-target="emojiPane">
+      <div class="emoji-panel-grid">
+        <% Dir.glob(Rails.root.join("public/emoji/*.webp")).each do |path| %>
+          <% filename = File.basename(path, ".webp") %>
+          <% name = filename %>
+          <button
+            type="button"
+            class="emoji-item flex items-center justify-center rounded-xl p-1 transition hover:bg-gray-100"
+            data-emoji-name="<%= name %>"
+            data-action="click->emoji#insert">
+            <img src="/emoji/<%= filename %>.webp" alt="<%= name %>" class="h-full w-full object-contain"/>
+          </button>
+        <% end %>
+      </div>
+    </div>
+    <div class="emoji-panel-body hidden" data-emoji-target="stickersPane">
+      <div class="gif-sticker-toolbar">
+        <button type="button" class="gif-sticker-upload" data-action="click->emoji#openStickerUpload">上传 GIF</button>
+        <button type="button" class="gif-sticker-upload" data-action="click->emoji#createStickerFolder">新建文件夹</button>
+        <span class="gif-sticker-status" data-emoji-target="stickerStatus"></span>
+        <input type="file" class="hidden" accept=".gif,image/gif" data-emoji-target="stickerFileInput" data-action="change->emoji#uploadSticker">
+      </div>
+      <div class="gif-sticker-folders" data-emoji-target="stickerFolders"></div>
+      <div class="gif-sticker-grid" data-emoji-target="stickerGrid"></div>
+      <div class="gif-sticker-empty hidden" data-emoji-target="stickerEmpty">还没有收藏的 GIF 表情</div>
+    </div>
+    <div class="emoji-panel-tabs">
+      <button type="button" class="emoji-panel-tab is-active" data-emoji-tab-param="emoji" data-action="click->emoji#switchTab">Emoji</button>
+      <button type="button" class="emoji-panel-tab" data-emoji-tab-param="stickers" data-action="click->emoji#switchTab">Stickers</button>
     </div>
   </div>
 </template>
