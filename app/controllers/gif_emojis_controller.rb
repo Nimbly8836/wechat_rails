@@ -2,16 +2,12 @@ class GifEmojisController < ApplicationController
   before_action :set_library
 
   def index
+    sync_cached_emojis!
     render json: library_payload
   end
 
   def create
-    emoji = if params[:file].present?
-      create_from_file(params[:file])
-    else
-      create_from_cached_md5(params.require(:file_md5))
-    end
-
+    emoji = create_from_cached_md5(params.require(:file_md5))
     return if performed?
 
     add_to_folder(emoji, favorites_folder) if truthy_param?(params[:favorite])
@@ -59,22 +55,15 @@ class GifEmojisController < ApplicationController
     end
   end
 
-  def create_from_file(uploaded_file)
-    data = uploaded_file.respond_to?(:read) ? uploaded_file.read : uploaded_file.tempfile.read
-    uploaded_file.tempfile.rewind if uploaded_file.respond_to?(:tempfile) && uploaded_file.tempfile
-    mime_type = Marcel::MimeType.for(StringIO.new(data), name: uploaded_file.original_filename)
-    unless mime_type == "image/gif"
-      render json: { error: "only gif emoji files are supported" }, status: :unprocessable_entity
-      return
+  def sync_cached_emojis!
+    EmojiCache.all.each do |cache_info|
+      Current.user.gif_emojis.find_or_initialize_by(file_md5: cache_info[:file_md5]).tap do |emoji|
+        emoji.total_len = cache_info[:total_len]
+        emoji.name ||= File.basename(cache_info[:path])
+        emoji.save! if emoji.new_record? || emoji.changed?
+      end
     end
-
-    cache_info = EmojiCache.store_gif(data)
-    Current.user.gif_emojis.find_or_initialize_by(file_md5: cache_info[:file_md5]).tap do |emoji|
-      emoji.total_len = cache_info[:total_len]
-      emoji.name = params[:name].to_s.strip.presence || emoji.name || uploaded_file.original_filename
-      emoji.last_used_at ||= Time.current
-      emoji.save!
-    end
+    @emojis = Current.user.gif_emojis.includes(:gif_emoji_folders).recent_first
   end
 
   def add_to_folder(emoji, folder)

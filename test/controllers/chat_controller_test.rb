@@ -126,6 +126,7 @@ class ChatControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Emoji/, template)
     assert_match(/Stickers/, template)
     assert_match(/gif-sticker-grid/, template)
+    assert_no_match(/openStickerUpload|uploadSticker|上传 GIF/, template + controller_js)
     assert_match(/gif-emoji:select->chat-room#selectGifEmoji/, room_view)
     assert_match(/fetch\("\/gif_emojis"/, controller_js)
   end

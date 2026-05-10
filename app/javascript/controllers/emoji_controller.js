@@ -2,7 +2,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["emojiPane", "stickersPane", "stickerFolders", "stickerGrid", "stickerEmpty", "stickerStatus", "stickerFileInput"]
+  static targets = ["emojiPane", "stickersPane", "stickerFolders", "stickerGrid", "stickerEmpty", "stickerStatus"]
 
   connect() {
     this.hideTimer = null
@@ -81,41 +81,6 @@ export default class extends Controller {
     input.setSelectionRange(newCursorPos, newCursorPos)
     input.dispatchEvent(new Event("input", { bubbles: true, cancelable: true, composed: true }))
     input.focus()
-  }
-
-  openStickerUpload() {
-    this.stickerFileInputTarget?.click()
-  }
-
-  uploadSticker(event) {
-    const file = event.target.files?.[0]
-    event.target.value = ""
-    if (!file) return
-    if (file.type !== "image/gif" && !file.name.toLowerCase().endsWith(".gif")) {
-      this.setStickerStatus("仅支持 GIF")
-      return
-    }
-
-    const formData = new FormData()
-    formData.append("file", file)
-    formData.append("favorite", "true")
-    if (this.activeStickerFolderId() && this.activeStickerFolderId() !== this.favoritesFolder()?.id) {
-      formData.append("folder_id", this.activeStickerFolderId())
-    }
-
-    this.setStickerStatus("上传中…")
-    fetch("/gif_emojis", {
-      method: "POST",
-      headers: { "X-CSRF-Token": this.csrfToken() },
-      body: formData
-    })
-      .then((res) => res.json().then((json) => ({ ok: res.ok, json })))
-      .then(({ ok, json }) => {
-        if (!ok) throw new Error(json?.error || "上传失败")
-        this.applyStickerPayload(json)
-        this.setStickerStatus("已保存")
-      })
-      .catch((error) => this.setStickerStatus(error.message || "上传失败"))
   }
 
   createStickerFolder() {

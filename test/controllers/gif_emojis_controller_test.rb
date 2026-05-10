@@ -17,15 +17,24 @@ class GifEmojisControllerTest < ActionDispatch::IntegrationTest
     FileUtils.rm_f(@path)
   end
 
-  test "creates gif emoji from cached md5 and favorites it" do
+  test "index scans cached emoji files as sticker source" do
+    get gif_emojis_path
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    emoji = payload["emojis"].find { |item| item["file_md5"] == @md5 }
+    assert_equal 6, emoji["total_len"]
+    assert_equal false, emoji["favorite"]
+    assert_equal "/message/emoji/md5/#{@md5}", emoji["preview_url"]
+  end
+
+  test "favorites cached md5" do
     post gif_emojis_path, params: { file_md5: @md5, favorite: true }
 
     assert_response :created
     payload = JSON.parse(response.body)
     emoji = payload["emojis"].find { |item| item["file_md5"] == @md5 }
-    assert_equal 6, emoji["total_len"]
     assert_equal true, emoji["favorite"]
-    assert_equal "/message/emoji/md5/#{@md5}", emoji["preview_url"]
   end
 
   test "rejects missing cached md5" do

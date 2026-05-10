@@ -40,6 +40,25 @@ class EmojiCache
       }
     end
 
+    def all
+      Dir.glob(storage_dir.join("*"))
+        .filter_map { |path| info_from_path(path) }
+        .sort_by { |item| [ -File.mtime(item[:path]).to_i, item[:file_md5] ] }
+    end
+
+    def info_from_path(path)
+      return nil unless File.file?(path)
+
+      basename = File.basename(path, File.extname(path))
+      file_md5 = normalize_md5(basename)
+      file_md5 ||= Digest::MD5.hexdigest(File.binread(path))
+      {
+        file_md5: file_md5,
+        path: path.to_s,
+        total_len: File.size(path)
+      }
+    end
+
     def store_gif(data)
       file_md5 = Digest::MD5.hexdigest(data)
       path = storage_dir.join("#{file_md5}.gif")
