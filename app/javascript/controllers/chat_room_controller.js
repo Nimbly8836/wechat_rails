@@ -142,6 +142,9 @@ import {
   handleMenuClose,
   openAppearanceSettings,
   closeThemePanel,
+  openHookPanel,
+  closeHookPanel,
+  saveHookSettings,
   handleInputCompositionStart,
   handleInputCompositionEnd,
   handleInputKeydown,
@@ -175,7 +178,8 @@ export default class extends Controller {
     "backgroundImageInput", "backgroundUploadInput", "backgroundUploadStatus",
     "fileInput", "uploadStatus",
     "fontSelect", "fontCustomInput", "attachmentSelect", "quoteComposer",
-    "quoteComposerMeta", "quoteComposerContent", "searchPanel",
+    "quoteComposerMeta", "quoteComposerContent", "hookPanel", "hookEnabledInput",
+    "hookTimeoutInput", "hookCodeInput", "hookStatus", "searchPanel",
     "searchInput", "searchResults", "searchEmpty", "membersPanel",
     "memberSearchInput", "memberResults", "memberEmpty", "voiceRecorder",
     "voiceRecorderStatus", "voiceRecorderTimer"];
@@ -198,11 +202,13 @@ export default class extends Controller {
 
     this.boundCloseMenu = this.closeMenu.bind(this);
     this.boundCloseThemePanel = this.closeThemePanel.bind(this);
+    this.boundCloseHookPanel = this.closeHookPanel.bind(this);
     this.boundCloseAttachmentSelect = this.mouseleaveAttachment.bind(this);
     this.boundCloseSearchPanel = this.closeSearchPanel.bind(this);
     this.boundCloseMembersPanel = this.closeMembersPanel.bind(this);
     this.boundPreventMenuHide = (event) => event.stopPropagation();
     this.boundPreventThemeHide = (event) => event.stopPropagation();
+    this.boundPreventHookHide = (event) => event.stopPropagation();
     this.boundCloseAttachmentSelectHide = (event) => event.stopPropagation();
     this.boundPreventSearchHide = (event) => event.stopPropagation();
     this.boundPreventMembersHide = (event) => event.stopPropagation();
@@ -214,6 +220,10 @@ export default class extends Controller {
     if (this.hasThemePanelTarget) {
       this.themePanelTarget.addEventListener("click",
         this.boundPreventThemeHide);
+    }
+
+    if (this.hasHookPanelTarget) {
+      this.hookPanelTarget.addEventListener("click", this.boundPreventHookHide);
     }
 
     if (this.hasAttachmentSelectTarget) {
@@ -457,6 +467,7 @@ export default class extends Controller {
 
     document.removeEventListener("click", this.boundCloseMenu);
     document.removeEventListener("click", this.boundCloseThemePanel);
+    document.removeEventListener("click", this.boundCloseHookPanel);
 
     if (this.hasMenuTarget) {
       this.menuTarget.removeEventListener("click", this.boundPreventMenuHide);
@@ -465,6 +476,10 @@ export default class extends Controller {
     if (this.hasThemePanelTarget) {
       this.themePanelTarget.removeEventListener("click",
         this.boundPreventThemeHide);
+    }
+
+    if (this.hasHookPanelTarget) {
+      this.hookPanelTarget.removeEventListener("click", this.boundPreventHookHide);
     }
 
     if (this.hasAttachmentSelectTarget) {
@@ -1283,6 +1298,9 @@ export default class extends Controller {
   handleMenuClose(event = null) { return handleMenuClose(this, event); }
   openAppearanceSettings(event) { return openAppearanceSettings(this, event); }
   closeThemePanel(event = null) { return closeThemePanel(this, event); }
+  openHookPanel(event) { return openHookPanel(this, event); }
+  closeHookPanel(event = null) { return closeHookPanel(this, event); }
+  saveHookSettings(event) { return saveHookSettings(this, event); }
 
   updateBackgroundColor(event) { return updateBackgroundColor(this, event); }
   updateBubbleColor(event) { return updateBubbleColor(this, event); }

@@ -77,15 +77,25 @@ class MessagesController < ApplicationController
 
   def create
     args = send_message_params
-    chat_room = ChatRoom.includes(:contact).find(args[:chat_room_id])
+    chat_room = ChatRoom.includes(:contact, :chat_room_hook).find(args[:chat_room_id])
+    message_attrs = hook_message_attrs(args)
+
+    before_result = run_chat_room_hook(chat_room, "beforeSend", hook_context(chat_room, message_attrs))
+    if before_result["action"].to_s == "block"
+      render json: { success: false, message: before_result["message"].presence || "消息已被 Hook 拦截" }
+      return
+    end
+    apply_before_hook_result(message_attrs, before_result)
+
     sender = MessageSender.new(
       chat_room,
-      args[:msg_type]&.to_i,
-      args[:content],
-      args[:extra],
-      args[:file]
+      message_attrs[:msg_type],
+      message_attrs[:content],
+      message_attrs[:extra],
+      message_attrs[:file]
     )
     res = sender.send
+    run_chat_room_hook(chat_room, "afterSend", hook_context(chat_room, message_attrs).merge(result: res))
     serialized = serialize_send_result(res, chat_room.id)
     render json: serialized
   end
@@ -1028,5 +1038,57 @@ class MessagesController < ApplicationController
     params.require(:msg_type)
     # params.require(:content)
     params.permit(:chat_room_id, :msg_type, :content, :file, extra: {})
+  end
+
+  def hook_message_attrs(args)
+    {
+      msg_type: args[:msg_type]&.to_i,
+      content: args[:content],
+      extra: args[:extra]&.to_h || {},
+      file: args[:file]
+    }
+  end
+
+  def hook_context(chat_room, message_attrs)
+    {
+      room: {
+        id: chat_room.id,
+        wx_id: chat_room.wx_id,
+        name: chat_room.name,
+        contact_id: chat_room.contact_id
+      },
+      message: {
+        msg_type: message_attrs[:msg_type],
+        content: message_attrs[:content].to_s,
+        extra: message_attrs[:extra] || {},
+        has_file: message_attrs[:file].present?,
+        file: hook_file_context(message_attrs[:file])
+      }
+    }
+  end
+
+  def hook_file_context(file)
+    return nil unless file.respond_to?(:original_filename)
+
+    {
+      original_filename: file.original_filename,
+      content_type: file.content_type,
+      size: file.respond_to?(:size) ? file.size : nil
+    }
+  end
+
+  def run_chat_room_hook(chat_room, event, context)
+    ChatRoomHookRunner.new(chat_room.chat_room_hook).run(event: event, context: context)
+  end
+
+  def apply_before_hook_result(message_attrs, hook_result)
+    return unless hook_result["action"].to_s == "modify"
+
+    message = hook_result["message"]
+    return unless message.is_a?(Hash)
+
+    message_attrs[:content] = message["content"].to_s if message.key?("content")
+    message_attrs[:msg_type] = message["msg_type"].to_i if message.key?("msg_type")
+    message_attrs[:extra] = message["extra"] if message["extra"].is_a?(Hash)
   end
 end

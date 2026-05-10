@@ -3,6 +3,7 @@ class ChatRoom < ApplicationRecord
   has_many :messages, -> { order(message_time: :desc) }
   has_many :chat_room_members
   has_many :chat_folder_memberships, dependent: :destroy
+  has_one :chat_room_hook, dependent: :destroy
 
   scope :order_by_latest_message, -> {
     left_joins(:messages)

@@ -282,6 +282,9 @@ export function closeMenu(controller, event = null) {
     if (controller.hasThemePanelTarget && controller.themePanelTarget.contains(target)) {
       return;
     }
+    if (controller.hasHookPanelTarget && controller.hookPanelTarget.contains(target)) {
+      return;
+    }
   }
 
   if (!controller.menuTarget.classList.contains("hidden")) {
@@ -318,6 +321,91 @@ export function closeThemePanel(controller, event = null) {
   }
 
   document.removeEventListener("click", controller.boundCloseThemePanel);
+}
+
+export function openHookPanel(controller, event) {
+  event.stopPropagation();
+  closeMenu(controller);
+
+  if (!controller.hasHookPanelTarget) {
+    return;
+  }
+
+  controller.hookPanelTarget.classList.remove("hidden");
+  loadHookSettings(controller);
+  document.addEventListener("click", controller.boundCloseHookPanel);
+}
+
+export function closeHookPanel(controller, event = null) {
+  if (!controller.hasHookPanelTarget) {
+    return;
+  }
+  if (!controller.hookPanelTarget.classList.contains("hidden")) {
+    controller.hookPanelTarget.classList.add("hidden");
+  }
+
+  document.removeEventListener("click", controller.boundCloseHookPanel);
+}
+
+export function loadHookSettings(controller) {
+  if (controller.hasHookStatusTarget) {
+    controller.hookStatusTarget.textContent = "加载 Hook 配置中…";
+  }
+
+  fetch(`/chat_room/${controller.idValue}/hook`, {
+    cache: "no-store",
+    headers: { "Accept": "application/json" }
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error(`请求失败: ${res.status}`);
+      return res.json();
+    })
+    .then((hook) => {
+      if (controller.hasHookEnabledInputTarget) controller.hookEnabledInputTarget.checked = Boolean(hook.enabled);
+      if (controller.hasHookTimeoutInputTarget) controller.hookTimeoutInputTarget.value = hook.timeout_ms || 1000;
+      if (controller.hasHookCodeInputTarget) controller.hookCodeInputTarget.value = hook.code || "";
+      if (controller.hasHookStatusTarget) {
+        controller.hookStatusTarget.textContent = hook.last_error
+          ? `最近错误：${hook.last_error}`
+          : "Hook 会在服务端 Node 子进程中执行。";
+      }
+    })
+    .catch((error) => {
+      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = `加载失败：${error.message}`;
+    });
+}
+
+export function saveHookSettings(controller, event) {
+  event?.preventDefault();
+  event?.stopPropagation();
+
+  if (controller.hasHookStatusTarget) {
+    controller.hookStatusTarget.textContent = "保存中…";
+  }
+
+  fetch(`/chat_room/${controller.idValue}/hook`, {
+    method: "PATCH",
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content || ""
+    },
+    body: JSON.stringify({
+      hook: {
+        enabled: controller.hasHookEnabledInputTarget ? controller.hookEnabledInputTarget.checked : false,
+        timeout_ms: controller.hasHookTimeoutInputTarget ? controller.hookTimeoutInputTarget.value : 1000,
+        code: controller.hasHookCodeInputTarget ? controller.hookCodeInputTarget.value : ""
+      }
+    })
+  })
+    .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok) throw new Error((data.errors || [data.error || "保存失败"]).join("，"));
+      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = "已保存。";
+    })
+    .catch((error) => {
+      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = `保存失败：${error.message}`;
+    });
 }
 
 export function handleInputCompositionStart(controller) { controller.isInputComposing = true; }

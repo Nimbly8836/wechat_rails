@@ -150,9 +150,9 @@
     </button>
     <button type="button"
             class="tg-room-actions-menu-item"
-            data-action="click->chat-room#handleMenuClose">
+            data-action="click->chat-room#openHookPanel">
       <span aria-hidden="true">⚙️</span>
-      <span>设置界面</span>
+      <span>消息 Hook</span>
     </button>
     <button type="button"
             class="tg-room-actions-menu-item"
@@ -264,6 +264,61 @@
                 class="px-3 py-1.5 text-sm font-medium rounded-full bg-slate-900 text-white hover:bg-slate-700 transition"
                 data-action="click->chat-room#closeThemePanel">
           完成
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div data-chat-room-target="hookPanel"
+       class="hidden absolute right-3 top-36 w-[min(32rem,calc(100%-1.5rem))] bg-white/95 text-slate-900 shadow-xl rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-40">
+    <div class="px-5 py-4 space-y-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-sm font-semibold text-slate-900">消息 Hook</div>
+          <p class="mt-1 text-xs text-slate-500">发送前可修改或拦截消息，发送后可读取发送结果。</p>
+        </div>
+        <button type="button"
+                class="rounded-full px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                data-action="click->chat-room#closeHookPanel">
+          关闭
+        </button>
+      </div>
+      <label class="flex items-center justify-between rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-700">
+        <span>启用 Hook</span>
+        <input type="checkbox"
+               class="h-4 w-4 rounded border-slate-300"
+               data-chat-room-target="hookEnabledInput">
+      </label>
+      <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        超时毫秒
+        <input type="number"
+               min="100"
+               max="5000"
+               step="100"
+               class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+               data-chat-room-target="hookTimeoutInput">
+      </label>
+      <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        JavaScript
+        <textarea rows="12"
+                  spellcheck="false"
+                  class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                  placeholder="module.exports.beforeSend = async function(ctx) {&#10;  if (ctx.message.content.includes('/block')) {&#10;    return { action: 'block', message: 'Blocked by hook' }&#10;  }&#10;  return { action: 'allow' }&#10;}&#10;&#10;module.exports.afterSend = async function(ctx) {&#10;  console.log('sent', ctx.result.success)&#10;  return { ok: true }&#10;}"
+                  data-chat-room-target="hookCodeInput"></textarea>
+      </label>
+      <div class="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500" data-chat-room-target="hookStatus">
+        Hook 会在服务端 Node 子进程中执行。
+      </div>
+      <div class="flex items-center justify-end gap-2">
+        <button type="button"
+                class="text-sm text-slate-400 hover:text-slate-600 transition"
+                data-action="click->chat-room#closeHookPanel">
+          取消
+        </button>
+        <button type="button"
+                class="px-3 py-1.5 text-sm font-medium rounded-full bg-slate-900 text-white hover:bg-slate-700 transition"
+                data-action="click->chat-room#saveHookSettings">
+          保存
         </button>
       </div>
     </div>

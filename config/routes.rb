@@ -45,6 +45,7 @@ Rails.application.routes.draw do
 
   # chat room management
   resources :chat_room do
+    resource :hook, only: [ :show, :update ], controller: "chat_room_hooks"
     resources :messages, only: [:index, :show, :create] do
       collection do
         get :resolve_reference
