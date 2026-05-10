@@ -110,6 +110,10 @@ export function sendMessage(controller, type, message) {
     pendingQuote
   });
 
+  controller.messages.add(msg);
+  controller.renderMessages({ forceScrollToBottom: true });
+  controller.dispatchLocalChatMessage(type, msg);
+
   if (type === "text") {
     hideAllEmojiPreviews();
   }

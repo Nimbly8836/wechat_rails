@@ -248,6 +248,8 @@ export default class extends Controller {
     this.highlightedRow = null;
     this.highlightTimer = null;
     this.loadingOlderMessages = false;
+    this.initialMessagesLoaded = false;
+    this.loadMessagesPromise = null;
     this.autoScrollPinnedToBottom = true;
     this.mediaPreviewOverlay = null;
     this.mediaPreviewFrame = null;
@@ -315,11 +317,13 @@ export default class extends Controller {
     }
 
     this.boundVisibilityRefresh = () => {
-      if (document.visibilityState === "visible") {
+      if (document.visibilityState === "visible" && this.initialMessagesLoaded) {
         this.loadNewMessages();
       }
     };
-    this.boundEventSourceOpen = () => this.loadNewMessages();
+    this.boundEventSourceOpen = () => {
+      if (this.initialMessagesLoaded) this.loadNewMessages();
+    };
     document.addEventListener("visibilitychange", this.boundVisibilityRefresh);
     window.addEventListener("chat:events:open", this.boundEventSourceOpen);
 
@@ -608,7 +612,11 @@ export default class extends Controller {
   syncComposerLayout(options = {}) { return syncComposerLayout(this, options); }
 
   loadMessages({ replace = false } = {}) {
-    return this.fetchMessages()
+    if (this.loadMessagesPromise) {
+      return this.loadMessagesPromise;
+    }
+
+    this.loadMessagesPromise = this.fetchMessages()
       .then(data => {
         if (replace) {
           this.messages.clear();
@@ -616,12 +624,18 @@ export default class extends Controller {
         this.messages.merge(data)
         this.persistMessages();
         this.renderMessages();
+        this.initialMessagesLoaded = true;
         return Array.isArray(data) ? data.length : 0;
       })
       .catch(error => {
         console.error("加载消息失败:", error);
         return 0;
+      })
+      .finally(() => {
+        this.loadMessagesPromise = null;
       });
+
+    return this.loadMessagesPromise;
   }
 
   fetchJson(url, { emptyOnNotModified = null } = {}) {
