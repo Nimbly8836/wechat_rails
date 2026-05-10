@@ -3,13 +3,11 @@
 require "base64"
 require "open3"
 require "tempfile"
-require "fileutils"
 
 class AudioTranscodingService
   class TranscodingError < StandardError; end
 
-  SILK_REPO_URL = "https://github.com/kn007/silk-v3-decoder.git"
-  BUILD_ROOT = Rails.root.join("tmp", "silk_encoder_build", "silk-v3-decoder").freeze
+  ENCODER_PATH = Rails.root.join("vendor", "silk", "encoder").freeze
   SAMPLE_RATE = 24_000
   BIT_RATE = 25_000
   PACKET_LENGTH_MS = 20
@@ -61,14 +59,7 @@ class AudioTranscodingService
   end
 
   def ensure_encoder_available!
-    return if File.exist?(compiled_encoder_path)
-
-    prepare_build_workspace!
-    stdout, stderr, status = Open3.capture3("make", "lib", "encoder", chdir: build_dir.to_s)
-    Rails.logger.debug { "silk encoder build stdout: #{stdout}" } if stdout.present?
-    Rails.logger.warn { "silk encoder build stderr: #{stderr}" } if stderr.present?
-
-    raise TranscodingError, "silk encoder build failed" unless status.success? && File.exist?(compiled_encoder_path)
+    raise TranscodingError, "silk encoder missing at #{ENCODER_PATH}" unless File.executable?(ENCODER_PATH)
   end
 
   def transcode_to_pcm!(input_path, output_path)
@@ -93,7 +84,7 @@ class AudioTranscodingService
 
   def encode_silk!(pcm_path, output_path)
     stdout, stderr, status = Open3.capture3(
-      compiled_encoder_path.to_s,
+      ENCODER_PATH.to_s,
       pcm_path,
       output_path,
       "-quiet",
@@ -152,23 +143,4 @@ class AudioTranscodingService
     @uploaded_file.tempfile.path
   end
 
-  def build_dir
-    BUILD_ROOT.join("silk")
-  end
-
-  def compiled_encoder_path
-    build_dir.join("encoder")
-  end
-
-  def prepare_build_workspace!
-    return if build_dir.exist?
-
-    FileUtils.rm_rf(BUILD_ROOT) if BUILD_ROOT.exist?
-    FileUtils.mkdir_p(BUILD_ROOT.dirname)
-    stdout, stderr, status = Open3.capture3("git", "clone", "--depth", "1", SILK_REPO_URL, BUILD_ROOT.to_s)
-    Rails.logger.debug { "silk encoder clone stdout: #{stdout}" } if stdout.present?
-    Rails.logger.warn { "silk encoder clone stderr: #{stderr}" } if stderr.present?
-
-    raise TranscodingError, "silk encoder clone failed" unless status.success? && build_dir.exist?
-  end
 end

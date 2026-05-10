@@ -51,6 +51,12 @@ COPY . .
 # Precompile bootsnap code for faster boot times
 RUN bundle exec bootsnap precompile app/ lib/
 
+# Build WeChat SILK encoder during image build so runtime does not need network access.
+RUN mkdir -p vendor && \
+    curl -fsSL https://github.com/kn007/silk-v3-decoder/archive/refs/heads/master.tar.gz | \
+    tar -xzf - --strip-components=1 -C vendor && \
+    make -C vendor/silk lib encoder
+
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 
