@@ -4,13 +4,12 @@ require "base64"
 require "open3"
 require "tempfile"
 require "fileutils"
-require "digest/sha1"
 
 class AudioTranscodingService
   class TranscodingError < StandardError; end
 
-  SILK_DIR = Rails.root.join("lib", "silk2mp3", "silk").freeze
-  BUILD_ROOT = Rails.root.join("tmp", "silk_encoder_build").freeze
+  SILK_REPO_URL = "https://github.com/kn007/silk-v3-decoder.git"
+  BUILD_ROOT = Rails.root.join("tmp", "silk_encoder_build", "silk-v3-decoder").freeze
   SAMPLE_RATE = 24_000
   BIT_RATE = 25_000
   PACKET_LENGTH_MS = 20
@@ -154,34 +153,22 @@ class AudioTranscodingService
   end
 
   def build_dir
-    BUILD_ROOT.join(source_signature)
+    BUILD_ROOT.join("silk")
   end
 
   def compiled_encoder_path
     build_dir.join("encoder")
   end
 
-  def source_signature
-    @source_signature ||= begin
-      digest = Digest::SHA1.new
-      Dir.glob(SILK_DIR.join("**", "*")).sort.each do |path|
-        next if File.directory?(path)
-
-        digest.update(path.delete_prefix(SILK_DIR.to_s))
-        digest.update(File.binread(path))
-      end
-      digest.hexdigest
-    end
-  end
-
   def prepare_build_workspace!
     return if build_dir.exist?
 
-    FileUtils.mkdir_p(build_dir)
-    Dir.children(SILK_DIR).each do |entry|
-      source = SILK_DIR.join(entry)
-      destination = build_dir.join(entry)
-      FileUtils.cp_r(source, destination, preserve: true)
-    end
+    FileUtils.rm_rf(BUILD_ROOT) if BUILD_ROOT.exist?
+    FileUtils.mkdir_p(BUILD_ROOT.dirname)
+    stdout, stderr, status = Open3.capture3("git", "clone", "--depth", "1", SILK_REPO_URL, BUILD_ROOT.to_s)
+    Rails.logger.debug { "silk encoder clone stdout: #{stdout}" } if stdout.present?
+    Rails.logger.warn { "silk encoder clone stderr: #{stderr}" } if stderr.present?
+
+    raise TranscodingError, "silk encoder clone failed" unless status.success? && build_dir.exist?
   end
 end
