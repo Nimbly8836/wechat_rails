@@ -368,6 +368,15 @@ function buildChatHistoryItemAction(controller, item) {
   link.textContent = item.type === "image" ? "查看图片" : "下载";
   link.addEventListener("click", (event) => {
     event.preventDefault();
+    if (item.type === "image") {
+      controller.openMediaPreview({
+        src: item.downloadUrl,
+        title: item.title || item.content || "图片预览",
+        meta: "Esc 关闭"
+      });
+      return;
+    }
+
     const filename = item.title || item.content || item.dataId || "record-item";
     controller.downloadFile(item.downloadUrl, filename);
   });

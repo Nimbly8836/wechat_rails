@@ -110,4 +110,11 @@ class ChatControllerTest < ActionDispatch::IntegrationTest
     assert_match(/controller\.openMediaPreview/, bubbles_js)
     assert_no_match(/downloadFile[^\n]*refer-quoted-image/, bubbles_js)
   end
+
+  test "forwarded chat history image actions open preview instead of downloading" do
+    bubbles_js = Rails.root.join("app/javascript/controllers/chat_room/chat_room_message_bubbles.js").read
+
+    assert_match(/if \(item\.type === "image"\) \{\s*controller\.openMediaPreview/m, bubbles_js)
+    assert_match(/controller\.downloadFile\(item\.downloadUrl, filename\)/, bubbles_js)
+  end
 end
