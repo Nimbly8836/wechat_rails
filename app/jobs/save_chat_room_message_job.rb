@@ -55,7 +55,10 @@ class SaveChatRoomMessageJob < ApplicationJob
       Rails.logger.debug { "Insert result: #{result.to_json}" }
 
       message_ids = messages_to_save.map { |message| message[:wx_messages_id] }
-      Message.includes(:wx_message).where(wx_messages_id: message_ids).find_each(&:notify_chat_room)
+      Message.includes(:wx_message).where(wx_messages_id: message_ids).find_each do |message|
+        message.notify_chat_room
+        run_chat_room_bots(message)
+      end
     end
   rescue StandardError => e
     Rails.logger.error "Failed to save messages: #{e.message}\n#{e.backtrace.join("\n")}"
@@ -63,6 +66,53 @@ class SaveChatRoomMessageJob < ApplicationJob
   end
 
   private
+
+  def run_chat_room_bots(message)
+    wx_message = message.wx_message
+    return if wx_message.blank? || wx_message.self_send?
+
+    chat_room = ChatRoom.includes(:contact, chat_room_bots: :chat_bot).find(message.chat_room_id)
+    ChatRoomBotRunner.new(chat_room).run_on_message(bot_message_context(chat_room, message, wx_message)) do |_bot, result|
+      send_bot_reply(chat_room, result)
+    end
+  rescue => e
+    Rails.logger.error "Failed to run chat room bots: message_id=#{message.id} #{e.class}: #{e.message}"
+  end
+
+  def send_bot_reply(chat_room, result)
+    content = result["content"].presence || result.dig("message", "content").presence
+    return if content.blank?
+
+    msg_type = (result["msg_type"] || result.dig("message", "msg_type") || MessageSender::MESSAGE_TYPES[:text]).to_i
+    extra = result["extra"].is_a?(Hash) ? result["extra"] : result.dig("message", "extra")
+    extra = {} unless extra.is_a?(Hash)
+
+    MessageSender.new(chat_room, msg_type, content.to_s, extra, nil).send
+  end
+
+  def bot_message_context(chat_room, message, wx_message)
+    {
+      room: {
+        id: chat_room.id,
+        wx_id: chat_room.wx_id,
+        name: chat_room.name,
+        contact_id: chat_room.contact_id
+      },
+      message: {
+        id: message.id,
+        wx_message_id: wx_message.id,
+        msg_type: wx_message.msg_type_before_type_cast,
+        type: wx_message.get_real_msg_type.to_s,
+        content: WxMessage.strip_sender_prefix(wx_message.preview_content.to_s).strip,
+        raw_content: wx_message.content.to_s,
+        from_user_name: wx_message.from_user_name,
+        to_user_name: wx_message.to_user_name,
+        push_content: wx_message.push_content.to_s,
+        self_send: wx_message.self_send?,
+        message_time: message.message_time&.iso8601
+      }
+    }
+  end
 
   def message_id_for(message)
     message["id"] || message[:id]

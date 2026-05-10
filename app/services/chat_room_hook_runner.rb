@@ -11,7 +11,7 @@ class ChatRoomHookRunner
   end
 
   def run(event:, context:)
-    return { "action" => "allow" } unless @hook&.active?
+    return fallback_result(event) unless @hook&.active?
 
     stdout, stderr, status = execute_node(event, context)
     raise "#{stderr.presence || 'hook failed'}" unless status.success?
@@ -20,7 +20,7 @@ class ChatRoomHookRunner
     payload = JSON.parse(stdout.presence || "{}")
     raise(payload["error"].presence || "hook failed") unless payload["ok"]
 
-    normalize_result(payload["result"])
+    normalize_result(payload["result"], event)
   rescue Timeout::Error
     record_error("hook timed out")
     fallback_result(event)
@@ -42,19 +42,31 @@ class ChatRoomHookRunner
       context: context
     })
 
-    Timeout.timeout(timeout_ms / 1000.0) do
-      Open3.capture3("node", RUNNER_PATH.to_s, stdin_data: input)
+    Timeout.timeout((timeout_ms / 1000.0) + 0.2) do
+      capture_node(input)
     end
   end
 
-  def normalize_result(result)
-    return { "action" => "allow" } unless result.is_a?(Hash)
+  def capture_node(input)
+    node_binaries.each_with_index do |binary, index|
+      return Open3.capture3(binary, RUNNER_PATH.to_s, stdin_data: input)
+    rescue Errno::ENOENT
+      raise if index == node_binaries.length - 1
+    end
+  end
+
+  def node_binaries
+    [ ENV["NODE_BINARY"].presence, "node", "nodejs" ].compact.uniq
+  end
+
+  def normalize_result(result, event)
+    return fallback_result(event) unless result.is_a?(Hash)
 
     result
   end
 
   def fallback_result(event)
-    event.to_s == "beforeSend" ? { "action" => "allow" } : {}
+    event.to_s == "beforeSend" ? { "action" => "allow" } : { "action" => "ignore" }
   end
 
   def record_error(message)
@@ -66,6 +78,6 @@ class ChatRoomHookRunner
   end
 
   def timeout_ms
-    @timeout_ms ||= @hook.timeout_ms.to_i.clamp(ChatRoomHook::MIN_TIMEOUT_MS, ChatRoomHook::MAX_TIMEOUT_MS)
+    @timeout_ms ||= @hook.timeout_ms.to_i.clamp(ChatBot::MIN_TIMEOUT_MS, ChatBot::MAX_TIMEOUT_MS)
   end
 end

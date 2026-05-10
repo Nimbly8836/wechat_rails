@@ -349,30 +349,62 @@ export function closeHookPanel(controller, event = null) {
 
 export function loadHookSettings(controller) {
   if (controller.hasHookStatusTarget) {
-    controller.hookStatusTarget.textContent = "加载 Hook 配置中…";
+    controller.hookStatusTarget.textContent = "加载 Bot 配置中…";
   }
 
-  fetch(`/chat_room/${controller.idValue}/hook`, {
-    cache: "no-store",
-    headers: { "Accept": "application/json" }
-  })
-    .then((res) => {
-      if (!res.ok) throw new Error(`请求失败: ${res.status}`);
-      return res.json();
+  Promise.all([
+    fetch("/chat_bots", { cache: "no-store", headers: { "Accept": "application/json" } }),
+    fetch(`/chat_room/${controller.idValue}/hook`, { cache: "no-store", headers: { "Accept": "application/json" } })
+  ])
+    .then(async ([botsRes, roomRes]) => {
+      if (!botsRes.ok) throw new Error(`请求 Bot 失败: ${botsRes.status}`);
+      if (!roomRes.ok) throw new Error(`请求房间 Bot 失败: ${roomRes.status}`);
+      return { bots: await botsRes.json(), room: await roomRes.json() };
     })
-    .then((hook) => {
-      if (controller.hasHookEnabledInputTarget) controller.hookEnabledInputTarget.checked = Boolean(hook.enabled);
-      if (controller.hasHookTimeoutInputTarget) controller.hookTimeoutInputTarget.value = hook.timeout_ms || 1000;
-      if (controller.hasHookCodeInputTarget) controller.hookCodeInputTarget.value = hook.code || "";
+    .then(({ bots, room }) => {
+      controller.availableChatBots = bots.bots || [];
+      controller.enabledChatBotIds = room.enabled_bot_ids || [];
+      renderHookBotList(controller);
       if (controller.hasHookStatusTarget) {
-        controller.hookStatusTarget.textContent = hook.last_error
-          ? `最近错误：${hook.last_error}`
-          : "Hook 会在服务端 Node 子进程中执行。";
+        const errors = controller.availableChatBots.filter((bot) => bot.last_error).map((bot) => `${bot.name}: ${bot.last_error}`);
+        controller.hookStatusTarget.textContent = errors.length > 0
+          ? `最近错误：${errors.join("；")}`
+          : "Bot 会在服务端 Node 子进程中执行。";
       }
     })
     .catch((error) => {
       if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = `加载失败：${error.message}`;
     });
+}
+
+export function renderHookBotList(controller) {
+  if (!controller.hasHookBotListTarget) {
+    return;
+  }
+
+  const bots = controller.availableChatBots || [];
+  const enabledIds = new Set((controller.enabledChatBotIds || []).map(Number));
+  if (bots.length === 0) {
+    controller.hookBotListTarget.innerHTML = `
+      <div class="rounded-2xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">
+        还没有 Bot，先在下面创建一个。
+      </div>
+    `;
+    return;
+  }
+
+  controller.hookBotListTarget.innerHTML = bots.map((bot) => `
+    <label class="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-700">
+      <span class="min-w-0">
+        <span class="block truncate font-medium">${controller.escapeHtml(bot.name || "Bot")}</span>
+        <span class="block truncate text-xs text-slate-400">${bot.enabled ? "全局启用" : "全局停用"}</span>
+      </span>
+      <input type="checkbox"
+             class="h-4 w-4 rounded border-slate-300"
+             data-chat-room-bot-id="${controller.escapeHtml(String(bot.id))}"
+             ${enabledIds.has(Number(bot.id)) ? "checked" : ""}>
+    </label>
+  `).join("");
 }
 
 export function saveHookSettings(controller, event) {
@@ -383,6 +415,10 @@ export function saveHookSettings(controller, event) {
     controller.hookStatusTarget.textContent = "保存中…";
   }
 
+  const enabledBotIds = controller.hasHookBotListTarget
+    ? Array.from(controller.hookBotListTarget.querySelectorAll("[data-chat-room-bot-id]:checked")).map((input) => input.dataset.chatRoomBotId)
+    : [];
+
   fetch(`/chat_room/${controller.idValue}/hook`, {
     method: "PATCH",
     headers: {
@@ -390,9 +426,38 @@ export function saveHookSettings(controller, event) {
       "Content-Type": "application/json",
       "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content || ""
     },
+    body: JSON.stringify({ enabled_bot_ids: enabledBotIds })
+  })
+    .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok) throw new Error((data.errors || [data.error || "保存失败"]).join("，"));
+      controller.enabledChatBotIds = data.enabled_bot_ids || [];
+      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = "已保存。";
+    })
+    .catch((error) => {
+      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = `保存失败：${error.message}`;
+    });
+}
+
+export function createHookBot(controller, event) {
+  event?.preventDefault();
+  event?.stopPropagation();
+
+  if (controller.hasHookStatusTarget) {
+    controller.hookStatusTarget.textContent = "创建 Bot 中…";
+  }
+
+  fetch("/chat_bots", {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content || ""
+    },
     body: JSON.stringify({
-      hook: {
-        enabled: controller.hasHookEnabledInputTarget ? controller.hookEnabledInputTarget.checked : false,
+      bot: {
+        name: controller.hasHookNameInputTarget ? controller.hookNameInputTarget.value : "",
+        enabled: controller.hasHookEnabledInputTarget ? controller.hookEnabledInputTarget.checked : true,
         timeout_ms: controller.hasHookTimeoutInputTarget ? controller.hookTimeoutInputTarget.value : 1000,
         code: controller.hasHookCodeInputTarget ? controller.hookCodeInputTarget.value : ""
       }
@@ -400,11 +465,15 @@ export function saveHookSettings(controller, event) {
   })
     .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
     .then(({ ok, data }) => {
-      if (!ok) throw new Error((data.errors || [data.error || "保存失败"]).join("，"));
-      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = "已保存。";
+      if (!ok) throw new Error((data.errors || [data.error || "创建失败"]).join("，"));
+      controller.availableChatBots = [...(controller.availableChatBots || []), data];
+      controller.enabledChatBotIds = [...new Set([...(controller.enabledChatBotIds || []), data.id])];
+      renderHookBotList(controller);
+      if (controller.hasHookNameInputTarget) controller.hookNameInputTarget.value = "";
+      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = "Bot 已创建并加入当前房间。";
     })
     .catch((error) => {
-      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = `保存失败：${error.message}`;
+      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = `创建失败：${error.message}`;
     });
 }
 

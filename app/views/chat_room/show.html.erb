@@ -152,7 +152,7 @@
             class="tg-room-actions-menu-item"
             data-action="click->chat-room#openHookPanel">
       <span aria-hidden="true">⚙️</span>
-      <span>消息 Hook</span>
+      <span>房间 Bot</span>
     </button>
     <button type="button"
             class="tg-room-actions-menu-item"
@@ -270,12 +270,12 @@
   </div>
 
   <div data-chat-room-target="hookPanel"
-       class="hidden absolute right-3 top-36 w-[min(32rem,calc(100%-1.5rem))] bg-white/95 text-slate-900 shadow-xl rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-40">
-    <div class="px-5 py-4 space-y-4">
+       class="hidden absolute right-3 top-36 w-[min(36rem,calc(100%-1.5rem))] bg-white/95 text-slate-900 shadow-xl rounded-2xl ring-1 ring-slate-200 backdrop-blur-md z-40">
+    <div class="max-h-[calc(100vh-10rem)] overflow-y-auto px-5 py-4 space-y-4">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <div class="text-sm font-semibold text-slate-900">消息 Hook</div>
-          <p class="mt-1 text-xs text-slate-500">发送前可修改或拦截消息，发送后可读取发送结果。</p>
+          <div class="text-sm font-semibold text-slate-900">房间 Bot</div>
+          <p class="mt-1 text-xs text-slate-500">Bot 是全局的；每个聊天室可以加入不同 Bot，支持 beforeSend、afterSend 和 onMessage。</p>
         </div>
         <button type="button"
                 class="rounded-full px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
@@ -283,31 +283,48 @@
           关闭
         </button>
       </div>
-      <label class="flex items-center justify-between rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-700">
-        <span>启用 Hook</span>
-        <input type="checkbox"
-               class="h-4 w-4 rounded border-slate-300"
-               data-chat-room-target="hookEnabledInput">
-      </label>
-      <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-        超时毫秒
-        <input type="number"
-               min="100"
-               max="5000"
-               step="100"
-               class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-               data-chat-room-target="hookTimeoutInput">
-      </label>
-      <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-        JavaScript
-        <textarea rows="12"
-                  spellcheck="false"
-                  class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                  placeholder="module.exports.beforeSend = async function(ctx) {&#10;  if (ctx.message.content.includes('/block')) {&#10;    return { action: 'block', message: 'Blocked by hook' }&#10;  }&#10;  return { action: 'allow' }&#10;}&#10;&#10;module.exports.afterSend = async function(ctx) {&#10;  console.log('sent', ctx.result.success)&#10;  return { ok: true }&#10;}"
-                  data-chat-room-target="hookCodeInput"></textarea>
-      </label>
+      <div class="space-y-2" data-chat-room-target="hookBotList">
+        <div class="rounded-2xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">加载 Bot 中…</div>
+      </div>
+      <div class="rounded-2xl border border-slate-200 px-3 py-3 space-y-3">
+        <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">新建全局 Bot</div>
+        <input type="text"
+               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+               placeholder="Bot 名称，例如 bot2 天气助手"
+               data-chat-room-target="hookNameInput">
+        <label class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <span>全局启用</span>
+          <input type="checkbox"
+                 checked
+                 class="h-4 w-4 rounded border-slate-300"
+                 data-chat-room-target="hookEnabledInput">
+        </label>
+        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+          超时毫秒
+          <input type="number"
+                 min="100"
+                 max="5000"
+                 step="100"
+                 value="1000"
+                 class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                 data-chat-room-target="hookTimeoutInput">
+        </label>
+        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+          JavaScript
+          <textarea rows="14"
+                    spellcheck="false"
+                    class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                    placeholder="module.exports.onMessage = async function(ctx) {&#10;  if (ctx.message.content === '/ping') {&#10;    return { action: 'reply', content: '/pong' }&#10;  }&#10;  if (ctx.message.content === '天气') {&#10;    return { action: 'reply', content: '今天晴。' }&#10;  }&#10;  return { action: 'ignore' }&#10;}&#10;&#10;module.exports.beforeSend = async function(ctx) {&#10;  return { action: 'allow' }&#10;}&#10;&#10;module.exports.afterSend = async function(ctx) {&#10;  console.log(ctx.bot.name, ctx.result.success)&#10;}"
+                    data-chat-room-target="hookCodeInput"></textarea>
+        </label>
+        <button type="button"
+                class="px-3 py-1.5 text-sm font-medium rounded-full bg-slate-900 text-white hover:bg-slate-700 transition"
+                data-action="click->chat-room#createHookBot">
+          创建并加入当前房间
+        </button>
+      </div>
       <div class="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500" data-chat-room-target="hookStatus">
-        Hook 会在服务端 Node 子进程中执行。
+        Bot 会在服务端 Node 子进程中执行。
       </div>
       <div class="flex items-center justify-end gap-2">
         <button type="button"
@@ -318,7 +335,7 @@
         <button type="button"
                 class="px-3 py-1.5 text-sm font-medium rounded-full bg-slate-900 text-white hover:bg-slate-700 transition"
                 data-action="click->chat-room#saveHookSettings">
-          保存
+          保存当前房间 Bot
         </button>
       </div>
     </div>

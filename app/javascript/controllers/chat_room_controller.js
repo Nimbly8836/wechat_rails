@@ -145,6 +145,7 @@ import {
   openHookPanel,
   closeHookPanel,
   saveHookSettings,
+  createHookBot,
   handleInputCompositionStart,
   handleInputCompositionEnd,
   handleInputKeydown,
@@ -178,8 +179,8 @@ export default class extends Controller {
     "backgroundImageInput", "backgroundUploadInput", "backgroundUploadStatus",
     "fileInput", "uploadStatus",
     "fontSelect", "fontCustomInput", "attachmentSelect", "quoteComposer",
-    "quoteComposerMeta", "quoteComposerContent", "hookPanel", "hookEnabledInput",
-    "hookTimeoutInput", "hookCodeInput", "hookStatus", "searchPanel",
+    "quoteComposerMeta", "quoteComposerContent", "hookPanel", "hookBotList",
+    "hookNameInput", "hookEnabledInput", "hookTimeoutInput", "hookCodeInput", "hookStatus", "searchPanel",
     "searchInput", "searchResults", "searchEmpty", "membersPanel",
     "memberSearchInput", "memberResults", "memberEmpty", "voiceRecorder",
     "voiceRecorderStatus", "voiceRecorderTimer"];
@@ -1301,6 +1302,7 @@ export default class extends Controller {
   openHookPanel(event) { return openHookPanel(this, event); }
   closeHookPanel(event = null) { return closeHookPanel(this, event); }
   saveHookSettings(event) { return saveHookSettings(this, event); }
+  createHookBot(event) { return createHookBot(this, event); }
 
   updateBackgroundColor(event) { return updateBackgroundColor(this, event); }
   updateBubbleColor(event) { return updateBubbleColor(this, event); }

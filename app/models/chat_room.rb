@@ -4,6 +4,8 @@ class ChatRoom < ApplicationRecord
   has_many :chat_room_members
   has_many :chat_folder_memberships, dependent: :destroy
   has_one :chat_room_hook, dependent: :destroy
+  has_many :chat_room_bots, -> { order(:position, :id) }, dependent: :destroy
+  has_many :chat_bots, through: :chat_room_bots
 
   scope :order_by_latest_message, -> {
     left_joins(:messages)

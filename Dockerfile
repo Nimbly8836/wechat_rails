@@ -20,7 +20,7 @@ WORKDIR /rails
 # Install base packages
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
-    curl libjemalloc2 libvips sqlite3 ffmpeg \
+    curl libjemalloc2 libvips sqlite3 ffmpeg nodejs \
     gcc g++ make \
     && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
