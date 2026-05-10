@@ -98,4 +98,16 @@ class ChatControllerTest < ActionDispatch::IntegrationTest
     assert_no_match(/\.tg-app-shell\.tg-sidebar-rail-only \.tg-desktop-sidebar-toggle\s*\{[^}]*left:\s*102px/m,
       css)
   end
+
+  test "quoted image messages render inline preview instead of download action" do
+    template = Rails.root.join("app/views/chat/_message_templates.html.erb").read
+    bubbles_js = Rails.root.join("app/javascript/controllers/chat_room/chat_room_message_bubbles.js").read
+
+    assert_match(/data-role="refer-quoted-image-wrapper"/, template)
+    assert_match(/data-role="refer-quoted-image"/, template)
+    assert_match(/renderQuotedImagePreview/, bubbles_js)
+    assert_match(/controller\.attachmentUrl\("image", refWx\)/, bubbles_js)
+    assert_match(/controller\.openMediaPreview/, bubbles_js)
+    assert_no_match(/downloadFile[^\n]*refer-quoted-image/, bubbles_js)
+  end
 end

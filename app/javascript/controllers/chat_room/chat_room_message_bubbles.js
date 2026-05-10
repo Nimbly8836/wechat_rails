@@ -727,6 +727,65 @@ export function renderVoiceMessage(controller, bubble, msg, isNewGroup, senderIn
   return controller.applyBubbleStyle(voiceBubble, msg, isNewGroup, senderInfo, isFirstMessage);
 }
 
+function prepareReferencedWxMessage(referenced) {
+  if (!referenced?.wx_message) return null;
+
+  const refWx = referenced.wx_message;
+  refWx._messageId = refWx._messageId || referenced.message_id || referenced.id;
+  refWx._wxMessageId = refWx._wxMessageId || referenced.wx_message_id || referenced.wx_messages_id;
+  refWx._cacheKey = refWx._cacheKey || referenced.updated_at || referenced.message_time || referenced.created_at;
+  return refWx;
+}
+
+function renderQuotedImagePreview(controller, referBubble, refWx) {
+  const wrapper = referBubble.querySelector("[data-role='refer-quoted-image-wrapper']");
+  const image = referBubble.querySelector("[data-role='refer-quoted-image']");
+  if (!wrapper || !image) return;
+
+  wrapper.classList.add("hidden");
+  wrapper.classList.remove("cursor-zoom-in");
+  wrapper.removeAttribute("role");
+  wrapper.removeAttribute("tabindex");
+  image.removeAttribute("src");
+  image.dataset.sourceUrl = "";
+
+  if (controller.normalizeMessageType(refWx) !== "image") return;
+
+  const imageUrl = controller.attachmentUrl("image", refWx);
+  if (!imageUrl) return;
+
+  const openPreview = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const previewUrl = image.dataset.sourceUrl || image.currentSrc || image.src;
+    if (!previewUrl) return;
+    controller.openMediaPreview({
+      src: previewUrl,
+      title: controller.buildMediaPreviewTitle(refWx, "引用图片预览"),
+      meta: "Esc 关闭"
+    });
+  };
+
+  image.addEventListener("load", () => {
+    wrapper.classList.remove("hidden");
+    controller.stickToBottomIfNeeded();
+  }, { once: true });
+  image.addEventListener("error", () => {
+    wrapper.classList.add("hidden");
+    image.removeAttribute("src");
+  }, { once: true });
+  wrapper.classList.add("cursor-zoom-in");
+  wrapper.setAttribute("role", "button");
+  wrapper.setAttribute("tabindex", "0");
+  wrapper.addEventListener("click", openPreview);
+  wrapper.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    openPreview(event);
+  });
+  image.dataset.sourceUrl = imageUrl;
+  image.src = imageUrl;
+}
+
 export function renderReferMessage(controller, bubble, msg, isNewGroup, senderInfo, isFirstMessage) {
   const template = controller.cloneTemplate("message-template-refer");
   const referBubble = template || bubble;
@@ -743,10 +802,11 @@ export function renderReferMessage(controller, bubble, msg, isNewGroup, senderIn
 
   const referenced = msg.referenced_message;
   if (referenced && referenced.wx_message) {
-    const refWx = referenced.wx_message;
+    const refWx = prepareReferencedWxMessage(referenced);
     controller.replaceRoomSenderWxid(refWx);
     const preview = controller.buildMessagePreview(refWx);
     const referenceSender = controller.lookupSenderInfo(refWx, refWx.content);
+    renderQuotedImagePreview(controller, referBubble, refWx);
     if (quoted) {
       quoted.classList.remove("cursor-not-allowed", "opacity-60");
       if (referNewMsgId) {
