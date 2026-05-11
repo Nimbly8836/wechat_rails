@@ -52,7 +52,7 @@ class ChatRoom < ApplicationRecord
   end
 
   def official_account?
-    wx_id.to_s.start_with?("gh_") || contact&.official_account?
+    contact&.official_account? || false
   end
 
   def official_account

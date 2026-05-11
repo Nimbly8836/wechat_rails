@@ -14,7 +14,7 @@ class Contact < ApplicationRecord
   end
 
   def official_account?
-    user_name.to_s.start_with?("gh_")
+    !description.nil?
   end
 
   def official_account
