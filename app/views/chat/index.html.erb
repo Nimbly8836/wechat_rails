@@ -73,6 +73,70 @@
              data-chat-target="contactsList"
              data-action="scroll->chat#highlightLetter">
           <div class="space-y-3 px-1">
+            <div class="flex items-center justify-end gap-2 px-1 text-xs">
+              <button type="button"
+                      class="rounded-full px-2 py-1 font-medium text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                      data-action="click->chat#expandAllContactGroups">
+                展开全部
+              </button>
+              <button type="button"
+                      class="rounded-full px-2 py-1 font-medium text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                      data-action="click->chat#collapseAllContactGroups">
+                收起全部
+              </button>
+            </div>
+
+            <div id="group-bots"
+                 data-chat-target="group"
+                 data-chat-collapsible-group
+                 data-group-key="bots">
+              <button type="button"
+                      class="tg-contact-section-header"
+                      data-chat-group-toggle
+                      data-action="click->chat#toggleContactGroup"
+                      data-chat-group-key-param="bots">
+                <span class="flex items-center gap-3">
+                  <span class="tg-contact-section-accent is-bot"></span>
+                  <span>BOT</span>
+                </span>
+                <span class="flex items-center gap-2">
+                  <span class="rounded-full bg-violet-100 px-2 py-0.5 text-xs text-violet-700" data-chat-target="botCount"><%= @chat_bots.size %></span>
+                  <svg class="h-4 w-4 text-slate-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-chat-group-chevron>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m6 9 6 6 6-6"/>
+                  </svg>
+                </span>
+              </button>
+              <div class="space-y-1 pt-2" data-chat-group-body data-chat-target="botList">
+                <% if @chat_bots.any? %>
+                  <% @chat_bots.each do |bot| %>
+                    <div class="tg-contact-row flex cursor-pointer items-center px-4 py-3 transition hover:bg-violet-50/70"
+                         data-bot-id="<%= bot.id %>"
+                         data-chat-target="bot"
+                         data-action="click->chat#selectBot">
+                      <div class="mr-3 flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-[1rem] bg-violet-100 text-xs font-bold text-violet-700">BOT</div>
+                      <div class="flex-1 overflow-hidden">
+                        <div class="flex items-center gap-2">
+                          <div class="truncate font-medium text-slate-900" data-chat-bot-name><%= bot.name.presence || "未命名 Bot" %></div>
+                          <span class="tg-room-badge is-bot">BOT</span>
+                        </div>
+                        <div class="truncate text-xs text-slate-400" data-chat-bot-meta><%= bot.enabled? ? "全局启用" : "全局停用" %> · <%= bot.timeout_ms || 1000 %>ms</div>
+                      </div>
+                    </div>
+                  <% end %>
+                <% else %>
+                  <button type="button"
+                          class="tg-contact-row flex w-full cursor-pointer items-center px-4 py-3 text-left transition hover:bg-violet-50/70"
+                          data-action="click->chat#openNewBot">
+                    <div class="mr-3 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[1rem] bg-violet-100 text-lg font-bold text-violet-700">+</div>
+                    <div class="min-w-0 flex-1">
+                      <div class="font-medium text-slate-900">新建 Bot</div>
+                      <div class="truncate text-xs text-slate-400">创建后可加入任意聊天室</div>
+                    </div>
+                  </button>
+                <% end %>
+              </div>
+            </div>
+
             <% if @official_contacts.any? %>
               <div id="group-official-accounts"
                    data-chat-target="group"

@@ -1,0 +1,107 @@
+<div class="mx-auto flex h-full w-full max-w-4xl flex-col overflow-y-auto bg-gradient-to-b from-white via-slate-50 to-slate-100"
+     data-controller="chat-bot"
+     data-chat-bot-id-value="<%= @bot.persisted? ? @bot.id : "" %>">
+  <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:hidden">
+    <button type="button"
+            class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+            data-action="click->chat-bot#openSidebar">
+      <span aria-hidden="true">&larr;</span>
+      <span>通讯录</span>
+    </button>
+    <div class="text-sm font-semibold text-slate-900">Bot 管理</div>
+    <div class="w-16"></div>
+  </div>
+
+  <div class="px-5 py-6 sm:px-8">
+    <div class="overflow-hidden rounded-[28px] bg-white shadow-[0_18px_55px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70">
+      <div class="bg-[radial-gradient(circle_at_top,_rgba(124,58,237,0.16),_transparent_58%),linear-gradient(135deg,#f8fafc,#e9d5ff)] px-6 py-8 sm:px-10">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div class="inline-flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-violet-100 text-xl font-bold text-violet-700 shadow-sm">BOT</div>
+            <h2 class="mt-4 text-2xl font-semibold text-slate-900" data-chat-bot-target="title">
+              <%= @bot.name.presence || "新建 Bot" %>
+            </h2>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              全局 Bot 可被加入不同聊天室，支持 beforeSend、afterSend 和 onMessage。
+            </p>
+          </div>
+          <button type="button"
+                  class="tg-secondary-action-button self-start"
+                  data-action="click->chat-bot#newBot">
+            新建 Bot
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-5 px-6 py-6 sm:px-10">
+        <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
+          <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+            名称
+            <input type="text"
+                   value="<%= @bot.name %>"
+                   class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                   data-chat-bot-target="nameInput">
+          </label>
+          <label class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 sm:mt-6">
+            <span>全局启用</span>
+            <input type="checkbox"
+                   class="h-4 w-4 rounded border-slate-300"
+                   data-chat-bot-target="enabledInput"
+                   <%= "checked" if @bot.enabled? %>>
+          </label>
+        </div>
+
+        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+          超时毫秒
+          <input type="number"
+                 min="100"
+                 max="5000"
+                 step="100"
+                 value="<%= @bot.timeout_ms || 1000 %>"
+                 class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                 data-chat-bot-target="timeoutInput">
+        </label>
+
+        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+          JavaScript
+          <textarea rows="18"
+                    spellcheck="false"
+                    class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                    data-chat-bot-target="codeInput"><%= @bot.code %></textarea>
+        </label>
+
+        <div class="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500" data-chat-bot-target="status">
+          <% if @bot.last_error.present? %>
+            最近错误：<%= @bot.last_error %>
+            <% if @bot.last_error_at.present? %>
+              （<%= l(@bot.last_error_at, format: :long) %>）
+            <% end %>
+          <% else %>
+            Bot 会在服务端 Node 子进程中执行。
+          <% end %>
+        </div>
+
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <button type="button"
+                  class="text-sm text-rose-500 hover:text-rose-600 transition <%= "hidden" unless @bot.persisted? %>"
+                  data-chat-bot-target="deleteButton"
+                  data-action="click->chat-bot#deleteBot">
+            删除 Bot
+          </button>
+          <div class="flex justify-end gap-2">
+            <button type="button"
+                    class="tg-secondary-action-button"
+                    data-action="click->chat-bot#openSidebar">
+              返回通讯录
+            </button>
+            <button type="button"
+                    class="tg-primary-action-button"
+                    data-action="click->chat-bot#save">
+              保存 Bot
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

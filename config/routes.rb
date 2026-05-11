@@ -38,7 +38,7 @@ Rails.application.routes.draw do
       patch :toggle_emoji
     end
   end
-  resources :chat_bots, only: [ :index, :create, :update, :destroy ]
+  resources :chat_bots, only: [ :index, :show, :create, :update, :destroy ]
 
   # contact management
   get "contact" => "contact#index"

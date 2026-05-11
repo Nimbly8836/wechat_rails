@@ -322,6 +322,11 @@ body.tg-mobile-app {
   color: #1d4ed8;
 }
 
+.tg-room-badge.is-bot {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
 .tg-pin-pill {
   display: inline-flex;
   align-items: center;
@@ -399,6 +404,10 @@ body.tg-mobile-app {
 
 .tg-contact-section-accent.is-group {
   background: #38bdf8;
+}
+
+.tg-contact-section-accent.is-bot {
+  background: #8b5cf6;
 }
 
 .tg-contact-row {

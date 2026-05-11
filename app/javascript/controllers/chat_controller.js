@@ -13,6 +13,8 @@ const DEFAULT_NOTIFICATION_SETTINGS = {
   onlyWhenHidden: true
 }
 
+const DEFAULT_COLLAPSED_CONTACT_GROUPS = new Set(["bots", "official_accounts", "group_chats"])
+
 const DEFAULT_CHAT_FOLDERS = [
   {
     id: "groups",
@@ -41,6 +43,9 @@ export default class extends Controller {
   static targets = [
     "chatBox",
     "contact",
+    "bot",
+    "botList",
+    "botCount",
     "letter",
     "contactsList",
     "group",
@@ -101,6 +106,9 @@ export default class extends Controller {
 
     this.boundHandleOpenChat = this.handleOpenChat.bind(this)
     this.boundHandleOpenContact = this.handleOpenContact.bind(this)
+    this.boundHandleOpenBot = this.handleOpenBot.bind(this)
+    this.boundHandleBotChanged = this.handleBotChanged.bind(this)
+    this.boundHandleBotDeleted = this.handleBotDeleted.bind(this)
     this.boundOpenSidebar = this.openSidebar.bind(this)
     this.boundCloseSidebar = this.closeSidebar.bind(this)
     this.boundHandleViewportChange = this.handleViewportChange.bind(this)
@@ -133,6 +141,9 @@ export default class extends Controller {
 
     this.element.addEventListener("chat:open", this.boundHandleOpenChat)
     this.element.addEventListener("chat:open-contact", this.boundHandleOpenContact)
+    this.element.addEventListener("chat:open-bot", this.boundHandleOpenBot)
+    this.element.addEventListener("chat:bot-changed", this.boundHandleBotChanged)
+    this.element.addEventListener("chat:bot-deleted", this.boundHandleBotDeleted)
     this.element.addEventListener("chat:sidebar:open", this.boundOpenSidebar)
     this.element.addEventListener("chat:sidebar:close", this.boundCloseSidebar)
     window.addEventListener("chat:local-message", this.boundLocalChatMessage)
@@ -157,6 +168,9 @@ export default class extends Controller {
     this.teardownEventSource()
     this.element.removeEventListener("chat:open", this.boundHandleOpenChat)
     this.element.removeEventListener("chat:open-contact", this.boundHandleOpenContact)
+    this.element.removeEventListener("chat:open-bot", this.boundHandleOpenBot)
+    this.element.removeEventListener("chat:bot-changed", this.boundHandleBotChanged)
+    this.element.removeEventListener("chat:bot-deleted", this.boundHandleBotDeleted)
     this.element.removeEventListener("chat:sidebar:open", this.boundOpenSidebar)
     this.element.removeEventListener("chat:sidebar:close", this.boundCloseSidebar)
     window.removeEventListener("chat:local-message", this.boundLocalChatMessage)
@@ -362,7 +376,12 @@ export default class extends Controller {
   }
 
   isContactGroupCollapsed(groupKey) {
-    return !!this.collapsedContactGroups?.[String(groupKey)]
+    const key = String(groupKey)
+    if (Object.prototype.hasOwnProperty.call(this.collapsedContactGroups || {}, key)) {
+      return !!this.collapsedContactGroups[key]
+    }
+
+    return DEFAULT_COLLAPSED_CONTACT_GROUPS.has(key)
   }
 
   applyContactGroupVisibility({ searching = false } = {}) {
@@ -377,7 +396,7 @@ export default class extends Controller {
         return
       }
 
-      const hasVisibleContact = !!group.querySelector('[data-chat-target="contact"]:not(.hidden)')
+      const hasVisibleContact = !!group.querySelector('[data-chat-target="contact"]:not(.hidden), [data-chat-target="bot"]:not(.hidden), button[data-action*="openNewBot"]:not(.hidden)')
       const collapsed = !searching && this.isContactGroupCollapsed(groupKey)
 
       body.classList.toggle("hidden", collapsed)
@@ -1268,7 +1287,7 @@ export default class extends Controller {
     const contactId = contact.dataset.contactId
     const contactName = contact.querySelector(".font-medium")?.textContent?.trim()
 
-    this.contactTargets.forEach((item) => item.classList.remove("bg-slate-100"))
+    this.clearSidebarSelection()
     contact.classList.add("bg-slate-100")
     this.currentRoomId = null
     this.updateMobileHeaderVisibility()
@@ -1286,6 +1305,25 @@ export default class extends Controller {
       })
   }
 
+  selectBot(event) {
+    const bot = event.currentTarget
+    const botId = bot.dataset.botId
+    const botName = bot.querySelector("[data-chat-bot-name]")?.textContent?.trim()
+
+    this.clearSidebarSelection()
+    bot.classList.add("bg-slate-100")
+    this.currentRoomId = null
+    this.updateMobileHeaderVisibility()
+    this.setMobileTitle(botName || "Bot 管理")
+    this.renderChatRoomList(this.chatRooms)
+    this.openBot(botId)
+  }
+
+  clearSidebarSelection() {
+    this.contactTargets.forEach((item) => item.classList.remove("bg-slate-100"))
+    this.botTargets.forEach((item) => item.classList.remove("bg-slate-100"))
+  }
+
   handleOpenChat(event) {
     const chatRoomId = event.detail?.chatRoomId
     if (chatRoomId) {
@@ -1297,6 +1335,37 @@ export default class extends Controller {
     const contactId = event.detail?.contactId
     if (contactId) {
       this.openContact(contactId)
+    }
+  }
+
+  handleOpenBot(event) {
+    const botId = event.detail?.botId
+    if (botId) {
+      this.openBot(botId)
+      return
+    }
+    this.openNewBot()
+  }
+
+  handleBotChanged(event) {
+    const bot = event.detail?.bot
+    if (!bot?.id) {
+      return
+    }
+
+    this.upsertBotRow(bot)
+  }
+
+  handleBotDeleted(event) {
+    const id = event.detail?.id
+    if (!id || !this.hasBotListTarget) {
+      return
+    }
+
+    this.botListTarget.querySelector(`[data-bot-id="${this.escapeHtml(String(id))}"]`)?.remove()
+    this.updateBotCount()
+    if (this.botTargets.length === 0) {
+      this.renderEmptyBotList()
     }
   }
 
@@ -1380,6 +1449,34 @@ export default class extends Controller {
       .catch(() => {
         this.chatBoxTarget.innerHTML = '<div class="flex h-full items-center justify-center px-6 text-sm text-rose-500">联系人详情加载失败</div>'
       })
+  }
+
+  openBot(botId) {
+    this.currentRoomId = null
+    this.updateMobileHeaderVisibility()
+    this.renderChatRoomList(this.chatRooms)
+    this.setMobileTitle("Bot 管理")
+
+    fetch(`/chat_bots/${encodeURIComponent(botId)}`)
+      .then((resp) => {
+        if (!resp.ok) {
+          throw new Error(`Bot 管理加载失败: ${resp.status}`)
+        }
+        return resp.text()
+      })
+      .then((html) => {
+        this.chatBoxTarget.innerHTML = html
+        this.closeSidebar()
+      })
+      .catch(() => {
+        this.chatBoxTarget.innerHTML = '<div class="flex h-full items-center justify-center px-6 text-sm text-rose-500">Bot 管理加载失败</div>'
+      })
+  }
+
+  openNewBot(event = null) {
+    event?.preventDefault()
+    this.clearSidebarSelection()
+    this.openBot("new")
   }
 
   switchTab(event) {
@@ -1567,6 +1664,70 @@ export default class extends Controller {
     })
   }
 
+  upsertBotRow(bot) {
+    if (!this.hasBotListTarget) {
+      return
+    }
+
+    const emptyButton = this.botListTarget.querySelector("button[data-action*='openNewBot']")
+    emptyButton?.remove()
+    const existing = this.botListTarget.querySelector(`[data-bot-id="${this.escapeHtml(String(bot.id))}"]`)
+    const wrapper = document.createElement("div")
+    wrapper.innerHTML = this.renderBotRow(bot).trim()
+    const row = wrapper.firstElementChild
+    row.addEventListener("click", (event) => this.selectBot(event))
+    if (existing) {
+      existing.replaceWith(row)
+    } else {
+      this.botListTarget.appendChild(row)
+    }
+    this.updateBotCount()
+  }
+
+  renderBotRow(bot) {
+    return `
+      <div class="tg-contact-row flex cursor-pointer items-center px-4 py-3 transition hover:bg-violet-50/70"
+           data-bot-id="${this.escapeHtml(String(bot.id))}"
+           data-chat-target="bot">
+        <div class="mr-3 flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-[1rem] bg-violet-100 text-xs font-bold text-violet-700">BOT</div>
+        <div class="flex-1 overflow-hidden">
+          <div class="flex items-center gap-2">
+            <div class="truncate font-medium text-slate-900" data-chat-bot-name>${this.escapeHtml(bot.name || "未命名 Bot")}</div>
+            <span class="tg-room-badge is-bot">BOT</span>
+          </div>
+          <div class="truncate text-xs text-slate-400" data-chat-bot-meta>${bot.enabled ? "全局启用" : "全局停用"} · ${this.escapeHtml(String(bot.timeout_ms || 1000))}ms</div>
+        </div>
+      </div>
+    `
+  }
+
+  updateBotCount() {
+    if (this.hasBotCountTarget) {
+      this.botCountTarget.textContent = String(this.element.querySelectorAll('[data-chat-target="bot"]').length)
+    }
+    if (this.hasContactsListTarget) {
+      this.originalContactsMarkup = this.contactsListTarget.innerHTML
+    }
+  }
+
+  renderEmptyBotList() {
+    if (!this.hasBotListTarget) {
+      return
+    }
+
+    this.botListTarget.innerHTML = `
+      <button type="button"
+              class="tg-contact-row flex w-full cursor-pointer items-center px-4 py-3 text-left transition hover:bg-violet-50/70"
+              data-action="click->chat#openNewBot">
+        <div class="mr-3 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[1rem] bg-violet-100 text-lg font-bold text-violet-700">+</div>
+        <div class="min-w-0 flex-1">
+          <div class="font-medium text-slate-900">新建 Bot</div>
+          <div class="truncate text-xs text-slate-400">创建后可加入任意聊天室</div>
+        </div>
+      </button>
+    `
+  }
+
   renderContactSearchRow(contact) {
     const avatar = contact?.avatar_url
       ? `<img src="${this.escapeHtml(contact.avatar_url)}" class="w-full h-full object-cover" alt="${this.escapeHtml(contact.display_name || contact.user_name || "联系人")}">`
@@ -1608,6 +1769,33 @@ export default class extends Controller {
       [groupKey]: !this.isContactGroupCollapsed(groupKey)
     }
     this.persistCollapsedContactGroups()
+    this.refreshContactGroupVisibility()
+  }
+
+  expandAllContactGroups(event = null) {
+    event?.preventDefault()
+    this.setAllContactGroupsCollapsed(false)
+  }
+
+  collapseAllContactGroups(event = null) {
+    event?.preventDefault()
+    this.setAllContactGroupsCollapsed(true)
+  }
+
+  setAllContactGroupsCollapsed(collapsed) {
+    const next = { ...(this.collapsedContactGroups || {}) }
+    this.element.querySelectorAll("[data-chat-collapsible-group]").forEach((group) => {
+      const groupKey = String(group.dataset.groupKey || "")
+      if (groupKey) {
+        next[groupKey] = collapsed
+      }
+    })
+    this.collapsedContactGroups = next
+    this.persistCollapsedContactGroups()
+    this.refreshContactGroupVisibility()
+  }
+
+  refreshContactGroupVisibility() {
     const searchValue = document.getElementById("sidebar-search")?.value?.trim() || ""
     this.applyContactGroupVisibility({ searching: searchValue.length > 0 })
   }

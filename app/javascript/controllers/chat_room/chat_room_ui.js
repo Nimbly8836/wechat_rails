@@ -387,7 +387,7 @@ export function renderHookBotList(controller) {
   if (bots.length === 0) {
     controller.hookBotListTarget.innerHTML = `
       <div class="rounded-2xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">
-        还没有 Bot，先在下面创建一个。
+        还没有 Bot，请先到 Bot 管理中创建。
       </div>
     `;
     return;
@@ -439,42 +439,11 @@ export function saveHookSettings(controller, event) {
     });
 }
 
-export function createHookBot(controller, event) {
+export function openBotManager(controller, event = null) {
   event?.preventDefault();
   event?.stopPropagation();
-
-  if (controller.hasHookStatusTarget) {
-    controller.hookStatusTarget.textContent = "创建 Bot 中…";
-  }
-
-  fetch("/chat_bots", {
-    method: "POST",
-    headers: {
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content || ""
-    },
-    body: JSON.stringify({
-      bot: {
-        name: controller.hasHookNameInputTarget ? controller.hookNameInputTarget.value : "",
-        enabled: controller.hasHookEnabledInputTarget ? controller.hookEnabledInputTarget.checked : true,
-        timeout_ms: controller.hasHookTimeoutInputTarget ? controller.hookTimeoutInputTarget.value : 1000,
-        code: controller.hasHookCodeInputTarget ? controller.hookCodeInputTarget.value : ""
-      }
-    })
-  })
-    .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
-    .then(({ ok, data }) => {
-      if (!ok) throw new Error((data.errors || [data.error || "创建失败"]).join("，"));
-      controller.availableChatBots = [...(controller.availableChatBots || []), data];
-      controller.enabledChatBotIds = [...new Set([...(controller.enabledChatBotIds || []), data.id])];
-      renderHookBotList(controller);
-      if (controller.hasHookNameInputTarget) controller.hookNameInputTarget.value = "";
-      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = "Bot 已创建并加入当前房间。";
-    })
-    .catch((error) => {
-      if (controller.hasHookStatusTarget) controller.hookStatusTarget.textContent = `创建失败：${error.message}`;
-    });
+  closeHookPanel(controller);
+  controller.element.dispatchEvent(new CustomEvent("chat:open-bot", { bubbles: true }));
 }
 
 export function handleInputCompositionStart(controller) { controller.isInputComposing = true; }

@@ -5,6 +5,15 @@ class ChatBotsController < ApplicationController
     }
   end
 
+  def show
+    @bot = params[:id].to_s == "new" ? bot_scope.new(default_bot_attributes) : bot_scope.find(params[:id])
+
+    respond_to do |format|
+      format.html
+      format.json { render json: serialize_bot(@bot) }
+    end
+  end
+
   def create
     bot = bot_scope.new(bot_params)
 
@@ -41,6 +50,22 @@ class ChatBotsController < ApplicationController
     params.require(:bot).permit(:name, :enabled, :code, :timeout_ms)
   rescue ActionController::ParameterMissing
     params.permit(:name, :enabled, :code, :timeout_ms)
+  end
+
+  def default_bot_attributes
+    {
+      name: "",
+      enabled: true,
+      timeout_ms: 1000,
+      code: <<~JS.strip
+        module.exports.onMessage = async function(ctx) {
+          if (ctx.message.content === '/ping') {
+            return { action: 'reply', content: '/pong' }
+          }
+          return { action: 'ignore' }
+        }
+      JS
+    }
   end
 
   def serialize_bot(bot)

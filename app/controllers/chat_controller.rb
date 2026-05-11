@@ -7,6 +7,7 @@ class ChatController < ApplicationController
     regular_contacts = @contacts.reject { |contact| contact.official_account? || contact.group_chat? }
     @grouped_contacts = regular_contacts.group_by(&:initial)
     @letters = [ "#" ] + ("A".."Z").to_a # 用于右侧导航
+    @chat_bots = ChatBot.where(user: Current.user).order(:name, :id)
 
     @chat_rooms = ChatRoom.all.order_by_latest_message
   end

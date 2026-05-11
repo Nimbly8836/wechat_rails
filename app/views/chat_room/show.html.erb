@@ -286,43 +286,12 @@
       <div class="space-y-2" data-chat-room-target="hookBotList">
         <div class="rounded-2xl bg-slate-50 px-3 py-4 text-center text-xs text-slate-400">加载 Bot 中…</div>
       </div>
-      <div class="rounded-2xl border border-slate-200 px-3 py-3 space-y-3">
-        <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">新建全局 Bot</div>
-        <input type="text"
-               class="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-               placeholder="Bot 名称，例如 bot2 天气助手"
-               data-chat-room-target="hookNameInput">
-        <label class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
-          <span>全局启用</span>
-          <input type="checkbox"
-                 checked
-                 class="h-4 w-4 rounded border-slate-300"
-                 data-chat-room-target="hookEnabledInput">
-        </label>
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-          超时毫秒
-          <input type="number"
-                 min="100"
-                 max="5000"
-                 step="100"
-                 value="1000"
-                 class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                 data-chat-room-target="hookTimeoutInput">
-        </label>
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-          JavaScript
-          <textarea rows="14"
-                    spellcheck="false"
-                    class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                    placeholder="module.exports.onMessage = async function(ctx) {&#10;  if (ctx.message.content === '/ping') {&#10;    return { action: 'reply', content: '/pong' }&#10;  }&#10;  if (ctx.message.content === '天气') {&#10;    return { action: 'reply', content: '今天晴。' }&#10;  }&#10;  return { action: 'ignore' }&#10;}&#10;&#10;module.exports.beforeSend = async function(ctx) {&#10;  return { action: 'allow' }&#10;}&#10;&#10;module.exports.afterSend = async function(ctx) {&#10;  console.log(ctx.bot.name, ctx.result.success)&#10;}"
-                    data-chat-room-target="hookCodeInput"></textarea>
-        </label>
-        <button type="button"
-                class="px-3 py-1.5 text-sm font-medium rounded-full bg-slate-900 text-white hover:bg-slate-700 transition"
-                data-action="click->chat-room#createHookBot">
-          创建并加入当前房间
-        </button>
-      </div>
+      <button type="button"
+              class="w-full rounded-2xl border border-dashed border-violet-200 bg-violet-50/60 px-3 py-3 text-left text-sm text-violet-700 transition hover:bg-violet-50"
+              data-action="click->chat-room#openBotManager">
+        管理全局 Bot
+        <span class="mt-1 block text-xs text-violet-500">创建和编辑 Bot 请在通讯录的 BOT 分组中完成。</span>
+      </button>
       <div class="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500" data-chat-room-target="hookStatus">
         Bot 会在服务端 Node 子进程中执行。
       </div>
