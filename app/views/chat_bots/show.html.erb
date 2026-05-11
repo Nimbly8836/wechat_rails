@@ -91,6 +91,14 @@
               </div>
 
               <div>
+                <div class="font-semibold text-slate-800">运行时能力</div>
+                <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div class="rounded-xl bg-white/80 p-3">Bot 在服务端 Node 沙箱中执行，不能使用 <span class="font-mono">import</span>、<span class="font-mono">require</span> 或任意 npm 包。</div>
+                  <div class="rounded-xl bg-white/80 p-3">可以使用平台提供的受限 <span class="font-mono">fetch</span> 调用外部 HTTP(S) API；会阻止 localhost、私网地址和危险协议。</div>
+                </div>
+              </div>
+
+              <div>
                 <div class="font-semibold text-slate-800">示例</div>
                 <div class="mt-2 grid gap-3">
                   <div class="rounded-xl bg-slate-950 p-3 text-slate-100" data-chat-bot-example>
@@ -145,6 +153,26 @@
   return { action: 'ignore' }
 }</code></pre>
                   </div>
+
+                  <div class="rounded-xl bg-slate-950 p-3 text-slate-100" data-chat-bot-example>
+                    <div class="mb-2 flex items-center justify-between gap-2 text-slate-300">
+                      <span>fetch：调用外部 HTTP(S) API</span>
+                      <button type="button" class="rounded-full bg-white/10 px-2 py-1 text-[11px] text-white transition hover:bg-white/20" data-action="click->chat-bot#copyExample">复制</button>
+                    </div>
+                    <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-5"><code>module.exports.beforeSend = async function(ctx) {
+  const response = await fetch('https://example.com/api', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: ctx.message.content })
+  })
+  const data = await response.json()
+
+  return {
+    action: 'modify',
+    message: { content: data.content || ctx.message.content }
+  }
+}</code></pre>
+                  </div>
                 </div>
               </div>
             </div>
@@ -166,7 +194,7 @@
               （<%= l(@bot.last_error_at, format: :long) %>）
             <% end %>
           <% else %>
-            Bot 会在服务端 Node 子进程中执行。
+            Bot 会在服务端 Node 沙箱中执行；可使用受限 fetch，但不能 import/require npm 包。
           <% end %>
         </div>
 
