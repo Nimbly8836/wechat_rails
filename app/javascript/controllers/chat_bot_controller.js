@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["nameInput", "enabledInput", "timeoutInput", "codeInput", "status", "title", "deleteButton"]
+  static targets = ["nameInput", "enabledInput", "timeoutInput", "codeInput", "status", "title", "deleteButton", "helpPanel"]
   static values = { id: String }
 
   openSidebar() {
@@ -14,17 +14,55 @@ export default class extends Controller {
     if (this.hasNameInputTarget) this.nameInputTarget.value = ""
     if (this.hasEnabledInputTarget) this.enabledInputTarget.checked = true
     if (this.hasTimeoutInputTarget) this.timeoutInputTarget.value = "1000"
-    if (this.hasCodeInputTarget) {
-      this.codeInputTarget.value = `module.exports.onMessage = async function(ctx) {
+    this.setCodeValue(`module.exports.onMessage = async function(ctx) {
   if (ctx.message.content === '/ping') {
     return { action: 'reply', content: '/pong' }
   }
   return { action: 'ignore' }
-}`
-    }
+}`)
     if (this.hasTitleTarget) this.titleTarget.textContent = "新建 Bot"
     if (this.hasDeleteButtonTarget) this.deleteButtonTarget.classList.add("hidden")
     this.setStatus("填写信息后保存即可创建全局 Bot。")
+  }
+
+  toggleHelp(event = null) {
+    event?.preventDefault()
+    if (!this.hasHelpPanelTarget) return
+
+    const isHidden = this.helpPanelTarget.classList.toggle("hidden")
+    event?.currentTarget?.setAttribute("aria-expanded", String(!isHidden))
+  }
+
+  copyExample(event = null) {
+    event?.preventDefault()
+    const example = event?.currentTarget?.closest("[data-chat-bot-example]")
+    const code = example?.querySelector("code")?.textContent
+    if (!code) return
+
+    this.copyText(code)
+      .then(() => this.setStatus("示例已复制，可以粘贴到 JavaScript 编辑框。"))
+      .catch(() => this.setStatus("复制失败，请手动选中示例复制。"))
+  }
+
+  copyText(text) {
+    if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text)
+
+    const textarea = document.createElement("textarea")
+    textarea.value = text
+    textarea.setAttribute("readonly", "")
+    textarea.style.position = "fixed"
+    textarea.style.left = "-9999px"
+    document.body.appendChild(textarea)
+    textarea.select()
+
+    try {
+      document.execCommand("copy")
+      return Promise.resolve()
+    } catch (error) {
+      return Promise.reject(error)
+    } finally {
+      textarea.remove()
+    }
   }
 
   save(event = null) {
@@ -84,8 +122,19 @@ export default class extends Controller {
       name: this.hasNameInputTarget ? this.nameInputTarget.value : "",
       enabled: this.hasEnabledInputTarget ? this.enabledInputTarget.checked : true,
       timeout_ms: this.hasTimeoutInputTarget ? this.timeoutInputTarget.value : 1000,
-      code: this.hasCodeInputTarget ? this.codeInputTarget.value : ""
+      code: this.codeValue()
     }
+  }
+
+  codeValue() {
+    return this.hasCodeInputTarget ? this.codeInputTarget.value : ""
+  }
+
+  setCodeValue(value) {
+    if (!this.hasCodeInputTarget) return
+
+    this.codeInputTarget.value = value || ""
+    this.codeInputTarget.dispatchEvent(new Event("input", { bubbles: true }))
   }
 
   applyBot(bot) {
@@ -93,7 +142,7 @@ export default class extends Controller {
     if (this.hasNameInputTarget) this.nameInputTarget.value = bot.name || ""
     if (this.hasEnabledInputTarget) this.enabledInputTarget.checked = !!bot.enabled
     if (this.hasTimeoutInputTarget) this.timeoutInputTarget.value = bot.timeout_ms || 1000
-    if (this.hasCodeInputTarget) this.codeInputTarget.value = bot.code || ""
+    this.setCodeValue(bot.code || "")
     if (this.hasTitleTarget) this.titleTarget.textContent = bot.name || "未命名 Bot"
     if (this.hasDeleteButtonTarget) this.deleteButtonTarget.classList.toggle("hidden", !bot.id)
   }

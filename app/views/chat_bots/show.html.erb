@@ -1,5 +1,5 @@
 <div class="mx-auto flex h-full w-full max-w-4xl flex-col overflow-y-auto bg-gradient-to-b from-white via-slate-50 to-slate-100"
-     data-controller="chat-bot"
+     data-controller="chat-bot code-editor"
      data-chat-bot-id-value="<%= @bot.persisted? ? @bot.id : "" %>">
   <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:hidden">
     <button type="button"
@@ -62,13 +62,102 @@
                  data-chat-bot-target="timeoutInput">
         </label>
 
-        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-          JavaScript
-          <textarea rows="18"
+        <div class="space-y-2">
+          <div class="flex items-center justify-between gap-3">
+            <label for="chat-bot-code" class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              JavaScript
+            </label>
+            <button type="button"
+                    class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-violet-200 bg-violet-50 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+                    title="查看 Bot 示例和 action 说明"
+                    aria-expanded="false"
+                    data-action="click->chat-bot#toggleHelp">
+              ?
+            </button>
+          </div>
+
+          <div class="hidden rounded-2xl border border-violet-100 bg-violet-50/70 p-4 text-xs text-slate-600"
+               data-chat-bot-target="helpPanel">
+            <div class="flex flex-col gap-4">
+              <div>
+                <div class="font-semibold text-slate-800">可用 action</div>
+                <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div class="rounded-xl bg-white/80 p-3"><span class="font-mono font-semibold text-violet-700">allow</span>：beforeSend 使用，允许原消息继续发送。</div>
+                  <div class="rounded-xl bg-white/80 p-3"><span class="font-mono font-semibold text-violet-700">modify</span>：beforeSend 使用，修改消息后发送，支持 <span class="font-mono">message.content</span>、<span class="font-mono">message.msg_type</span>、<span class="font-mono">message.extra</span>。</div>
+                  <div class="rounded-xl bg-white/80 p-3"><span class="font-mono font-semibold text-violet-700">block</span>：beforeSend 使用，拦截本次发送，<span class="font-mono">message</span> 可作为提示文案。</div>
+                  <div class="rounded-xl bg-white/80 p-3"><span class="font-mono font-semibold text-violet-700">reply</span>：onMessage 使用，让 Bot 回复消息，支持 <span class="font-mono">content</span> 或 <span class="font-mono">message.content</span>。</div>
+                  <div class="rounded-xl bg-white/80 p-3"><span class="font-mono font-semibold text-violet-700">ignore</span>：onMessage 和 afterSend 使用，不做任何处理。</div>
+                </div>
+              </div>
+
+              <div>
+                <div class="font-semibold text-slate-800">示例</div>
+                <div class="mt-2 grid gap-3">
+                  <div class="rounded-xl bg-slate-950 p-3 text-slate-100" data-chat-bot-example>
+                    <div class="mb-2 flex items-center justify-between gap-2 text-slate-300">
+                      <span>beforeSend：修改发送内容</span>
+                      <button type="button" class="rounded-full bg-white/10 px-2 py-1 text-[11px] text-white transition hover:bg-white/20" data-action="click->chat-bot#copyExample">复制</button>
+                    </div>
+                    <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-5"><code>module.exports.beforeSend = async function(ctx) {
+  if (ctx.message.content === '/hook') {
+    return {
+      action: 'modify',
+      message: { content: '/hook haha' }
+    }
+  }
+  return { action: 'allow' }
+}</code></pre>
+                  </div>
+
+                  <div class="rounded-xl bg-slate-950 p-3 text-slate-100" data-chat-bot-example>
+                    <div class="mb-2 flex items-center justify-between gap-2 text-slate-300">
+                      <span>beforeSend：拦截发送</span>
+                      <button type="button" class="rounded-full bg-white/10 px-2 py-1 text-[11px] text-white transition hover:bg-white/20" data-action="click->chat-bot#copyExample">复制</button>
+                    </div>
+                    <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-5"><code>module.exports.beforeSend = async function(ctx) {
+  if (ctx.message.content.includes('禁止')) {
+    return { action: 'block', message: '这条消息被 Bot 拦截' }
+  }
+  return { action: 'allow' }
+}</code></pre>
+                  </div>
+
+                  <div class="rounded-xl bg-slate-950 p-3 text-slate-100" data-chat-bot-example>
+                    <div class="mb-2 flex items-center justify-between gap-2 text-slate-300">
+                      <span>onMessage：收到消息后回复</span>
+                      <button type="button" class="rounded-full bg-white/10 px-2 py-1 text-[11px] text-white transition hover:bg-white/20" data-action="click->chat-bot#copyExample">复制</button>
+                    </div>
+                    <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-5"><code>module.exports.onMessage = async function(ctx) {
+  if (ctx.message.content === '/ping') {
+    return { action: 'reply', content: '/pong' }
+  }
+  return { action: 'ignore' }
+}</code></pre>
+                  </div>
+
+                  <div class="rounded-xl bg-slate-950 p-3 text-slate-100" data-chat-bot-example>
+                    <div class="mb-2 flex items-center justify-between gap-2 text-slate-300">
+                      <span>afterSend：发送后执行</span>
+                      <button type="button" class="rounded-full bg-white/10 px-2 py-1 text-[11px] text-white transition hover:bg-white/20" data-action="click->chat-bot#copyExample">复制</button>
+                    </div>
+                    <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-5"><code>module.exports.afterSend = async function(ctx) {
+  console.log('sent', ctx.result?.success)
+  return { action: 'ignore' }
+}</code></pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tg-code-editor-shell hidden" data-code-editor-target="mount"></div>
+          <textarea id="chat-bot-code"
+                    rows="18"
                     spellcheck="false"
-                    class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                    data-chat-bot-target="codeInput"><%= @bot.code %></textarea>
-        </label>
+                    class="w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs font-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                    data-chat-bot-target="codeInput"
+                    data-code-editor-target="textarea"><%= @bot.code %></textarea>
+        </div>
 
         <div class="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500" data-chat-bot-target="status">
           <% if @bot.last_error.present? %>
