@@ -5,7 +5,9 @@ class MessageEventsController < ApplicationController
 
   def events
     response.headers["Content-Type"] = "text/event-stream"
-    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Cache-Control"] = "no-cache, no-transform"
+    response.headers["Last-Modified"] = Time.now.httpdate
+    response.headers["X-Accel-Buffering"] = "no"
 
     last_id = resume_stream_id
     response.stream.write ": connected\n\n"

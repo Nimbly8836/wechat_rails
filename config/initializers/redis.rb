@@ -3,7 +3,7 @@ require "redis"
 module RedisConfig
   STREAM_KEY = ENV.fetch("MESSAGE_EVENT_STREAM_KEY", "wechat_rails:message_events")
   STREAM_MAXLEN = Integer(ENV.fetch("MESSAGE_EVENT_STREAM_MAXLEN", 100_000))
-  STREAM_READ_BLOCK_MS = Integer(ENV.fetch("MESSAGE_EVENT_STREAM_READ_BLOCK_MS", 1_000))
+  STREAM_READ_BLOCK_MS = Integer(ENV.fetch("MESSAGE_EVENT_STREAM_READ_BLOCK_MS", 250))
   STREAM_READ_COUNT = Integer(ENV.fetch("MESSAGE_EVENT_STREAM_READ_COUNT", 100))
 
   module_function
