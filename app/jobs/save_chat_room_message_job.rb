@@ -55,10 +55,9 @@ class SaveChatRoomMessageJob < ApplicationJob
       Rails.logger.debug { "Insert result: #{result.to_json}" }
 
       message_ids = messages_to_save.map { |message| message[:wx_messages_id] }
-      Message.includes(:wx_message).where(wx_messages_id: message_ids).find_each do |message|
-        message.notify_chat_room
-        run_chat_room_bots(message)
-      end
+      inserted_messages = Message.includes(:wx_message).where(wx_messages_id: message_ids).to_a
+      inserted_messages.each(&:notify_chat_room)
+      inserted_messages.each { |message| run_chat_room_bots(message) }
     end
   rescue StandardError => e
     Rails.logger.error "Failed to save messages: #{e.message}\n#{e.backtrace.join("\n")}"

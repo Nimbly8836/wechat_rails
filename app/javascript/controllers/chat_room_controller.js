@@ -1461,46 +1461,49 @@ export default class extends Controller {
   }
 
   refreshRoomFromNotification(payload, attempt = 0) {
-    if (this.pendingNotifyRefreshTimer) {
+    const expectedMessageId = payload?.message_id;
+    if (!expectedMessageId && this.pendingNotifyRefreshTimer) {
       clearTimeout(this.pendingNotifyRefreshTimer);
       this.pendingNotifyRefreshTimer = null;
     }
 
-    this.pendingNotifyRefreshTimer = setTimeout(() => {
-      this.pendingNotifyRefreshTimer = null;
+    const refreshTimer = setTimeout(() => {
+      if (this.pendingNotifyRefreshTimer === refreshTimer) {
+        this.pendingNotifyRefreshTimer = null;
+      }
       if (!this.element?.isConnected) {
         return;
       }
-      const expectedMessageId = payload?.message_id;
+      if (expectedMessageId && this.hasMessage(expectedMessageId)) {
+        return;
+      }
+
+      if (expectedMessageId) {
+        this.fetchMessageById(expectedMessageId)
+          .then((loaded) => {
+            if (loaded) {
+              this.renderMessages({
+                forceScrollToBottom: this.autoScrollPinnedToBottom
+              });
+              return;
+            }
+
+            if (attempt >= 3) {
+              this.loadNewMessages(payload);
+              return;
+            }
+
+            this.refreshRoomFromNotification(payload, attempt + 1);
+          })
+          .catch((error) => {
+            console.error("按通知消息补拉失败:", error);
+          });
+        return;
+      }
 
       this.loadNewMessages(payload)
         .then((loadedCount) => {
-          const alreadyLoaded = expectedMessageId ? this.hasMessage(expectedMessageId)
-            : loadedCount > 0;
-          if (alreadyLoaded) {
-            return;
-          }
-
-          if (expectedMessageId) {
-            this.fetchMessageById(expectedMessageId)
-              .then((loaded) => {
-                if (loaded) {
-                  this.renderMessages({
-                    forceScrollToBottom: this.autoScrollPinnedToBottom
-                  });
-                  return;
-                }
-
-                if (attempt >= 3) {
-                  this.loadMessages();
-                  return;
-                }
-
-                this.refreshRoomFromNotification(payload, attempt + 1);
-              })
-              .catch((error) => {
-                console.error("按通知消息补拉失败:", error);
-              });
+          if (loadedCount > 0) {
             return;
           }
 
@@ -1514,7 +1517,11 @@ export default class extends Controller {
         .catch((error) => {
           console.error("刷新当前聊天室失败:", error);
         });
-    }, attempt === 0 ? 16 : 120 * (attempt + 1));
+    }, attempt === 0 ? 0 : 120 * (attempt + 1));
+
+    if (!expectedMessageId) {
+      this.pendingNotifyRefreshTimer = refreshTimer;
+    }
   }
 
   loadNewMessages(msg) {
