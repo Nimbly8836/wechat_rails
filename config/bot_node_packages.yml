@@ -1,0 +1,8 @@
+# Packages listed here must also be installed in package.json before the app is built.
+# Bot code can load them with: const pkg = await importPackage("alias")
+#
+# Add more packages by running npm install <package>, then mapping an alias here.
+# Example:
+# lodash: lodash
+
+openai: openai

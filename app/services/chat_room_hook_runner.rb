@@ -1,6 +1,7 @@
 require "json"
 require "open3"
 require "timeout"
+require "yaml"
 
 class ChatRoomHookRunner
   RUNNER_PATH = Rails.root.join("app", "javascript", "hooks", "chat_room_hook_runner.js").freeze
@@ -39,7 +40,8 @@ class ChatRoomHookRunner
       event: event,
       code: @hook.code.to_s,
       timeout_ms: timeout_ms,
-      context: context
+      context: context,
+      node_packages: bot_node_packages
     })
 
     Timeout.timeout((timeout_ms / 1000.0) + 0.2) do
@@ -57,6 +59,26 @@ class ChatRoomHookRunner
 
   def node_binaries
     [ ENV["NODE_BINARY"].presence, "node", "nodejs" ].compact.uniq
+  end
+
+  def bot_node_packages
+    @bot_node_packages ||= begin
+      path = Rails.root.join("config", "bot_node_packages.yml")
+      if File.exist?(path)
+        config = YAML.safe_load_file(path, aliases: false) || {}
+        raise "bot node package config must be a mapping" unless config.is_a?(Hash)
+
+        config.each_with_object({}) do |(alias_name, package_name), packages|
+          alias_name = alias_name.to_s.strip
+          package_name = package_name.to_s.strip
+          next if alias_name.blank? || package_name.blank?
+
+          packages[alias_name] = package_name
+        end
+      else
+        {}
+      end
+    end
   end
 
   def normalize_result(result, event)

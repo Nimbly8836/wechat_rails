@@ -95,6 +95,7 @@
                 <div class="mt-2 grid gap-2 sm:grid-cols-2">
                   <div class="rounded-xl bg-white/80 p-3">Bot 在服务端 Node 沙箱中执行，不能使用 <span class="font-mono">import</span>、<span class="font-mono">require</span> 或任意 npm 包。</div>
                   <div class="rounded-xl bg-white/80 p-3">可以使用 Node 原生 <span class="font-mono">fetch</span> 调用 HTTP(S) API；仍不会开放 <span class="font-mono">require</span>、<span class="font-mono">process</span> 或文件系统能力。</div>
+                  <div class="rounded-xl bg-white/80 p-3 sm:col-span-2">需要 Node 包时，先把包加入 <span class="font-mono">package.json</span> 并在构建期安装，再写入 <span class="font-mono">config/bot_node_packages.yml</span> 白名单；Bot 里用 <span class="font-mono">await importPackage('别名')</span> 加载。</div>
                 </div>
               </div>
 
@@ -170,6 +171,26 @@
   return {
     action: 'modify',
     message: { content: data.content || ctx.message.content }
+  }
+}</code></pre>
+                  </div>
+
+                  <div class="rounded-xl bg-slate-950 p-3 text-slate-100" data-chat-bot-example>
+                    <div class="mb-2 flex items-center justify-between gap-2 text-slate-300">
+                      <span>importPackage：加载构建期白名单包</span>
+                      <button type="button" class="rounded-full bg-white/10 px-2 py-1 text-[11px] text-white transition hover:bg-white/20" data-action="click->chat-bot#copyExample">复制</button>
+                    </div>
+                    <pre class="overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-5"><code>module.exports.beforeSend = async function(ctx) {
+  const OpenAI = await importPackage('openai')
+  const client = new OpenAI({ apiKey: 'YOUR_OPENAI_API_KEY' })
+  const completion = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: ctx.message.content }]
+  })
+
+  return {
+    action: 'modify',
+    message: { content: completion.choices[0]?.message?.content || ctx.message.content }
   }
 }</code></pre>
                   </div>

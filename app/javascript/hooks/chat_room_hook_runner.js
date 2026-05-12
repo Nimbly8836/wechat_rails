@@ -36,6 +36,23 @@ function fetchFromHost(...args) {
   return globalThis.fetch(...args);
 }
 
+function createPackageImporter(packages) {
+  const allowedPackages = packages && typeof packages === "object" ? packages : {};
+
+  return async function importPackage(aliasName) {
+    const alias = String(aliasName || "").trim();
+    const packageName = allowedPackages[alias];
+    if (typeof packageName !== "string" || !packageName) throw new Error(`Node package is not allowed: ${alias}`);
+
+    try {
+      const imported = await import(packageName);
+      return imported.default || imported;
+    } catch (error) {
+      throw new Error(`Node package failed to load: ${alias}: ${error.message || String(error)}`);
+    }
+  };
+}
+
 async function runHook(input) {
   const module = { exports: {} };
   const sandbox = {
@@ -53,7 +70,8 @@ async function runHook(input) {
     Headers: globalThis.Headers,
     Request: globalThis.Request,
     Response: globalThis.Response,
-    fetch: fetchFromHost
+    fetch: fetchFromHost,
+    importPackage: createPackageImporter(input.node_packages)
   };
   const context = vm.createContext(sandbox);
   const script = new vm.Script(String(input.code || ""));

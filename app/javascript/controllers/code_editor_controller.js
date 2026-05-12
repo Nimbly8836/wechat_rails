@@ -49,10 +49,13 @@ const API_COMPLETIONS = [
   { label: "ctx.result.message", detail: "发送结果消息" },
   { label: "ctx.result.data", detail: "发送结果数据" },
   { label: "fetch", detail: "Node 原生 HTTP 请求" },
-  { label: "fetch(url)", detail: "调用外部 HTTP(S) API", apply: "fetch('https://example.com/api')" }
+  { label: "fetch(url)", detail: "调用外部 HTTP(S) API", apply: "fetch('https://example.com/api')" },
+  { label: "importPackage", detail: "加载 config/bot_node_packages.yml 中允许的 Node 包" },
+  { label: "importPackage('openai')", detail: "加载构建期安装的白名单包", apply: "importPackage('openai')" }
 ]
 
 const FETCH_SNIPPET = "const response = await fetch('https://example.com/api', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ text: ctx.message.content })\n})\nconst data = await response.json()"
+const IMPORT_PACKAGE_SNIPPET = "const OpenAI = await importPackage('openai')\nconst client = new OpenAI({ apiKey: 'YOUR_OPENAI_API_KEY' })"
 
 export default class extends Controller {
   static targets = ["textarea", "mount"]
@@ -190,8 +193,15 @@ export default class extends Controller {
       apply: FETCH_SNIPPET,
       boost: 90
     }
+    const importPackageSnippet = {
+      label: "importPackage openai",
+      detail: "加载白名单 Node 包示例",
+      type: "function",
+      apply: IMPORT_PACKAGE_SNIPPET,
+      boost: 85
+    }
 
-    return [...hooks, ...actions, ...apis, fetchSnippet]
+    return [...hooks, ...actions, ...apis, fetchSnippet, importPackageSnippet]
   }
 
   openContextMenu(event, view) {
@@ -234,7 +244,8 @@ export default class extends Controller {
       ["ctx.message.msg_type", "insert", "ctx.message.msg_type"],
       ["ctx.message.extra", "insert", "ctx.message.extra"],
       ["ctx.result?.success", "insert", "ctx.result?.success"],
-      ["fetch POST JSON", "insert", FETCH_SNIPPET]
+      ["fetch POST JSON", "insert", FETCH_SNIPPET],
+      ["importPackage openai", "insert", IMPORT_PACKAGE_SNIPPET]
     ])
     this.appendMenuButton(menu, "触发补全", "complete")
 
