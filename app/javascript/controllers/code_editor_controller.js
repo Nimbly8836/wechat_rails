@@ -48,7 +48,7 @@ const API_COMPLETIONS = [
   { label: "ctx.result.success", detail: "是否发送成功" },
   { label: "ctx.result.message", detail: "发送结果消息" },
   { label: "ctx.result.data", detail: "发送结果数据" },
-  { label: "fetch", detail: "受限 HTTP 请求" },
+  { label: "fetch", detail: "Node 原生 HTTP 请求" },
   { label: "fetch(url)", detail: "调用外部 HTTP(S) API", apply: "fetch('https://example.com/api')" }
 ]
 
@@ -185,7 +185,7 @@ export default class extends Controller {
     const apis = API_COMPLETIONS.map((item) => ({ ...item, type: "variable", boost: 60, apply: item.apply || item.label }))
     const fetchSnippet = {
       label: "fetch POST JSON",
-      detail: "受限 HTTP(S) 请求示例",
+      detail: "HTTP(S) 请求示例",
       type: "function",
       apply: FETCH_SNIPPET,
       boost: 90

@@ -94,7 +94,7 @@
                 <div class="font-semibold text-slate-800">运行时能力</div>
                 <div class="mt-2 grid gap-2 sm:grid-cols-2">
                   <div class="rounded-xl bg-white/80 p-3">Bot 在服务端 Node 沙箱中执行，不能使用 <span class="font-mono">import</span>、<span class="font-mono">require</span> 或任意 npm 包。</div>
-                  <div class="rounded-xl bg-white/80 p-3">可以使用平台提供的受限 <span class="font-mono">fetch</span> 调用外部 HTTP(S) API；会阻止 localhost、私网地址和危险协议。</div>
+                  <div class="rounded-xl bg-white/80 p-3">可以使用 Node 原生 <span class="font-mono">fetch</span> 调用 HTTP(S) API；仍不会开放 <span class="font-mono">require</span>、<span class="font-mono">process</span> 或文件系统能力。</div>
                 </div>
               </div>
 
@@ -194,7 +194,7 @@
               （<%= l(@bot.last_error_at, format: :long) %>）
             <% end %>
           <% else %>
-            Bot 会在服务端 Node 沙箱中执行；可使用受限 fetch，但不能 import/require npm 包。
+            Bot 会在服务端 Node 沙箱中执行；可使用 fetch，但不能 import/require npm 包。
           <% end %>
         </div>
 
