@@ -78,6 +78,7 @@ export default class extends Controller {
     this.eventSource = null
     this.reconnectTimer = null
     this.eventSourceUrl = "/notion/message"
+    this.lastEventId = null
     this.eventSourceRetryDelay = 1500
     this.sessionBootstrapUrl = "/login/bootstrap_online_sessions"
     this.notificationServiceWorkerTimeoutMs = 1200
@@ -876,7 +877,7 @@ export default class extends Controller {
   establishEventSource() {
     this.teardownEventSource()
 
-    const source = new EventSource(this.eventSourceUrl)
+    const source = new EventSource(this.eventSourceEndpoint())
     this.eventSource = source
 
     source.onmessage = (event) => this.handleEventSourceMessage(event)
@@ -893,6 +894,10 @@ export default class extends Controller {
 
   async handleEventSourceMessage(event) {
     try {
+      if (event.lastEventId) {
+        this.lastEventId = event.lastEventId
+      }
+
       const payload = JSON.parse(event.data)
       this.mergeChatRoomUpdate(payload)
       window.dispatchEvent(new CustomEvent("chat:notify", { detail: payload }))
@@ -900,6 +905,15 @@ export default class extends Controller {
     } catch (error) {
       console.error("解析消息失败", error)
     }
+  }
+
+  eventSourceEndpoint() {
+    if (!this.lastEventId) {
+      return this.eventSourceUrl
+    }
+
+    const params = new URLSearchParams({ last_event_id: this.lastEventId })
+    return `${this.eventSourceUrl}?${params}`
   }
 
   async showDesktopNotification(payload, { force = false } = {}) {

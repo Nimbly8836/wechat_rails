@@ -12,11 +12,6 @@ development:
     <<: *default
     database: wechat_rails_development
 
-  notify:
-    <<: *default
-    database: wechat_rails_development
-    pool: 5
-
 test:
   <<: *default
   database: wechat_rails_test
@@ -37,6 +32,3 @@ production:
     <<: *primary_production
     database: wechat_rails_cable
     migrations_paths: db/cable_migrate
-  notify:
-    <<: *default
-    database: wechat_rails

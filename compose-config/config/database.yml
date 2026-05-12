@@ -23,7 +23,3 @@ production:
     <<: *primary_production
     database: wechat_rails_cable
     migrations_paths: db/cable_migrate
-  notify:
-    <<: *default
-    database: wechat_rails
-    poll: 10

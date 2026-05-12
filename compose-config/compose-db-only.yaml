@@ -18,8 +18,23 @@ services:
       - RAILS_CREDENTIALS_YML_ENC_FILE
       - RUN_DB_MERGE_SCRIPT=${RUN_DB_MERGE_SCRIPT:-0}
       - DB_MERGE_SCRIPT_PATH=${DB_MERGE_SCRIPT_PATH:-/rails/bin/db-merge}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/1}
     depends_on:
       - db
+      - redis
+
+  redis:
+    image: redis:7.2
+    container_name: wechat-rails-redis
+    volumes:
+      - ./redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
 
   db:
     container_name: wechat-rails-db
