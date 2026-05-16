@@ -19,22 +19,29 @@ function storageAvailable() {
   }
 }
 
-export function readCache(namespace, identifier = "", fallback = null) {
+export function readCacheEntry(namespace, identifier = "", fallback = null) {
   if (!storageAvailable()) {
-    return fallback
+    return { data: fallback, updatedAt: null }
   }
 
   try {
     const rawValue = window.localStorage.getItem(storageKey(namespace, identifier))
     if (!rawValue) {
-      return fallback
+      return { data: fallback, updatedAt: null }
     }
 
     const parsed = JSON.parse(rawValue)
-    return parsed?.data ?? fallback
+    return {
+      data: parsed?.data ?? fallback,
+      updatedAt: parsed?.updatedAt ?? null
+    }
   } catch (_) {
-    return fallback
+    return { data: fallback, updatedAt: null }
   }
+}
+
+export function readCache(namespace, identifier = "", fallback = null) {
+  return readCacheEntry(namespace, identifier, fallback).data
 }
 
 export function writeCache(namespace, identifier = "", data) {

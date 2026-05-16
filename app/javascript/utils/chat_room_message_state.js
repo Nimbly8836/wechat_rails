@@ -1,5 +1,5 @@
 import { MessageSet } from "utils/file_utils";
-import { chatStorageKeys, readCache, writeCache, removeCache } from "utils/chat_storage";
+import { chatStorageKeys, readCacheEntry, writeCache, removeCache } from "utils/chat_storage";
 
 const MESSAGE_CACHE_LIMIT = 80;
 const MESSAGE_CACHE_FALLBACK_LIMITS = [80, 40, 20, 10];
@@ -8,6 +8,7 @@ export class ChatRoomMessageState {
   constructor(chatRoomId) {
     this.idValue = chatRoomId;
     this.messages = new MessageSet();
+    this.cachedMessagesUpdatedAt = null;
   }
 
   sanitizeMessageForCache(wrapper) {
@@ -58,13 +59,21 @@ export class ChatRoomMessageState {
 
   restoreCachedMessages() {
     const [namespace, identifier] = chatStorageKeys.chatRoomMessages(this.idValue);
-    const cached = readCache(namespace, identifier, []);
+    const { data: cached, updatedAt } = readCacheEntry(namespace, identifier, []);
+    this.cachedMessagesUpdatedAt = updatedAt;
     if (!Array.isArray(cached) || cached.length === 0) {
       return 0;
     }
 
     this.messages.merge(cached);
     return cached.length;
+  }
+
+  cachedMessagesFresh(maxAgeMs) {
+    const cachedAt = this.cachedMessagesUpdatedAt
+      ? new Date(this.cachedMessagesUpdatedAt).getTime()
+      : NaN;
+    return Number.isFinite(cachedAt) && Date.now() - cachedAt <= maxAgeMs;
   }
 
   hasMessage(messageId) {

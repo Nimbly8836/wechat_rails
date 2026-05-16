@@ -172,6 +172,8 @@ import {
 } from "controllers/chat_room/chat_room_voice_player";
 
 const EMOJI_REQUEST_VERSION = "20260330b";
+const MESSAGE_CACHE_FRESH_MS = 15 * 1000;
+const MESSAGE_FETCH_LIMIT = 100;
 
 export default class extends Controller {
   static targets = ["messageList", "input", "emptyMessage", "menu",
@@ -321,8 +323,12 @@ export default class extends Controller {
     }
 
     if (restoredMessages > 0) {
-      this.renderMessages();
-      requestAnimationFrame(() => this.loadMessages({ replace: true }));
+      const cachedMessagesFresh = this.messageState.cachedMessagesFresh(MESSAGE_CACHE_FRESH_MS);
+      this.renderMessages({ skipPersist: true });
+      this.initialMessagesLoaded = true;
+      if (!cachedMessagesFresh) {
+        requestAnimationFrame(() => this.refreshCachedMessages());
+      }
     } else {
       this.loadMessages();
     }
@@ -449,6 +455,17 @@ export default class extends Controller {
 
   restoreCachedMessages() {
     return this.messageState.restoreCachedMessages();
+  }
+
+  refreshCachedMessages() {
+    if (!this.element?.isConnected) {
+      return Promise.resolve(0);
+    }
+    if (this.latestServerMessageId() == null) {
+      return this.loadMessages({ replace: true });
+    }
+
+    return this.loadNewMessages({ refreshCacheOnEmpty: true, resetOnLimit: true });
   }
 
   disconnect() {
@@ -1524,7 +1541,14 @@ export default class extends Controller {
     }
   }
 
-  loadNewMessages(msg) {
+  loadNewMessages(msg, options = {}) {
+    const refreshOptions = msg && !Object.prototype.hasOwnProperty.call(msg, "message_id")
+      ? msg
+      : options;
+    const notifyPayload = msg && Object.prototype.hasOwnProperty.call(msg, "message_id")
+      ? msg
+      : null;
+
     if (this.messages.size === 0) {
       return this.loadMessages();
     }
@@ -1533,28 +1557,30 @@ export default class extends Controller {
     const shouldStickToBottom = this.isNearBottom();
     const preserveBottomOffset = shouldStickToBottom ? null
       : container.scrollHeight - container.scrollTop;
-
-    // Get the latest message by sorting and taking the last
-    // const sortedMessages = [...this.messages].sort((a, b) => {
-    //   const timeA = a.message_time || a.created_at || a.wx_message?.message_time
-    //     || 0;
-    //   const timeB = b.message_time || b.created_at || b.wx_message?.message_time
-    //     || 0;
-    //   return new Date(timeA) - new Date(timeB);
-    // });
     const lastMsgId = this.latestServerMessageId();
     if (lastMsgId == null) {
-      return this.loadMessages();
+      return this.loadMessages({ replace: true });
     }
 
-    return this.fetchMessages({ afterId: lastMsgId, includeId: msg?.message_id })
+    return this.fetchMessages({
+      afterId: lastMsgId,
+      includeId: notifyPayload?.message_id
+    })
       .then(data => {
+        if (!this.element?.isConnected) {
+          return 0;
+        }
         if (!data.length) {
+          if (refreshOptions.refreshCacheOnEmpty) {
+            this.persistMessages();
+          }
           return 0;
         }
 
-        // Add new messages to the Set
-        this.messages.merge(data)
+        if (refreshOptions.resetOnLimit && data.length >= MESSAGE_FETCH_LIMIT) {
+          this.messages.clear();
+        }
+        this.messages.merge(data);
         this.renderMessages({
           preserveBottomOffset,
           forceScrollToBottom: shouldStickToBottom

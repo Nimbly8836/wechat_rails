@@ -1409,6 +1409,9 @@ export default class extends Controller {
       }
 
       writeCache(namespace, identifier, html)
+      if (cachedHtml && html === cachedHtml) {
+        return
+      }
       this.chatBoxTarget.innerHTML = html
       this.closeSidebar()
     }

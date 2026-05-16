@@ -21,7 +21,9 @@ export function renderMessages(controller, options = {}) {
   controller.highlightedRow = null;
 
   if (controller.messages.length === 0) {
-    controller.persistMessages();
+    if (!options.skipPersist) {
+      controller.persistMessages();
+    }
     emptyState.style.display = "block";
     container.appendChild(emptyState);
     return;
@@ -107,7 +109,9 @@ export function renderMessages(controller, options = {}) {
     controller.scheduleScrollToBottom();
   }
 
-  controller.persistMessages();
+  if (!options.skipPersist) {
+    controller.persistMessages();
+  }
 }
 
 export function buildEmptyState() {
