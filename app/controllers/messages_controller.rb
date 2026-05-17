@@ -427,15 +427,12 @@ class MessagesController < ApplicationController
     end
 
     tools_api = ToolsApiService.new(contact.own_wxid)
-    data = download_chat_history_record_item(tools_api, message, wx_message, item)
-    unless data
+    download = download_chat_history_record_item(tools_api, message, wx_message, item, storage_dir, basename, filename)
+    unless download
       render json: { error: true, message: "chat history attachment download failed" }, status: :bad_gateway and return
     end
 
-    mime = detect_mime(data, name: filename, fallback: chat_history_attachment_fallback_mime(item))
-    extension_hint = File.extname(filename).presence || extension_for_mime(mime)
-    file_path = persist_binary(storage_dir, basename, data, extension_hint: extension_hint, fallback_extension: ".bin")
-    send_file(file_path, type: mime, disposition: chat_history_attachment_disposition(item), filename: filename)
+    send_file(download[:path], type: download[:mime], disposition: chat_history_attachment_disposition(item), filename: filename)
   rescue ActiveRecord::RecordNotFound
     render json: { error: true, message: "chat history message not found" }, status: :not_found
   rescue => e
@@ -866,14 +863,17 @@ class MessagesController < ApplicationController
     end
   end
 
-  def download_chat_history_record_item(api_service, message, wx_message, item)
+  def download_chat_history_record_item(api_service, message, wx_message, item, storage_dir, basename, filename)
     if chat_history_record_item_cdn_downloadable?(item) && item[:data_size].to_i <= LARGE_RECORD_ITEM_THRESHOLD
       if (data = download_record_item_via_cdn(api_service, item))
-        return data
+        mime = detect_mime(data, name: filename, fallback: chat_history_attachment_fallback_mime(item))
+        extension_hint = File.extname(filename).presence || extension_for_mime(mime)
+        path = persist_binary(storage_dir, basename, data, extension_hint: extension_hint, fallback_extension: ".bin")
+        return { path: path, mime: mime }
       end
     end
 
-    download_record_item_via_file_helper(api_service, message, wx_message, item)
+    download_record_item_via_file_helper(api_service, message, wx_message, item, storage_dir, basename, filename)
   end
 
   def chat_history_record_item_cdn_downloadable?(item)
@@ -892,18 +892,22 @@ class MessagesController < ApplicationController
     extract_record_item_payload(response)
   end
 
-  def download_record_item_via_file_helper(api_service, message, wx_message, item)
+  def download_record_item_via_file_helper(api_service, message, wx_message, item, storage_dir, basename, filename)
+    extension_hint = File.extname(filename).presence || chat_history_attachment_default_extension(item)
+    path = storage_dir.join("#{basename}#{extension_hint}")
     response = api_service.forward_record_item_to_file_helper_download(
+      file_path: path,
       msgID: wx_message.msg_id,
       newMsgID: wx_message.new_msg_id,
-      sourceXml: wx_message.content,
-      talker: message.chat_room&.wx_id,
-      senderUserName: wx_message.from_user_name,
-      itemIndex: chat_history_record_item_index(wx_message, item[:data_id]) || 0,
-      isThumb: 0,
-      skipForward: false
+      diagnostic: false
     )
-    extract_record_item_payload(response)
+    unless response[:success]
+      Rails.logger.warn { "filehelper record item download failed: #{response.inspect}" }
+      return nil
+    end
+
+    mime = response[:content_type].presence || Marcel::MimeType.for(Pathname.new(path), name: filename)
+    { path: path, mime: mime }
   end
 
   def chat_history_record_item_index(wx_message, data_id)
@@ -961,6 +965,14 @@ class MessagesController < ApplicationController
 
   def chat_history_attachment_disposition(item)
     item[:type].to_s == "image" ? "inline" : "attachment"
+  end
+
+  def chat_history_attachment_default_extension(item)
+    extension = item[:format].presence
+    return ".#{extension.to_s.downcase}" if extension.present?
+    return ".jpg" if item[:type].to_s == "image"
+
+    ".bin"
   end
 
   def chat_history_attachment_fallback_mime(item)

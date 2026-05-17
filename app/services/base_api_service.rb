@@ -4,6 +4,7 @@ require "uri"
 require "json"
 require "singleton"
 require "net/http/post/multipart"
+require "fileutils"
 
 class BaseApiService
   include Singleton
@@ -50,6 +51,11 @@ class BaseApiService
   def post(path, params = {})
     params_with_wxid = { Wxid: @@wx_id }.merge(params.compact)
     make_request(path, params_with_wxid, :post)
+  end
+
+  def post_binary_to_file(path, params = {}, file_path:)
+    params_with_wxid = { Wxid: @@wx_id }.merge(params.compact)
+    make_binary_request(path, params_with_wxid, file_path: file_path)
   end
 
   # 发送PUT请求
@@ -133,6 +139,50 @@ class BaseApiService
   end
 
   private
+
+  def make_binary_request(path, params = {}, file_path:)
+    url = build_url(path)
+    uri = URI.parse(url)
+    request = Net::HTTP::Post.new(uri)
+    request.body = params.to_json
+    set_headers(request)
+
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = (uri.scheme == "https")
+    http.read_timeout = @config[:timeout] || 30
+
+    tries = 0
+    max_tries = @config[:retry_count] || 3
+
+    begin
+      tries += 1
+      FileUtils.mkdir_p(File.dirname(file_path))
+      File.open(file_path, "wb") do |file|
+        http.request(request) do |response|
+          unless response.is_a?(Net::HTTPSuccess)
+            body = response.read_body
+            return { error: true, status: response.code, message: response.message, body: body }
+          end
+
+          response.read_body { |chunk| file.write(chunk) }
+          return {
+            success: true,
+            path: file_path.to_s,
+            content_type: response["content-type"],
+            filename: response["content-disposition"]
+          }
+        end
+      end
+    rescue => e
+      FileUtils.rm_f(file_path)
+      if tries < max_tries
+        sleep(1)
+        retry
+      end
+      Rails.logger.error("API二进制请求失败 (#{url}): #{e.message}")
+      { error: true, message: "请求失败: #{e.message}" }
+    end
+  end
 
   # 发送HTTP请求
   def make_request(path, params = {}, method = :get)

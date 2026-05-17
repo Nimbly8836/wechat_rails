@@ -54,12 +54,12 @@ class ToolsApiService
     @api_service.post(path, params)
   end
 
-  def forward_record_item_to_file_helper_download(**attrs)
+  def forward_record_item_to_file_helper_download(file_path:, **attrs)
     path = WechatApis::Tools.forward_record_item_to_file_helper_download
     params = WechatRequest::Tools::ForwardRecordItemToFileHelperDownload
                .new(wxid: @wx_id, **attrs)
                .to_h
-    @api_service.post(path, params)
+    @api_service.post_binary_to_file(path, params, file_path: file_path)
   end
 
   def download_image_chunk(to_wxid:, msg_id:, data_len:, section:, compress_type: 0)
