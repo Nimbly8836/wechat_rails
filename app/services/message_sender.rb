@@ -12,6 +12,7 @@ class MessageSender
     video: 43,
     voice: 34,
     file: 6,
+    chat_history: 19,
     emoji: 47,
     quote: 49
   }.freeze
@@ -65,6 +66,8 @@ class MessageSender
                                            voice_time: payload[:voice_time])
     when MESSAGE_TYPES[:file]
       res = send_file
+    when MESSAGE_TYPES[:chat_history]
+      res = send_merged_forward
     else
       raise ArgumentError, "Unsupported message_type: #{@message_type}"
     end
@@ -385,6 +388,33 @@ class MessageSender
            .find_by(id: reference_message_id, chat_room_id: @chat_room.id)
   end
 
+  def merged_forward_source_message
+    source_message_id = extra_value(:source_message_id)
+    return nil if source_message_id.blank?
+
+    Message.includes(:wx_message)
+           .find_by(id: source_message_id, chat_room_id: @chat_room.id)
+  end
+
+  def send_merged_forward
+    source_message = merged_forward_source_message
+    wx_message = source_message&.wx_message
+    attrs = {
+      xml: extra_value(:xml).presence || @message_content.presence,
+      sourceXml: extra_value(:source_xml).presence || extra_value(:sourceXml).presence || wx_message&.content,
+      msgID: extra_value(:msg_id).presence || extra_value(:msgID).presence || wx_message&.msg_id,
+      newMsgID: extra_value(:new_msg_id).presence || extra_value(:newMsgID).presence || wx_message&.new_msg_id,
+      talker: extra_value(:talker).presence || @chat_room.wx_id,
+      senderUserName: extra_value(:sender_user_name).presence || extra_value(:senderUserName).presence || wx_message&.from_user_name,
+      title: extra_value(:title),
+      desc: extra_value(:desc)
+    }.compact
+    return { success: false, message: "合并转发内容不存在" } if attrs.slice(:xml, :sourceXml, :msgID, :newMsgID).values.all?(&:blank?)
+
+    @message_content = attrs[:xml].presence || attrs[:sourceXml].to_s
+    message_api_service.send_merged_forward(@chat_room.wx_id, **attrs)
+  end
+
   def build_quote_xml(reference_message, reply_content)
     wx_message = reference_message.wx_message
     raise ArgumentError, "引用消息不存在" unless wx_message
@@ -478,6 +508,7 @@ class MessageSender
 
   def persisted_real_message_type
     return :quote if @message_type == MESSAGE_TYPES[:quote]
+    return :chat_history if @message_type == MESSAGE_TYPES[:chat_history]
 
     @message_type
   end

@@ -21,6 +21,45 @@ module WechatRequest
       end
     end
 
+    # 合并转发 RecordItem 转发到文件传输助手后下载
+    class ForwardRecordItemToFileHelperDownload < Base
+      params(
+        msgID: nil,
+        newMsgID: nil,
+        sourceXml: nil,
+        xml: nil,
+        talker: nil,
+        senderUserName: nil,
+        itemIndex: nil,
+        isThumb: 0,
+        skipForward: nil,
+        diagnostic: nil,
+        localID: nil,
+        msgSeq: nil,
+        msgType: nil,
+        keyword: nil
+      )
+
+      def self.api_key_for(name)
+        {
+          msgID: "MsgID",
+          newMsgID: "NewMsgID",
+          sourceXml: "SourceXml",
+          xml: "Xml",
+          talker: "Talker",
+          senderUserName: "SenderUserName",
+          itemIndex: "ItemIndex",
+          isThumb: "IsThumb",
+          skipForward: "SkipForward",
+          diagnostic: "Diagnostic",
+          localID: "LocalID",
+          msgSeq: "MsgSeq",
+          msgType: "MsgType",
+          keyword: "Keyword"
+        }.fetch(name.to_sym) { super }
+      end
+    end
+
     # 文件下载
     class DownloadFile < Base
       params { [ :appId, :attachId, :dataLen, :section, :userName ] }

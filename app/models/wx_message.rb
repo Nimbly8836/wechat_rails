@@ -379,9 +379,7 @@ class WxMessage < ApplicationRecord
 
     def record_item_downloadable?(payload)
       payload[:data_id].present? &&
-        payload[:cdn_data_url].present? &&
-        payload[:cdn_data_key].present? &&
-        [ "image", "file_message" ].include?(payload[:type])
+        [ "image", "video", "file_message" ].include?(payload[:type])
     end
 
     def parse_voip_payload(raw)

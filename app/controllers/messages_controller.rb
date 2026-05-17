@@ -4,6 +4,7 @@ require "net/http"
 require "stringio"
 
 class MessagesController < ApplicationController
+  LARGE_RECORD_ITEM_THRESHOLD = 100.megabytes
   skip_before_action :verify_authenticity_token, only: :callback
   skip_before_action :require_authentication, only: :callback
   before_action :disable_http_cache, only: [ :index, :show, :resolve_reference ]
@@ -426,15 +427,7 @@ class MessagesController < ApplicationController
     end
 
     tools_api = ToolsApiService.new(contact.own_wxid)
-    response = tools_api.cdn_download_record_item(
-      cdn_data_url: item[:cdn_data_url],
-      cdn_data_key: item[:cdn_data_key],
-      data_id: item[:data_id],
-      full_md5: item[:full_md5],
-      data_size: item[:data_size],
-      is_thumb: 0
-    )
-    data = extract_record_item_payload(response)
+    data = download_chat_history_record_item(tools_api, message, wx_message, item)
     unless data
       render json: { error: true, message: "chat history attachment download failed" }, status: :bad_gateway and return
     end
@@ -873,12 +866,78 @@ class MessagesController < ApplicationController
     end
   end
 
+  def download_chat_history_record_item(api_service, message, wx_message, item)
+    if chat_history_record_item_cdn_downloadable?(item) && item[:data_size].to_i <= LARGE_RECORD_ITEM_THRESHOLD
+      if (data = download_record_item_via_cdn(api_service, item))
+        return data
+      end
+    end
+
+    download_record_item_via_file_helper(api_service, message, wx_message, item)
+  end
+
+  def chat_history_record_item_cdn_downloadable?(item)
+    item[:cdn_data_url].present? && item[:cdn_data_key].present?
+  end
+
+  def download_record_item_via_cdn(api_service, item)
+    response = api_service.cdn_download_record_item(
+      cdn_data_url: item[:cdn_data_url],
+      cdn_data_key: item[:cdn_data_key],
+      data_id: item[:data_id],
+      full_md5: item[:full_md5],
+      data_size: item[:data_size],
+      is_thumb: 0
+    )
+    extract_record_item_payload(response)
+  end
+
+  def download_record_item_via_file_helper(api_service, message, wx_message, item)
+    response = api_service.forward_record_item_to_file_helper_download(
+      msgID: wx_message.msg_id,
+      newMsgID: wx_message.new_msg_id,
+      sourceXml: wx_message.content,
+      talker: message.chat_room&.wx_id,
+      senderUserName: wx_message.from_user_name,
+      itemIndex: chat_history_record_item_index(wx_message, item[:data_id]) || 0,
+      isThumb: 0,
+      skipForward: false
+    )
+    extract_record_item_payload(response)
+  end
+
+  def chat_history_record_item_index(wx_message, data_id)
+    payload = WxMessage.parse_chat_history_payload(wx_message.content)
+    find_chat_history_record_item_index(payload&.dig(:items), data_id)
+  end
+
+  def find_chat_history_record_item_index(items, data_id)
+    return nil unless items.is_a?(Array)
+
+    items.each_with_index do |item, index|
+      return index if item[:data_id].to_s == data_id.to_s
+
+      nested_index = find_chat_history_record_item_index(item[:items], data_id)
+      return nested_index if nested_index
+    end
+    nil
+  end
+
   def extract_record_item_payload(response)
     payload = response.is_a?(Hash) ? response : {}
     data_node = payload["Data"] || payload[:Data]
-    encoded = data_node&.[]("Image") || data_node&.[](:Image) ||
-      data_node&.[]("File") || data_node&.[](:File) ||
-      data_node&.[]("Data") || data_node&.[](:Data)
+    buffer_node = data_node&.[]("data") || data_node&.[](:data) || data_node
+    encoded = buffer_node if buffer_node.is_a?(String)
+    encoded ||= buffer_node&.[]("Image") || buffer_node&.[](:Image) ||
+      buffer_node&.[]("File") || buffer_node&.[](:File) ||
+      buffer_node&.[]("Data") || buffer_node&.[](:Data) ||
+      buffer_node&.[]("Base64") || buffer_node&.[](:Base64) ||
+      buffer_node&.[]("Buffer") || buffer_node&.[](:Buffer) ||
+      buffer_node&.[]("buffer") || buffer_node&.[](:buffer) ||
+      buffer_node&.[]("FileBase64") || buffer_node&.[](:FileBase64) ||
+      buffer_node&.[]("ImageBase64") || buffer_node&.[](:ImageBase64) ||
+      payload["Base64"] || payload[:Base64] ||
+      payload["FileBase64"] || payload[:FileBase64]
     unless encoded.present?
       Rails.logger.warn { "record item payload missing data: #{payload.inspect}" }
       return nil

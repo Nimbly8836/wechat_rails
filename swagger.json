@@ -2150,6 +2150,30 @@
                 }
             }
         },
+        "/Msg/SendMergedForward": {
+            "post": {
+                "tags": [
+                    "Msg"
+                ],
+                "summary": "发送合并转发消息",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "Xml==type19则直接发送；否则从SourceXml或MsgID/NewMsgID查询本地消息推测构建",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Msg.SendMergedForwardParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/Msg/SendTxt": {
             "post": {
                 "tags": [
@@ -2882,6 +2906,19 @@
                 }
             }
         },
+        "/Tools/CdnDownloadAppAttach": {
+            "post": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "CDN下载文件附件（已删除）",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/Tools/CdnDownloadImage": {
             "post": {
                 "tags": [
@@ -2895,6 +2932,54 @@
                         "description": "true",
                         "schema": {
                             "$ref": "#/definitions/Tools.CdnDownloadImageParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/Tools/CdnDownloadRecordItem": {
+            "post": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "CDN下载聊天记录内嵌图片/文件",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "type=19 recorditem dataitem",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Tools.CdnDownloadRecordItemParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/Tools/DownloadAppAttachChunks": {
+            "post": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "文件分片下载",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "DataLen == 文件大小, xml中获取",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Tools.CdnDownloadAppAttachParam"
                         }
                     }
                 ],
@@ -2991,6 +3076,30 @@
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/Tools.DownloadVoiceParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/Tools/ForwardRecordItemToFileHelperDownload": {
+            "post": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "合并转发消息到文件传输助手并下载RecordItem",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "传MsgID/NewMsgID或SourceXml，接口自动构建type19、转发filehelper并下载RecordItem",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Tools.ForwardRecordItemDownloadParam"
                         }
                     }
                 ],
@@ -4777,9 +4886,21 @@
                     "type": "integer",
                     "format": "int64"
                 },
+                "MsgID": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgSeq": {
+                    "type": "integer",
+                    "format": "int32"
+                },
                 "MsgType": {
                     "type": "integer",
                     "format": "int32"
+                },
+                "NewMsgID": {
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "Offset": {
                     "type": "integer",
@@ -4876,6 +4997,109 @@
                     "type": "string"
                 },
                 "Wxid": {
+                    "type": "string"
+                }
+            }
+        },
+        "Msg.SendMergedForwardParam": {
+            "title": "SendMergedForwardParam",
+            "type": "object",
+            "properties": {
+                "CdnDataKey": {
+                    "type": "string"
+                },
+                "CdnDataUrl": {
+                    "type": "string"
+                },
+                "DataFmt": {
+                    "type": "string"
+                },
+                "DataId": {
+                    "type": "string"
+                },
+                "DataSize": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "DataTitle": {
+                    "type": "string"
+                },
+                "Desc": {
+                    "type": "string"
+                },
+                "FromNewMsgId": {
+                    "type": "string"
+                },
+                "FullMd5": {
+                    "type": "string"
+                },
+                "HtmlId": {
+                    "type": "string"
+                },
+                "Keyword": {
+                    "type": "string"
+                },
+                "LocalID": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MediaExpireAt": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "MessageUuid": {
+                    "type": "string"
+                },
+                "MsgID": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgSeq": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgType": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "NewMsgID": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "SenderUserName": {
+                    "type": "string"
+                },
+                "SourceHeadUrl": {
+                    "type": "string"
+                },
+                "SourceName": {
+                    "type": "string"
+                },
+                "SourceTime": {
+                    "type": "string"
+                },
+                "SourceXml": {
+                    "type": "string"
+                },
+                "SrcMsgCreateTime": {
+                    "type": "string"
+                },
+                "SrcMsgLocalId": {
+                    "type": "string"
+                },
+                "Talker": {
+                    "type": "string"
+                },
+                "Title": {
+                    "type": "string"
+                },
+                "ToWxid": {
+                    "type": "string"
+                },
+                "Wxid": {
+                    "type": "string"
+                },
+                "Xml": {
                     "type": "string"
                 }
             }
@@ -5588,6 +5812,100 @@
             "title": "UnionpayData",
             "type": "object"
         },
+        "Tools.CdnDownloadAppAttachParam": {
+            "title": "CdnDownloadAppAttachParam",
+            "type": "object",
+            "properties": {
+                "aeskey": {
+                    "type": "string"
+                },
+                "app_id": {
+                    "type": "string"
+                },
+                "attachid": {
+                    "type": "string"
+                },
+                "cdnattachurl": {
+                    "type": "string"
+                },
+                "cdntype": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "chat_room_wxid": {
+                    "type": "string"
+                },
+                "chunk_size": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "downpicformat": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "fileext": {
+                    "type": "string"
+                },
+                "filetype": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "fileuploadtoken": {
+                    "type": "string"
+                },
+                "from_user_name": {
+                    "type": "string"
+                },
+                "md5": {
+                    "type": "string"
+                },
+                "media_expire_at": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "message_id": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "msg_id": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "out_fmt": {
+                    "type": "string"
+                },
+                "overwrite_newmsgid": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "rotation": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "sdk_version": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "totallen": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "type": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "wx_message_id": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "wxid": {
+                    "type": "string"
+                }
+            }
+        },
         "Tools.CdnDownloadImageParam": {
             "title": "CdnDownloadImageParam",
             "type": "object",
@@ -5597,6 +5915,38 @@
                 },
                 "FileNo": {
                     "type": "string"
+                },
+                "Wxid": {
+                    "type": "string"
+                }
+            }
+        },
+        "Tools.CdnDownloadRecordItemParam": {
+            "title": "CdnDownloadRecordItemParam",
+            "type": "object",
+            "properties": {
+                "CdnDataKey": {
+                    "type": "string"
+                },
+                "CdnDataUrl": {
+                    "type": "string"
+                },
+                "DataId": {
+                    "type": "string"
+                },
+                "DataSize": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "Diagnostic": {
+                    "type": "boolean"
+                },
+                "FullMd5": {
+                    "type": "string"
+                },
+                "IsThumb": {
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "Wxid": {
                     "type": "string"
@@ -5617,14 +5967,45 @@
                     "type": "integer",
                     "format": "int64"
                 },
+                "NewMsgId": {
+                    "type": "integer",
+                    "format": "int64"
+                },
                 "Section": {
                     "$ref": "#/definitions/Tools.Section"
+                },
+                "Type": {
+                    "type": "integer",
+                    "format": "int32"
                 },
                 "UserName": {
                     "type": "string"
                 },
                 "Wxid": {
                     "type": "string"
+                },
+                "cdntype": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "downpicformat": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "filetype": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "outfmt": {
+                    "type": "string"
+                },
+                "rotation": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "sdkversion": {
+                    "type": "integer",
+                    "format": "int32"
                 }
             }
         },
@@ -5674,6 +6055,64 @@
                     "format": "int64"
                 },
                 "Wxid": {
+                    "type": "string"
+                }
+            }
+        },
+        "Tools.ForwardRecordItemDownloadParam": {
+            "title": "ForwardRecordItemDownloadParam",
+            "type": "object",
+            "properties": {
+                "Diagnostic": {
+                    "type": "boolean"
+                },
+                "IsThumb": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "ItemIndex": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "Keyword": {
+                    "type": "string"
+                },
+                "LocalID": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgID": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgSeq": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgType": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "NewMsgID": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "SenderUserName": {
+                    "type": "string"
+                },
+                "SkipForward": {
+                    "type": "boolean"
+                },
+                "SourceXml": {
+                    "type": "string"
+                },
+                "Talker": {
+                    "type": "string"
+                },
+                "Wxid": {
+                    "type": "string"
+                },
+                "Xml": {
                     "type": "string"
                 }
             }

@@ -89,6 +89,14 @@ class MessageApiService
     send_app(to_wxid, 49, xml)
   end
 
+  def send_merged_forward(to_wxid, **attrs)
+    path = WechatApis::Message.send_merged_forward
+    params = WechatRequest::Message::SendMergedForward
+               .new(wxid: @wx_id, toWxid: to_wxid, **attrs)
+               .to_h
+    @api_service.post(path, params)
+  end
+
   def send_emoji(to_wxid, base64, md5: nil, total_len: nil)
     path = WechatApis::Message.send_emoji
     params = WechatRequest::Message::SendEmoji.new(

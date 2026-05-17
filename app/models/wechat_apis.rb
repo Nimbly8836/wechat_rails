@@ -91,6 +91,10 @@ module WechatApis
     def self.send_voice
       "/Msg/SendVoice"
     end
+
+    def self.send_merged_forward
+      "/Msg/SendMergedForward"
+    end
   end
 
   # 联系人相关API路径
@@ -131,6 +135,10 @@ module WechatApis
 
     def self.cdn_download_record_item
       "/Tools/CdnDownloadRecordItem"
+    end
+
+    def self.forward_record_item_to_file_helper_download
+      "/Tools/ForwardRecordItemToFileHelperDownload"
     end
 
     def self.download_file

@@ -40,6 +40,74 @@ module WechatRequest
       params { [ :toWxid, :content ] }
     end
 
+    # 发送合并转发消息
+    class SendMergedForward < Base
+      params(
+        xml: nil,
+        sourceXml: nil,
+        msgID: nil,
+        newMsgID: nil,
+        talker: nil,
+        senderUserName: nil,
+        title: nil,
+        desc: nil,
+        dataId: nil,
+        cdnDataUrl: nil,
+        cdnDataKey: nil,
+        fullMd5: nil,
+        dataSize: nil,
+        dataFmt: nil,
+        dataTitle: nil,
+        fromNewMsgId: nil,
+        htmlId: nil,
+        keyword: nil,
+        localID: nil,
+        mediaExpireAt: nil,
+        messageUuid: nil,
+        msgSeq: nil,
+        msgType: nil,
+        sourceHeadUrl: nil,
+        sourceName: nil,
+        sourceTime: nil,
+        srcMsgCreateTime: nil,
+        srcMsgLocalId: nil
+      ) { [ :toWxid ] }
+
+      def self.api_key_for(name)
+        {
+          toWxid: "ToWxid",
+          xml: "Xml",
+          sourceXml: "SourceXml",
+          msgID: "MsgID",
+          newMsgID: "NewMsgID",
+          talker: "Talker",
+          senderUserName: "SenderUserName",
+          title: "Title",
+          desc: "Desc",
+          dataId: "DataId",
+          cdnDataUrl: "CdnDataUrl",
+          cdnDataKey: "CdnDataKey",
+          fullMd5: "FullMd5",
+          dataSize: "DataSize",
+          dataFmt: "DataFmt",
+          dataTitle: "DataTitle",
+          fromNewMsgId: "FromNewMsgId",
+          htmlId: "HtmlId",
+          keyword: "Keyword",
+          localID: "LocalID",
+          mediaExpireAt: "MediaExpireAt",
+          messageUuid: "MessageUuid",
+          msgSeq: "MsgSeq",
+          msgType: "MsgType",
+          sourceHeadUrl: "SourceHeadUrl",
+          sourceName: "SourceName",
+          sourceTime: "SourceTime",
+          srcMsgCreateTime: "SrcMsgCreateTime",
+          srcMsgLocalId: "SrcMsgLocalId"
+        }.fetch(name.to_sym) { super }
+      end
+    end
+
     # 发送表情
     class SendEmoji < Base
       params(base64: nil, md5: nil, totalLen: nil) { [ :toWxid ] }
