@@ -1110,7 +1110,16 @@ class MessagesController < ApplicationController
     params.require(:chat_room_id)
     params.require(:msg_type)
     # params.require(:content)
-    params.permit(:chat_room_id, :msg_type, :content, :file, extra: {})
+    params.permit(
+      :chat_room_id, :msg_type, :content, :file,
+      extra: [
+        :xml, :source_xml, :sourceXml, :source_message_id,
+        :msg_id, :msgID, :new_msg_id, :newMsgID,
+        :talker, :sender_user_name, :senderUserName, :title, :desc,
+        { items: [ :msg_id, :msgID, :new_msg_id, :newMsgID, :source_xml, :sourceXml ],
+          Items: [ :MsgID, :NewMsgID, :SourceXml ] }
+      ]
+    )
   end
 
   def hook_message_attrs(args)

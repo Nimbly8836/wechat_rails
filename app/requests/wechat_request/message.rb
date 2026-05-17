@@ -70,7 +70,8 @@ module WechatRequest
         sourceName: nil,
         sourceTime: nil,
         srcMsgCreateTime: nil,
-        srcMsgLocalId: nil
+        srcMsgLocalId: nil,
+        items: nil
       ) { [ :toWxid ] }
 
       def self.api_key_for(name)
@@ -103,7 +104,8 @@ module WechatRequest
           sourceName: "SourceName",
           sourceTime: "SourceTime",
           srcMsgCreateTime: "SrcMsgCreateTime",
-          srcMsgLocalId: "SrcMsgLocalId"
+          srcMsgLocalId: "SrcMsgLocalId",
+          items: "Items"
         }.fetch(name.to_sym) { super }
       end
     end

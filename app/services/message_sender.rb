@@ -407,12 +407,37 @@ class MessageSender
       talker: extra_value(:talker).presence || @chat_room.wx_id,
       senderUserName: extra_value(:sender_user_name).presence || extra_value(:senderUserName).presence || wx_message&.from_user_name,
       title: extra_value(:title),
-      desc: extra_value(:desc)
+      desc: extra_value(:desc),
+      items: merged_forward_items
     }.compact
-    return { success: false, message: "合并转发内容不存在" } if attrs.slice(:xml, :sourceXml, :msgID, :newMsgID).values.all?(&:blank?)
+    return { success: false, message: "合并转发内容不存在" } if merged_forward_empty?(attrs)
 
-    @message_content = attrs[:xml].presence || attrs[:sourceXml].to_s
+    @message_content = attrs[:xml].presence || attrs[:sourceXml].presence || merged_forward_preview_content(attrs[:items])
     message_api_service.send_merged_forward(@chat_room.wx_id, **attrs)
+  end
+
+  def merged_forward_items
+    raw_items = extra_value(:items) || extra_value(:Items)
+    return nil unless raw_items.respond_to?(:map)
+
+    raw_items.map do |item|
+      next unless item.respond_to?(:dig)
+
+      {
+        "MsgID" => item.dig(:msg_id) || item.dig("msg_id") || item.dig(:MsgID) || item.dig("MsgID"),
+        "NewMsgID" => item.dig(:new_msg_id) || item.dig("new_msg_id") || item.dig(:NewMsgID) || item.dig("NewMsgID"),
+        "SourceXml" => item.dig(:source_xml) || item.dig("source_xml") || item.dig(:SourceXml) || item.dig("SourceXml")
+      }.compact
+    end.compact_blank.presence
+  end
+
+  def merged_forward_empty?(attrs)
+    attrs.slice(:xml, :sourceXml, :msgID, :newMsgID).values.all?(&:blank?) && attrs[:items].blank?
+  end
+
+  def merged_forward_preview_content(items)
+    count = Array(items).length
+    count.positive? ? "[合并转发 #{count} 条消息]" : "[聊天记录]"
   end
 
   def build_quote_xml(reference_message, reply_content)
