@@ -380,18 +380,26 @@ class MessagesController < ApplicationController
     end
 
     tools_api = ToolsApiService.new(contact.own_wxid)
+    base_name = sanitize_filename(file_meta[:title], default: "file")
+    extension_hint = file_meta[:fileext].present? ? ".#{file_meta[:fileext].downcase}" : nil
+    filename = ensure_extension(base_name, extension_hint)
+
+    if file_meta[:totallen].to_i > LARGE_RECORD_ITEM_THRESHOLD
+      download = download_large_file_via_file_helper(tools_api, wx_message, storage_dir, basename, filename)
+      unless download
+        render json: { error: true, message: "file download failed" }, status: :bad_gateway and return
+      end
+
+      return send_file(download[:path], type: download[:mime], disposition: "attachment", filename: filename)
+    end
+
     data = download_file_chunks(tools_api, message, wx_message, file_meta)
     unless data
       render json: { error: true, message: "file download failed" }, status: :bad_gateway and return
     end
 
     data.force_encoding(Encoding::BINARY)
-
-    base_name = sanitize_filename(file_meta[:title], default: "file")
-    extension_hint = file_meta[:fileext].present? ? ".#{file_meta[:fileext].downcase}" : nil
-    filename = ensure_extension(base_name, extension_hint)
     mime = detect_mime(data, name: filename, fallback: "application/octet-stream")
-
     file_path = persist_binary(storage_dir, basename, data, extension_hint: File.extname(filename), fallback_extension: ".bin")
 
     send_file(file_path, type: mime, disposition: "attachment", filename: filename)
@@ -824,6 +832,24 @@ class MessagesController < ApplicationController
 
     mime = detect_mime(data, name: "video.mp4", fallback: "video/mp4")
     { data: data, mime: mime }
+  end
+
+  def download_large_file_via_file_helper(api_service, wx_message, storage_dir, basename, filename)
+    extension_hint = File.extname(filename).presence || ".bin"
+    path = storage_dir.join("#{basename}#{extension_hint}")
+    response = api_service.forward_record_item_to_file_helper_download(
+      file_path: path,
+      msgID: wx_message.msg_id,
+      newMsgID: wx_message.new_msg_id,
+      diagnostic: false
+    )
+    unless response[:success]
+      Rails.logger.warn { "filehelper large file download failed: #{response.inspect}" }
+      return nil
+    end
+
+    mime = response[:content_type].presence || Marcel::MimeType.for(Pathname.new(path), name: filename)
+    { path: path, mime: mime }
   end
 
   def download_file_chunks(api_service, message, wx_message, file_meta)
