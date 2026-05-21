@@ -1065,6 +1065,7 @@ body.tg-mobile-app {
 .telegram-chat-room .telegram-composer {
   position: sticky;
   bottom: 0;
+  min-height: 84px;
   flex-shrink: 0;
   z-index: 20;
   border-top: 1px solid rgba(203, 213, 225, 0.88);
@@ -1433,8 +1434,8 @@ html.tg-theme-dark .tg-contact-detail .border-slate-200 {
   }
 
   .telegram-chat-room .telegram-composer {
-    padding-top: 0.5rem;
-    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+    min-height: calc(64px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .tg-section-switcher {
