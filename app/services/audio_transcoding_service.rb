@@ -1,13 +1,16 @@
 # frozen_string_literal: true
 
 require "base64"
+require "digest/sha1"
+require "fileutils"
 require "open3"
 require "tempfile"
 
 class AudioTranscodingService
   class TranscodingError < StandardError; end
 
-  ENCODER_PATH = Rails.root.join("vendor", "silk", "encoder").freeze
+  SILK_DIR = Rails.root.join("lib", "silk2mp3", "silk").freeze
+  BUILD_ROOT = Rails.root.join("tmp", "silk_encoder_build").freeze
   SAMPLE_RATE = 24_000
   BIT_RATE = 25_000
   PACKET_LENGTH_MS = 20
@@ -59,9 +62,6 @@ class AudioTranscodingService
   end
 
   def ensure_encoder_available!
-<<<<<<< HEAD
-    raise TranscodingError, "silk encoder missing at #{ENCODER_PATH}" unless File.executable?(ENCODER_PATH)
-=======
     return if File.exist?(compiled_encoder_path) && File.exist?(compiled_library_path)
 
     prepare_build_workspace!
@@ -75,7 +75,6 @@ class AudioTranscodingService
     Rails.logger.warn { "silk encoder build stderr: #{stderr}" } unless stderr.blank?
 
     raise TranscodingError, "silk encoder build failed" unless status.success? && File.exist?(compiled_library_path) && File.exist?(compiled_encoder_path)
->>>>>>> c8d6d78 (Rebuild silk library before encoder link)
   end
 
   def transcode_to_pcm!(input_path, output_path)
@@ -100,7 +99,7 @@ class AudioTranscodingService
 
   def encode_silk!(pcm_path, output_path)
     stdout, stderr, status = Open3.capture3(
-      ENCODER_PATH.to_s,
+      compiled_encoder_path.to_s,
       pcm_path,
       output_path,
       "-quiet",
@@ -159,8 +158,6 @@ class AudioTranscodingService
     @uploaded_file.tempfile.path
   end
 
-<<<<<<< HEAD
-=======
   def build_dir
     BUILD_ROOT.join(source_signature)
   end
@@ -190,7 +187,6 @@ class AudioTranscodingService
     return if workspace_prepared?
 
     FileUtils.rm_rf(build_dir) if build_dir.exist?
-
     FileUtils.mkdir_p(build_dir)
 
     Dir.children(SILK_DIR).each do |entry|
@@ -206,5 +202,4 @@ class AudioTranscodingService
       build_dir.join("test").directory? &&
       build_dir.join("interface").directory?
   end
->>>>>>> c8d6d78 (Rebuild silk library before encoder link)
 end
