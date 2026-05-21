@@ -302,6 +302,9 @@ export default class extends Controller {
       this.applyTheme({ refreshBubbles: false });
       this.syncThemeInputs();
     };
+    this.boundGlobalThemeChange = () => {
+      this.applyTheme();
+    };
     this.boundComposerFocus = this.handleComposerFocus.bind(this);
     this.boundComposerBlur = this.handleComposerBlur.bind(this);
     this.boundComposerViewportChange = this.handleComposerViewportChange.bind(this);
@@ -310,6 +313,7 @@ export default class extends Controller {
     window.addEventListener("chat:notify", this.boundChatNotify);
     window.addEventListener("chat:global-background-image:change",
       this.boundGlobalBackgroundImageChange);
+    window.addEventListener("chat:global-theme:change", this.boundGlobalThemeChange);
 
     this.messageState = new ChatRoomMessageState(this.idValue);
     this.messages = this.messageState.messages;
@@ -517,6 +521,9 @@ export default class extends Controller {
     if (this.boundGlobalBackgroundImageChange) {
       window.removeEventListener("chat:global-background-image:change",
         this.boundGlobalBackgroundImageChange);
+    }
+    if (this.boundGlobalThemeChange) {
+      window.removeEventListener("chat:global-theme:change", this.boundGlobalThemeChange);
     }
     this.inputTarget.removeEventListener("focus", this.boundComposerFocus);
     this.inputTarget.removeEventListener("blur", this.boundComposerBlur);

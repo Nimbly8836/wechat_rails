@@ -22,6 +22,22 @@
        class="fixed inset-y-0 left-0 z-40 flex w-[min(28rem,calc(100vw-1.25rem))] max-w-[560px] -translate-x-full overflow-hidden rounded-r-[2rem] shadow-2xl transition-transform duration-200 ease-out sm:static sm:z-auto sm:min-w-[360px] sm:translate-x-0 sm:rounded-none sm:shadow-none"
        data-chat-target="sidebar">
     <div class="tg-folder-rail">
+      <div class="relative flex shrink-0 justify-center pb-3">
+        <button type="button"
+                class="tg-account-switcher-button"
+                aria-label="切换账号"
+                title="切换账号"
+                data-chat-target="accountButton"
+                data-action="click->chat#toggleAccountSwitcher">
+          <span data-chat-target="accountAvatar">微</span>
+        </button>
+        <div class="tg-account-switcher-panel hidden" data-chat-target="accountPanel">
+          <div class="px-3 py-2 text-xs font-semibold text-slate-500">切换账号</div>
+          <div class="space-y-1" data-chat-target="accountList">
+            <div class="px-3 py-3 text-xs text-slate-400">加载中...</div>
+          </div>
+        </div>
+      </div>
       <div class="min-h-0 flex-1 overflow-hidden" data-chat-target="folderBar"></div>
       <div class="tg-global-theme-control">
         <button type="button"

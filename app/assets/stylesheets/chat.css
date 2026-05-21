@@ -19,8 +19,9 @@ body.tg-mobile-app {
   display: flex;
   flex-direction: column;
   padding: 14px 10px;
-  background: #08090c;
-  color: rgba(248, 250, 252, 0.92);
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #475569;
+  border-right: 1px solid rgba(203, 213, 225, 0.78);
 }
 
 .tg-folder-rail-scroll {
@@ -29,6 +30,11 @@ body.tg-mobile-app {
   gap: 6px;
   overflow-y: auto;
   padding-right: 0;
+  scrollbar-width: none;
+}
+
+.tg-folder-rail-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .tg-folder-rail-item {
@@ -64,12 +70,13 @@ body.tg-mobile-app {
 
 .tg-folder-rail-item:hover .tg-folder-rail-icon,
 .tg-folder-rail-item.is-active .tg-folder-rail-icon {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
 }
 
 .tg-folder-rail-item.is-active .tg-folder-rail-icon {
   background: #2f80ed;
+  color: #fff;
   box-shadow: 0 12px 26px rgba(47, 128, 237, 0.34);
 }
 
@@ -80,20 +87,96 @@ body.tg-mobile-app {
 
 .tg-folder-rail-count {
   position: absolute;
-  right: 10px;
-  top: 10px;
-  min-width: 20px;
-  height: 20px;
+  right: 4px;
+  top: 4px;
+  z-index: 2;
+  min-width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0 5px;
   border-radius: 999px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: #2563eb;
+  color: #fff;
   font-size: 10px;
   font-weight: 700;
   box-shadow: 0 6px 12px rgba(15, 23, 42, 0.18);
+  transform: translate(20%, -20%);
+}
+
+.tg-account-switcher-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb 0%, #38bdf8 100%);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.28);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.tg-account-switcher-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.34);
+}
+
+.tg-account-switcher-panel {
+  position: absolute;
+  left: 58px;
+  top: 0;
+  z-index: 50;
+  width: 248px;
+  padding: 8px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.98);
+  color: #0f172a;
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.tg-account-row,
+.tg-account-login-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border-radius: 14px;
+  padding: 9px 10px;
+  color: #334155;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.tg-account-row:hover,
+.tg-account-login-link:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.tg-account-row-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tg-account-login-link {
+  justify-content: center;
+  margin-top: 4px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .tg-code-editor-shell {
@@ -227,13 +310,13 @@ body.tg-mobile-app {
   justify-content: center;
   gap: 3px;
   border-radius: 14px;
-  color: #e2e8f0;
+  color: #475569;
   transition: background-color 0.16s ease, transform 0.16s ease, color 0.16s ease;
 }
 
 .tg-global-theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
   transform: translateY(-1px);
 }
 
@@ -806,6 +889,24 @@ body.tg-mobile-app {
   border-radius: 14px;
   background: #f8fafc;
   padding: 10px 12px;
+  cursor: grab;
+  transition: background-color 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+
+.tg-folder-settings-row:hover {
+  background: #f1f5f9;
+  box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.65);
+}
+
+.tg-folder-settings-row.is-dragging {
+  opacity: 0.58;
+  cursor: grabbing;
+}
+
+.tg-folder-drag-handle {
+  color: #94a3b8;
+  font-size: 15px;
+  letter-spacing: -0.28em;
 }
 
 .tg-folder-settings-icon {
@@ -857,10 +958,10 @@ body.tg-mobile-app {
 
 .tg-desktop-sidebar-toggle {
   position: fixed;
-  top: 14px;
+  top: 76px;
   left: 18px;
   z-index: 35;
-  color: #f8fafc;
+  color: #475569;
 }
 
 @media (min-width: 640px) {
@@ -872,9 +973,14 @@ body.tg-mobile-app {
     display: flex;
   }
 
+  .tg-app-shell.tg-sidebar-rail-only .tg-desktop-sidebar-toggle {
+    background: rgba(255, 255, 255, 0.46);
+    box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.72);
+  }
+
   .tg-app-shell.tg-sidebar-rail-only .tg-desktop-sidebar-toggle:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
+    background: rgba(59, 130, 246, 0.12);
+    color: #2563eb;
   }
 
   #sidebar.tg-sidebar-collapsed {
@@ -1008,6 +1114,30 @@ html.tg-theme-dark .tg-app-shell.tg-has-chat-background .telegram-composer {
   filter: saturate(1.18) contrast(1.14);
 }
 
+.tg-section-tab .tg-ui-icon,
+.tg-sidebar-collapse-button .tg-ui-icon,
+.tg-desktop-sidebar-toggle .tg-ui-icon {
+  opacity: 0.92;
+}
+
+html.tg-theme-light .tg-app-shell {
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 24%),
+    linear-gradient(135deg, #e9eef4 0%, #dfe7f1 100%);
+}
+
+html.tg-theme-light .tg-sidebar-panel {
+  background: #f7f8fb;
+}
+
+html.tg-theme-light .tg-main-panel {
+  background: #fff;
+}
+
+html.tg-theme-light .tg-section-switcher {
+  background: rgba(255, 255, 255, 0.9);
+}
+
 .letter {
   transition: all 0.2s ease;
 }
@@ -1032,6 +1162,47 @@ html.tg-theme-dark .tg-app-shell {
 html.tg-theme-dark .tg-folder-rail {
   background: linear-gradient(180deg, #111827 0%, #0b1120 100%);
   color: rgba(226, 232, 240, 0.95);
+  border-color: rgba(30, 41, 59, 0.95);
+}
+
+html.tg-theme-dark .tg-folder-rail-item:hover .tg-folder-rail-icon,
+html.tg-theme-dark .tg-folder-rail-item.is-active .tg-folder-rail-icon {
+  background: rgba(56, 189, 248, 0.16);
+  color: #7dd3fc;
+}
+
+html.tg-theme-dark .tg-folder-rail-item.is-active .tg-folder-rail-icon {
+  background: #0ea5e9;
+  color: #082f49;
+  box-shadow: 0 12px 26px rgba(14, 165, 233, 0.24);
+}
+
+html.tg-theme-dark .tg-folder-rail-count {
+  background: #38bdf8;
+  color: #082f49;
+}
+
+html.tg-theme-dark .tg-account-switcher-panel {
+  border-color: rgba(51, 65, 85, 0.92);
+  background: rgba(15, 23, 42, 0.98);
+  color: #e2e8f0;
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.34);
+}
+
+html.tg-theme-dark .tg-account-row,
+html.tg-theme-dark .tg-account-login-link {
+  color: #cbd5e1;
+}
+
+html.tg-theme-dark .tg-account-row:hover,
+html.tg-theme-dark .tg-account-login-link:hover {
+  background: rgba(51, 65, 85, 0.96);
+  color: #f8fafc;
+}
+
+html.tg-theme-dark .tg-account-row-avatar {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(37, 99, 235, 0.32));
+  color: #bae6fd;
 }
 
 html.tg-theme-dark .tg-global-theme-toggle {
@@ -1051,11 +1222,32 @@ html.tg-theme-dark .tg-contact-row,
 html.tg-theme-dark .tg-contact-section-header,
 html.tg-theme-dark .tg-section-switcher,
 html.tg-theme-dark .tg-room-menu,
-html.tg-theme-dark .tg-room-actions-menu {
+html.tg-theme-dark .tg-room-actions-menu,
+html.tg-theme-dark .tg-settings-card,
+html.tg-theme-dark .tg-folder-settings-row {
   border-color: rgba(51, 65, 85, 0.92);
   background: rgba(30, 41, 59, 0.92);
   color: #e2e8f0;
   box-shadow: 0 10px 24px rgba(2, 6, 23, 0.22);
+}
+
+html.tg-theme-dark .tg-settings-input {
+  border-color: rgba(51, 65, 85, 0.92);
+  background: rgba(15, 23, 42, 0.82);
+  color: #e2e8f0;
+}
+
+html.tg-theme-dark .tg-folder-settings-icon {
+  background: rgba(51, 65, 85, 0.96);
+  color: #cbd5e1;
+}
+
+html.tg-theme-dark .tg-folder-settings-row:hover {
+  background: rgba(51, 65, 85, 0.95);
+}
+
+html.tg-theme-dark .tg-folder-drag-handle {
+  color: #64748b;
 }
 
 html.tg-theme-dark .tg-room-row:hover,
@@ -1073,6 +1265,12 @@ html.tg-theme-dark .tg-contact-section-header.is-letter {
 
 html.tg-theme-dark .tg-section-tab {
   color: #94a3b8;
+}
+
+html.tg-theme-dark .tg-section-tab .tg-ui-icon,
+html.tg-theme-dark .tg-sidebar-collapse-button .tg-ui-icon,
+html.tg-theme-dark .tg-desktop-sidebar-toggle .tg-ui-icon {
+  filter: brightness(1.35) saturate(1.12) contrast(1.08);
 }
 
 html.tg-theme-dark .tg-section-tab:hover,

@@ -85,6 +85,10 @@ class LoginController < ApplicationController
                    response
   end
 
+  def accounts
+    render json: LoginInfo.order(last_login_at: :desc).map { |login_info| serialize_account(login_info) }
+  end
+
   def reconnect_user
     user_name = params[:user_name]
 
@@ -137,6 +141,18 @@ class LoginController < ApplicationController
   end
 
   private
+
+  def serialize_account(login_info)
+    label = login_info.nick_name.presence || login_info.user_name
+    {
+      user_name: login_info.user_name,
+      nick_name: login_info.nick_name,
+      label: label,
+      initial: label.to_s.first&.upcase || "微",
+      online: login_info.online?,
+      last_login_at: login_info.last_login_at
+    }
+  end
 
   def fetch_contacts_in_background(wx_id)
     Thread.new do

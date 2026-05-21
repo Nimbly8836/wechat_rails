@@ -42,6 +42,20 @@ class ChatFoldersController < ApplicationController
     render json: { folders: folders_payload }
   end
 
+  def reorder
+    folder_ids = Array(params.require(:folder_ids)).map(&:to_s)
+    folders_by_id = Current.user.chat_folders.index_by { |folder| folder.id.to_s }
+    return render json: { error: "invalid folder order" }, status: :unprocessable_entity unless folder_ids.sort == folders_by_id.keys.sort
+
+    ChatFolder.transaction do
+      folder_ids.each_with_index do |folder_id, index|
+        folders_by_id.fetch(folder_id).update!(position: index)
+      end
+    end
+
+    render json: { folders: folders_payload }
+  end
+
   def toggle_pin
     chat_room = ChatRoom.find(params.require(:chat_room_id))
     membership = @chat_folder.chat_folder_memberships.find_or_initialize_by(chat_room_id: chat_room.id)
@@ -91,6 +105,7 @@ class ChatFoldersController < ApplicationController
       name: folder.name,
       kind: folder.kind,
       built_in: folder.built_in?,
+      position: folder.position,
       room_ids: folder.room_ids,
       pinned_room_ids: folder.pinned_room_ids
     }

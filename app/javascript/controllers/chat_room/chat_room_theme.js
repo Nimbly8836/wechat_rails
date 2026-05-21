@@ -80,6 +80,67 @@ export function readableTextColorForBackground(value, fallback = "#111827") {
   return luminance > 0.45 ? "#111827" : "#ffffff";
 }
 
+export function globalThemeIsDark() {
+  return document.documentElement.classList.contains("tg-theme-dark");
+}
+
+export function effectiveBubbleStyle(controller, senderType) {
+  const theme = controller.theme || DEFAULT_THEME;
+  const dark = globalThemeIsDark();
+  const selfIsDefault = theme.selfBubbleColor === DEFAULT_THEME.selfBubbleColor
+    && theme.selfBubbleTextColor === DEFAULT_THEME.selfBubbleTextColor;
+  const otherIsDefault = theme.otherBubbleColor === DEFAULT_THEME.otherBubbleColor
+    && theme.otherBubbleBorderColor === DEFAULT_THEME.otherBubbleBorderColor;
+
+  if (senderType === "system") {
+    return dark
+      ? {
+        background: "rgba(30,41,59,0.92)",
+        color: "#cbd5e1",
+        border: "1px solid rgba(71,85,105,0.9)",
+        shadow: "0 8px 30px -20px rgba(0,0,0,0.55)",
+        voiceProgress: "#38bdf8"
+      }
+      : {
+        background: "rgba(255,255,255,0.92)",
+        color: "#475569",
+        border: "1px solid rgba(203,213,225,0.9)",
+        shadow: "0 8px 30px -20px rgba(15,23,42,0.35)",
+        voiceProgress: "#6366f1"
+      };
+  }
+
+  if (senderType === "self") {
+    const background = dark && selfIsDefault ? "#075985" : theme.selfBubbleColor;
+    const color = dark && selfIsDefault
+      ? "#f0f9ff"
+      : readableTextColorForBackground(background, theme.selfBubbleTextColor || "#111827");
+    const border = dark && selfIsDefault ? "rgba(14,165,233,0.58)" : "rgba(181, 214, 173, 0.92)";
+    return {
+      background,
+      color,
+      border: `1px solid ${border}`,
+      borderColor: border,
+      shadow: dark ? "0 1px 2px rgba(0,0,0,0.22)" : "0 1px 1px rgba(15,23,42,0.05)",
+      voiceProgress: color
+    };
+  }
+
+  const background = dark && otherIsDefault ? "#1e293b" : theme.otherBubbleColor;
+  const color = dark && otherIsDefault
+    ? "#e2e8f0"
+    : readableTextColorForBackground(background, "#111827");
+  const borderColor = dark && otherIsDefault ? "rgba(71,85,105,0.92)" : theme.otherBubbleBorderColor;
+  return {
+    background,
+    color,
+    border: `1px solid ${borderColor}`,
+    borderColor,
+    shadow: dark ? "0 1px 2px rgba(0,0,0,0.2)" : "0 1px 1px rgba(15,23,42,0.06)",
+    voiceProgress: dark && otherIsDefault ? "#38bdf8" : "#6366f1"
+  };
+}
+
 function applyBackgroundStyles(element, backgroundColor, backgroundImageValue) {
   if (!element) {
     return;
@@ -339,26 +400,17 @@ export function refreshBubbleStyles(controller) {
       return;
     }
     const senderType = bubble.dataset.senderType;
-    if (senderType === "self") {
-      const textColor = readableTextColorForBackground(controller.theme.selfBubbleColor, "#111827");
-      bubble.style.background = controller.theme.selfBubbleColor;
-      bubble.style.color = textColor;
-      bubble.style.border = "none";
-      bubble.classList.remove("text-white");
-      const progressInner = bubble.querySelector('[data-role="voice-progress-inner"]');
-      if (progressInner) {
-        progressInner.style.background = textColor;
-      }
-    } else {
-      const textColor = readableTextColorForBackground(controller.theme.otherBubbleColor, "#111827");
-      bubble.style.background = controller.theme.otherBubbleColor;
-      bubble.style.color = textColor;
-      bubble.style.border = `1px solid ${controller.theme.otherBubbleBorderColor}`;
-      bubble.classList.remove("text-white");
-      const progressInner = bubble.querySelector('[data-role="voice-progress-inner"]');
-      if (progressInner) {
-        progressInner.style.background = "#6366f1";
-      }
+    const bubbleStyle = effectiveBubbleStyle(controller, senderType);
+    bubble.style.background = bubbleStyle.background;
+    bubble.style.color = bubbleStyle.color;
+    bubble.style.border = bubbleStyle.border;
+    bubble.style.boxShadow = bubbleStyle.shadow;
+    bubble.style.setProperty("--tg-bubble-bg", bubbleStyle.background);
+    bubble.style.setProperty("--tg-bubble-border-color", bubbleStyle.borderColor || bubbleStyle.border);
+    bubble.classList.remove("text-white");
+    const progressInner = bubble.querySelector('[data-role="voice-progress-inner"]');
+    if (progressInner) {
+      progressInner.style.background = bubbleStyle.voiceProgress;
     }
   });
 }

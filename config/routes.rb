@@ -17,12 +17,16 @@ Rails.application.routes.draw do
   post "login" => "login#show_wechat_qrcode"
   post "check_login_status" => "login#check_login_status"
   post "re-login" => "login#reconnect_user"
+  get "login/accounts" => "login#accounts"
   post "login/bootstrap_online_sessions" => "login#bootstrap_online_sessions"
   get "chat/search" => "chat#search"
 
   # chat
   get "chat" => "chat#index"
   resources :chat_folders, only: [ :index, :create, :destroy ] do
+    collection do
+      patch :reorder
+    end
     member do
       patch :toggle_room
       patch :toggle_pin

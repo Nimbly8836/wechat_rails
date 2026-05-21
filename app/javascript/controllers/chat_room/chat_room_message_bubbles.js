@@ -1,4 +1,5 @@
 import { replaceEmojis } from "utils/file_utils";
+import { effectiveBubbleStyle } from "./chat_room_theme";
 
 const EMOJI_REQUEST_VERSION = "20260330b";
 
@@ -920,13 +921,14 @@ export function applyBubbleStyle(controller, bubble, msg, isNewGroup = true, sen
     bubble.dataset.senderType = "system";
     bubble.classList.remove("rounded-bl-2xl", "rounded-tr-2xl", "rounded-br-md", "rounded-br-2xl", "rounded-tl-2xl", "rounded-bl-md", "border");
     bubble.classList.add("mx-auto");
-    bubble.style.background = "rgba(255,255,255,0.92)";
-    bubble.style.color = "#475569";
-    bubble.style.border = "1px solid rgba(203,213,225,0.9)";
-    bubble.style.boxShadow = "0 8px 30px -20px rgba(15,23,42,0.35)";
+    const bubbleStyle = effectiveBubbleStyle(controller, "system");
+    bubble.style.background = bubbleStyle.background;
+    bubble.style.color = bubbleStyle.color;
+    bubble.style.border = bubbleStyle.border;
+    bubble.style.boxShadow = bubbleStyle.shadow;
     bubble.style.borderRadius = "9999px";
-    bubble.style.setProperty("--tg-bubble-bg", "rgba(255,255,255,0.92)");
-    bubble.style.setProperty("--tg-bubble-border-color", "rgba(203,213,225,0.9)");
+    bubble.style.setProperty("--tg-bubble-bg", bubbleStyle.background);
+    bubble.style.setProperty("--tg-bubble-border-color", bubbleStyle.borderColor || bubbleStyle.border);
     return bubble;
   }
 
@@ -934,24 +936,26 @@ export function applyBubbleStyle(controller, bubble, msg, isNewGroup = true, sen
     bubble.dataset.senderType = "self";
     bubble.classList.add("text-white", "rounded-bl-2xl", "rounded-tr-2xl", "rounded-br-md");
     bubble.classList.remove("rounded-br-2xl", "rounded-tl-2xl", "rounded-bl-md");
-    bubble.style.background = controller.theme.selfBubbleColor;
-    bubble.style.color = controller.theme.selfBubbleTextColor;
-    bubble.style.border = "1px solid rgba(181, 214, 173, 0.92)";
-    bubble.style.boxShadow = "0 1px 1px rgba(15,23,42,0.05)";
+    const bubbleStyle = effectiveBubbleStyle(controller, "self");
+    bubble.style.background = bubbleStyle.background;
+    bubble.style.color = bubbleStyle.color;
+    bubble.style.border = bubbleStyle.border;
+    bubble.style.boxShadow = bubbleStyle.shadow;
     bubble.style.borderRadius = "18px 18px 6px 18px";
-    bubble.style.setProperty("--tg-bubble-bg", controller.theme.selfBubbleColor);
-    bubble.style.setProperty("--tg-bubble-border-color", "rgba(181, 214, 173, 0.92)");
+    bubble.style.setProperty("--tg-bubble-bg", bubbleStyle.background);
+    bubble.style.setProperty("--tg-bubble-border-color", bubbleStyle.borderColor || bubbleStyle.border);
   } else {
     bubble.dataset.senderType = "other";
     bubble.classList.add("text-gray-900", "border", "rounded-br-2xl", "rounded-tl-2xl", "rounded-bl-md");
     bubble.classList.remove("rounded-bl-2xl", "rounded-tr-2xl", "rounded-br-md");
-    bubble.style.background = controller.theme.otherBubbleColor;
-    bubble.style.color = "#111827";
-    bubble.style.border = `1px solid ${controller.theme.otherBubbleBorderColor}`;
-    bubble.style.boxShadow = "0 1px 1px rgba(15,23,42,0.06)";
+    const bubbleStyle = effectiveBubbleStyle(controller, "other");
+    bubble.style.background = bubbleStyle.background;
+    bubble.style.color = bubbleStyle.color;
+    bubble.style.border = bubbleStyle.border;
+    bubble.style.boxShadow = bubbleStyle.shadow;
     bubble.style.borderRadius = "18px 18px 18px 6px";
-    bubble.style.setProperty("--tg-bubble-bg", controller.theme.otherBubbleColor);
-    bubble.style.setProperty("--tg-bubble-border-color", controller.theme.otherBubbleBorderColor);
+    bubble.style.setProperty("--tg-bubble-bg", bubbleStyle.background);
+    bubble.style.setProperty("--tg-bubble-border-color", bubbleStyle.borderColor || bubbleStyle.border);
   }
 
   const existingName = bubble.querySelector('[data-role="sender-name"]');

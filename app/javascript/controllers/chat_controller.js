@@ -73,7 +73,11 @@ export default class extends Controller {
     "globalThemeToggle",
     "globalThemeIcon",
     "globalThemeLabel",
-    "globalBackgroundImageInput"
+    "globalBackgroundImageInput",
+    "accountButton",
+    "accountAvatar",
+    "accountPanel",
+    "accountList"
   ]
 
   connect() {
@@ -87,6 +91,9 @@ export default class extends Controller {
     this.chatRoomNames = {}
     this.chatRooms = this.cachedChatRooms()
     this.chatFolders = this.loadChatFolders()
+    this.accounts = []
+    this.accountsLoaded = false
+    this.draggedFolderId = null
     this.activeChatFolderId = this.loadActiveChatFolderId()
     this.activeChatSection = this.loadActiveChatSection()
     this.desktopSidebarCollapsed = this.readDesktopSidebarCollapsed()
@@ -116,6 +123,7 @@ export default class extends Controller {
     this.boundCloseSidebar = this.closeSidebar.bind(this)
     this.boundHandleViewportChange = this.handleViewportChange.bind(this)
     this.boundCloseNotificationPanel = this.closeNotificationPanel.bind(this)
+    this.boundCloseAccountSwitcher = this.closeAccountSwitcher.bind(this)
     this.boundServiceWorkerMessage = this.handleServiceWorkerMessage.bind(this)
     this.boundLocalChatMessage = this.handleLocalChatMessage.bind(this)
     this.boundVisualViewportChange = this.updateViewportMetrics.bind(this)
@@ -129,6 +137,7 @@ export default class extends Controller {
     this.applyContactGroupVisibility()
     this.renderFolderBar()
     this.renderFolderSettings()
+    this.renderAccountSwitcher()
     this.refreshChatFolders()
     this.applyConfiguredBadgeLabels(this.element)
 
@@ -182,6 +191,7 @@ export default class extends Controller {
     window.visualViewport?.removeEventListener("resize", this.boundVisualViewportChange)
     window.visualViewport?.removeEventListener("scroll", this.boundVisualViewportChange)
     document.removeEventListener("click", this.boundCloseNotificationPanel)
+    document.removeEventListener("click", this.boundCloseAccountSwitcher)
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.removeEventListener("message", this.boundServiceWorkerMessage)
     }
@@ -223,6 +233,7 @@ export default class extends Controller {
   loadChatFolders() {
     return DEFAULT_CHAT_FOLDERS.map((folder) => ({
       ...folder,
+      position: folder.position,
       room_ids: [],
       pinned_room_ids: []
     }))
@@ -277,6 +288,7 @@ export default class extends Controller {
       name: String(folder?.name || "未命名分组"),
       kind: folder?.kind || "custom",
       builtIn: !!folder?.built_in || !!folder?.builtIn,
+      position: Number.isFinite(Number(folder?.position)) ? Number(folder.position) : 0,
       room_ids: Array.isArray(folder?.room_ids) ? folder.room_ids.map((id) => String(id)) : [],
       pinned_room_ids: Array.isArray(folder?.pinned_room_ids)
         ? folder.pinned_room_ids.map((id) => String(id))
@@ -783,6 +795,9 @@ export default class extends Controller {
       toggleGlobalThemeValue(this.globalTheme)
     ))
     this.syncGlobalThemeUi()
+    window.dispatchEvent(new CustomEvent("chat:global-theme:change", {
+      detail: { theme: this.globalTheme }
+    }))
   }
 
   syncGlobalThemeUi() {
@@ -1889,6 +1904,127 @@ export default class extends Controller {
     })
   }
 
+  toggleAccountSwitcher(event = null) {
+    event?.preventDefault()
+    event?.stopPropagation()
+    if (!this.hasAccountPanelTarget) {
+      return
+    }
+
+    const opening = this.accountPanelTarget.classList.contains("hidden")
+    this.accountPanelTarget.classList.toggle("hidden", !opening)
+    if (opening) {
+      this.loadAccounts()
+      document.addEventListener("click", this.boundCloseAccountSwitcher)
+    } else {
+      document.removeEventListener("click", this.boundCloseAccountSwitcher)
+    }
+  }
+
+  closeAccountSwitcher(event = null) {
+    if (!this.hasAccountPanelTarget || this.accountPanelTarget.classList.contains("hidden")) {
+      return
+    }
+    if (event?.target && this.accountPanelTarget.contains(event.target)) {
+      return
+    }
+    if (event?.target && this.hasAccountButtonTarget && this.accountButtonTarget.contains(event.target)) {
+      return
+    }
+
+    this.accountPanelTarget.classList.add("hidden")
+    document.removeEventListener("click", this.boundCloseAccountSwitcher)
+  }
+
+  loadAccounts() {
+    if (this.accountsLoaded) {
+      this.renderAccountSwitcher()
+      return
+    }
+
+    fetch("/login/accounts", {
+      headers: { "Accept": "application/json" }
+    })
+      .then((resp) => {
+        if (!resp.ok) {
+          throw new Error(`加载账号失败: ${resp.status}`)
+        }
+        return resp.json()
+      })
+      .then((accounts) => {
+        this.accounts = Array.isArray(accounts) ? accounts : []
+        this.accountsLoaded = true
+        this.renderAccountSwitcher()
+      })
+      .catch((error) => {
+        console.error("加载账号失败", error)
+        if (this.hasAccountListTarget) {
+          this.accountListTarget.innerHTML = '<div class="px-3 py-3 text-xs text-red-400">账号加载失败</div>'
+        }
+      })
+  }
+
+  renderAccountSwitcher() {
+    const account = this.accounts?.[0]
+    if (this.hasAccountAvatarTarget) {
+      this.accountAvatarTarget.textContent = account?.initial || "微"
+    }
+    if (!this.hasAccountListTarget) {
+      return
+    }
+    if (!this.accountsLoaded) {
+      this.accountListTarget.innerHTML = '<div class="px-3 py-3 text-xs text-slate-400">加载中...</div>'
+      return
+    }
+    if (!this.accounts.length) {
+      this.accountListTarget.innerHTML = '<a href="/login" class="tg-account-row">扫码登录新账号</a>'
+      return
+    }
+
+    const rows = this.accounts.map((account) => `
+      <button type="button"
+              class="tg-account-row"
+              data-action="click->chat#switchAccount"
+              data-chat-user-name-param="${this.escapeHtml(account.user_name)}">
+        <span class="tg-account-row-avatar">${this.escapeHtml(account.initial || "微")}</span>
+        <span class="min-w-0 flex-1 text-left">
+          <span class="block truncate text-sm font-medium">${this.escapeHtml(account.label || account.user_name)}</span>
+          <span class="block truncate text-xs opacity-70">${account.online ? "在线" : "离线"} · ${this.escapeHtml(account.user_name)}</span>
+        </span>
+      </button>
+    `).join("")
+    this.accountListTarget.innerHTML = `${rows}<a href="/login" class="tg-account-login-link">扫码登录新账号</a>`
+  }
+
+  switchAccount(event) {
+    event?.preventDefault()
+    event?.stopPropagation()
+    const userName = String(event?.params?.userName || "")
+    if (!userName) {
+      return
+    }
+
+    fetch("/re-login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "X-CSRF-Token": this.csrfToken()
+      },
+      body: JSON.stringify({ user_name: userName })
+    })
+      .then((resp) => resp.json().then((payload) => ({ resp, payload })))
+      .then(({ resp, payload }) => {
+        if (!resp.ok || payload?.status !== "success") {
+          throw new Error(payload?.message || "切换账号失败")
+        }
+        window.location.href = "/chat"
+      })
+      .catch((error) => {
+        window.alert(error.message || "切换账号失败")
+      })
+  }
+
   togglePinInCurrentFolder(event) {
     event.preventDefault()
     event.stopPropagation()
@@ -1971,7 +2107,11 @@ export default class extends Controller {
       `
 
       return `
-        <div class="tg-folder-settings-row">
+        <div class="tg-folder-settings-row"
+             draggable="true"
+             data-folder-id="${this.escapeHtml(folder.id)}"
+             data-action="dragstart->chat#startFolderDrag dragover->chat#dragOverFolder drop->chat#dropFolder dragend->chat#endFolderDrag">
+          <span class="tg-folder-drag-handle" aria-hidden="true">⋮⋮</span>
           <span class="tg-folder-settings-icon" aria-hidden="true">${this.folderRailIcon(folder)}</span>
           <span class="min-w-0 flex-1">
             <span class="block truncate text-sm font-medium text-slate-900">${this.escapeHtml(folder.name)}</span>
@@ -1983,6 +2123,62 @@ export default class extends Controller {
     }).join("")
 
     this.folderSettingsListTarget.innerHTML = folderRows
+  }
+
+  startFolderDrag(event) {
+    const row = event.currentTarget
+    this.draggedFolderId = String(row?.dataset?.folderId || "")
+    row?.classList.add("is-dragging")
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move"
+      event.dataTransfer.setData("text/plain", this.draggedFolderId)
+    }
+  }
+
+  dragOverFolder(event) {
+    event.preventDefault()
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move"
+    }
+  }
+
+  dropFolder(event) {
+    event.preventDefault()
+    const targetId = String(event.currentTarget?.dataset?.folderId || "")
+    const sourceId = this.draggedFolderId || event.dataTransfer?.getData("text/plain")
+    if (!sourceId || !targetId || sourceId === targetId) {
+      return
+    }
+
+    const sourceIndex = this.chatFolders.findIndex((folder) => String(folder.id) === String(sourceId))
+    const targetIndex = this.chatFolders.findIndex((folder) => String(folder.id) === String(targetId))
+    if (sourceIndex < 0 || targetIndex < 0) {
+      return
+    }
+
+    const nextFolders = [...this.chatFolders]
+    const [moved] = nextFolders.splice(sourceIndex, 1)
+    nextFolders.splice(targetIndex, 0, moved)
+    this.chatFolders = nextFolders.map((folder, index) => ({ ...folder, position: index }))
+    this.renderFolderBar()
+    this.renderFolderSettings()
+    this.persistFolderOrder()
+  }
+
+  endFolderDrag(event) {
+    event.currentTarget?.classList.remove("is-dragging")
+    this.draggedFolderId = null
+  }
+
+  persistFolderOrder() {
+    this.submitFolderRequest("/chat_folders/reorder", {
+      method: "PATCH",
+      body: { folder_ids: this.chatFolders.map((folder) => folder.id) }
+    }).then((payload) => {
+      if (!payload) {
+        this.refreshChatFolders()
+      }
+    })
   }
 
   folderRailIcon(folder) {
