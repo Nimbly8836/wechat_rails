@@ -1065,7 +1065,7 @@ body.tg-mobile-app {
 .telegram-chat-room .telegram-composer {
   position: sticky;
   bottom: 0;
-  min-height: 84px;
+  min-height: 71px;
   flex-shrink: 0;
   z-index: 20;
   border-top: 1px solid rgba(203, 213, 225, 0.88);
