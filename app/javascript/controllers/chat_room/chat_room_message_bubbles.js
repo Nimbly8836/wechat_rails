@@ -1,5 +1,5 @@
 import { replaceEmojis } from "utils/file_utils";
-import { effectiveBubbleStyle } from "./chat_room_theme";
+import { effectiveBubbleStyle } from "controllers/chat_room/chat_room_theme";
 
 const EMOJI_REQUEST_VERSION = "20260330b";
 

@@ -130,4 +130,13 @@ class ChatControllerTest < ActionDispatch::IntegrationTest
     assert_match(/gif-emoji:select->chat-room#selectGifEmoji/, room_view)
     assert_match(/fetch\("\/gif_emojis"/, controller_js)
   end
+
+  test "javascript modules avoid relative local imports under importmap" do
+    relative_import = /(?:from\s+|import\s*\(\s*)["']\.{1,2}\//
+    offenders = Rails.root.glob("app/javascript/**/*.js").filter_map do |path|
+      path.relative_path_from(Rails.root).to_s if path.read.match?(relative_import)
+    end
+
+    assert_empty offenders
+  end
 end
