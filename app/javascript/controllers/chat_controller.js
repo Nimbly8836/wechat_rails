@@ -55,6 +55,8 @@ export default class extends Controller {
     "messagesList",
     "settingsList",
     "folderBar",
+    "folderNameInput",
+    "folderSettingsList",
     "letterNav",
     "mobileHeader",
     "mobileTitle",
@@ -126,6 +128,7 @@ export default class extends Controller {
     this.syncGlobalBackgroundImageUi()
     this.applyContactGroupVisibility()
     this.renderFolderBar()
+    this.renderFolderSettings()
     this.refreshChatFolders()
     this.applyConfiguredBadgeLabels(this.element)
 
@@ -289,6 +292,7 @@ export default class extends Controller {
     this.chatFolders = folders.map((folder) => this.normalizeFolder(folder))
     this.ensureActiveFolder()
     this.renderFolderBar()
+    this.renderFolderSettings()
     if (this.hasMessagesListTarget && !this.messagesListTarget.classList.contains("hidden")) {
       this.renderChatRoomList(this.chatRooms)
     }
@@ -600,8 +604,8 @@ export default class extends Controller {
         this.desktopSidebarToggleTarget.classList.toggle("hidden", !this.desktopSidebarCollapsed)
       }
       if (this.desktopSidebarCollapsed) {
-        this.sidebarTarget.style.width = "88px"
-      } else if (this.sidebarTarget.style.width === "0px" || this.sidebarTarget.style.width === "88px") {
+        this.sidebarTarget.style.width = "72px"
+      } else if (this.sidebarTarget.style.width === "0px" || this.sidebarTarget.style.width === "72px") {
         this.sidebarTarget.style.width = ""
       }
     }
@@ -1834,13 +1838,10 @@ export default class extends Controller {
     event?.preventDefault()
     event?.stopPropagation()
 
-    const folderName = window.prompt("输入新的分组名称")
-    if (!folderName) {
-      return
-    }
-
-    const name = folderName.trim()
+    const input = this.hasFolderNameInputTarget ? this.folderNameInputTarget : null
+    const name = (input?.value || "").trim()
     if (!name) {
+      input?.focus()
       return
     }
 
@@ -1852,8 +1853,10 @@ export default class extends Controller {
       if (createdId) {
         this.activeChatFolderId = String(createdId)
         this.persistActiveChatFolderId()
+        input.value = ""
         this.activateSection("messages")
         this.renderChatRoomList(this.chatRooms)
+        this.renderFolderSettings()
       }
     })
   }
@@ -1862,7 +1865,8 @@ export default class extends Controller {
     event?.preventDefault()
     event?.stopPropagation()
 
-    const activeFolder = this.currentChatFolder()
+    const folderId = String(event?.params?.folderId || this.currentChatFolder()?.id || "")
+    const activeFolder = this.chatFolders.find((folder) => String(folder.id) === folderId)
     if (!activeFolder || activeFolder.builtIn) {
       return
     }
@@ -1875,10 +1879,13 @@ export default class extends Controller {
     this.submitFolderRequest(`/chat_folders/${activeFolder.id}`, {
       method: "DELETE"
     }).then(() => {
-      this.activeChatFolderId = DEFAULT_CHAT_FOLDERS[0].id
-      this.persistActiveChatFolderId()
+      if (String(this.activeChatFolderId) === String(activeFolder.id)) {
+        this.activeChatFolderId = DEFAULT_CHAT_FOLDERS[0].id
+        this.persistActiveChatFolderId()
+      }
       this.activateSection("messages")
       this.renderChatRoomList(this.chatRooms)
+      this.renderFolderSettings()
     })
   }
 
@@ -1939,33 +1946,43 @@ export default class extends Controller {
       `
     }).join("")
 
-    const deleteButton = currentFolder && !currentFolder.builtIn
-      ? `
-        <button type="button"
-                class="tg-folder-rail-action is-danger"
-                title="删除当前分组"
-                aria-label="删除当前分组"
-                data-action="click->chat#deleteActiveChatFolder">
-          -
-        </button>
-      `
-      : ""
-
     this.folderBarTarget.innerHTML = `
       <div class="flex h-full min-h-0 flex-col">
         <div class="tg-folder-rail-scroll">${folderButtons}</div>
-        <div class="tg-folder-rail-actions">
-          <button type="button"
-                  class="tg-folder-rail-action"
-                  title="新建分组"
-                  aria-label="新建分组"
-                  data-action="click->chat#createChatFolder">
-            +
-          </button>
-          ${deleteButton}
-        </div>
       </div>
     `
+  }
+
+  renderFolderSettings() {
+    if (!this.hasFolderSettingsListTarget) {
+      return
+    }
+
+    const folderRows = this.chatFolders.map((folder) => {
+      const count = this.visibleRoomsForFolder(folder).length
+      const meta = folder.builtIn ? "系统分组" : "自定义分组"
+      const deleteAction = folder.builtIn ? "" : `
+        <button type="button"
+                class="tg-folder-settings-delete"
+                data-action="click->chat#deleteActiveChatFolder"
+                data-chat-folder-id-param="${this.escapeHtml(folder.id)}">
+          删除
+        </button>
+      `
+
+      return `
+        <div class="tg-folder-settings-row">
+          <span class="tg-folder-settings-icon" aria-hidden="true">${this.folderRailIcon(folder)}</span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-medium text-slate-900">${this.escapeHtml(folder.name)}</span>
+            <span class="mt-0.5 block text-xs text-slate-400">${meta} · ${count} 个会话</span>
+          </span>
+          ${deleteAction}
+        </div>
+      `
+    }).join("")
+
+    this.folderSettingsListTarget.innerHTML = folderRows
   }
 
   folderRailIcon(folder) {

@@ -12,7 +12,10 @@
           title="打开侧边栏"
           data-chat-target="desktopSidebarToggle"
           data-action="click->chat#toggleDesktopSidebar">
-    <img src="/icon/menu.svg" alt="" class="h-4 w-2 tg-ui-icon" aria-hidden="true">
+    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="14" rx="3" stroke-width="1.8"/>
+      <path d="M10 5v14" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
   </button>
 
   <div id="sidebar"
@@ -53,11 +56,14 @@
           </svg>
         </button>
         <button type="button"
-                class="hidden h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 sm:flex"
+                class="tg-sidebar-collapse-button hidden sm:flex"
                 aria-label="收起侧边栏"
                 title="收起侧边栏"
                 data-action="click->chat#toggleDesktopSidebar">
-          <img src="/icon/back.svg" alt="" class="h-5 w-5 rotate-180 tg-ui-icon" aria-hidden="true">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="14" rx="3" stroke-width="1.8"/>
+            <path d="M10 5v14" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
         </button>
       </div>
 
@@ -279,12 +285,26 @@
              class="hidden h-full overflow-y-auto px-3 pb-3"
              data-chat-target="settingsList">
           <div class="space-y-4">
-            <div class="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <div class="tg-settings-card">
+              <div class="text-sm font-semibold text-slate-900">分组管理</div>
+              <div class="mt-1 text-xs text-slate-500">新建和删除分组统一放在这里，左侧只保留快捷入口。</div>
+              <form class="mt-4 flex gap-2" data-action="submit->chat#createChatFolder">
+                <input type="text"
+                       class="tg-settings-input"
+                       maxlength="24"
+                       placeholder="新的分组名称"
+                       data-chat-target="folderNameInput">
+                <button type="submit" class="tg-primary-action-button shrink-0">新增</button>
+              </form>
+              <div class="mt-4 space-y-2" data-chat-target="folderSettingsList"></div>
+            </div>
+
+            <div class="tg-settings-card">
               <div class="text-sm font-semibold text-slate-900">通知设置</div>
               <div class="mt-1 text-xs text-slate-500" data-chat-target="notificationStatus"></div>
             </div>
 
-            <label class="flex items-start gap-3 rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <label class="tg-settings-card flex items-start gap-3">
               <input type="checkbox"
                      class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                      data-chat-target="notificationToggle"
@@ -295,7 +315,7 @@
               </span>
             </label>
 
-            <label class="flex items-start gap-3 rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <label class="flex items-start gap-3 tg-settings-card">
               <input type="checkbox"
                      class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                      data-chat-target="notificationHiddenOnly"
@@ -319,7 +339,7 @@
               </button>
             </div>
 
-            <div class="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <div class="tg-settings-card">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold text-slate-900">聊天背景图片</div>
@@ -332,13 +352,13 @@
                 </button>
               </div>
               <input type="url"
-                     class="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                     class="mt-4 tg-settings-input"
                      placeholder="输入图片链接，例如 https://example.com/bg.jpg"
                      data-chat-target="globalBackgroundImageInput"
                      data-action="input->chat#updateGlobalBackgroundImage">
             </div>
 
-            <div class="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <div class="tg-settings-card">
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold text-slate-900">标签展示</div>
@@ -355,7 +375,7 @@
                 <label class="block">
                   <span class="mb-1.5 block text-xs font-medium text-slate-600">群聊标签</span>
                   <input type="text"
-                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                         class="tg-settings-input"
                          maxlength="12"
                          placeholder="群聊"
                          data-chat-target="groupBadgeInput"
@@ -365,7 +385,7 @@
                 <label class="block">
                   <span class="mb-1.5 block text-xs font-medium text-slate-600">公众号标签</span>
                   <input type="text"
-                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-100"
+                         class="tg-settings-input"
                          maxlength="12"
                          placeholder="公众号"
                          data-chat-target="officialBadgeInput"
