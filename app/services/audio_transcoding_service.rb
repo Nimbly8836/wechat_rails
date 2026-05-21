@@ -59,7 +59,23 @@ class AudioTranscodingService
   end
 
   def ensure_encoder_available!
+<<<<<<< HEAD
     raise TranscodingError, "silk encoder missing at #{ENCODER_PATH}" unless File.executable?(ENCODER_PATH)
+=======
+    return if File.exist?(compiled_encoder_path) && File.exist?(compiled_library_path)
+
+    prepare_build_workspace!
+
+    clean_stdout, clean_stderr, = Open3.capture3("make", "clean", chdir: build_dir.to_s)
+    Rails.logger.debug { "silk encoder clean stdout: #{clean_stdout}" } unless clean_stdout.blank?
+    Rails.logger.warn { "silk encoder clean stderr: #{clean_stderr}" } unless clean_stderr.blank?
+
+    stdout, stderr, status = Open3.capture3("make", "lib", "encoder", chdir: build_dir.to_s)
+    Rails.logger.debug { "silk encoder build stdout: #{stdout}" } unless stdout.blank?
+    Rails.logger.warn { "silk encoder build stderr: #{stderr}" } unless stderr.blank?
+
+    raise TranscodingError, "silk encoder build failed" unless status.success? && File.exist?(compiled_library_path) && File.exist?(compiled_encoder_path)
+>>>>>>> c8d6d78 (Rebuild silk library before encoder link)
   end
 
   def transcode_to_pcm!(input_path, output_path)
@@ -143,4 +159,52 @@ class AudioTranscodingService
     @uploaded_file.tempfile.path
   end
 
+<<<<<<< HEAD
+=======
+  def build_dir
+    BUILD_ROOT.join(source_signature)
+  end
+
+  def compiled_encoder_path
+    build_dir.join("encoder")
+  end
+
+  def compiled_library_path
+    build_dir.join("libSKP_SILK_SDK.a")
+  end
+
+  def source_signature
+    @source_signature ||= begin
+      digest = Digest::SHA1.new
+      Dir.glob(SILK_DIR.join("**", "*")).sort.each do |path|
+        next if File.directory?(path)
+
+        digest.update(path.delete_prefix(SILK_DIR.to_s))
+        digest.update(File.binread(path))
+      end
+      digest.hexdigest
+    end
+  end
+
+  def prepare_build_workspace!
+    return if workspace_prepared?
+
+    FileUtils.rm_rf(build_dir) if build_dir.exist?
+
+    FileUtils.mkdir_p(build_dir)
+
+    Dir.children(SILK_DIR).each do |entry|
+      source = SILK_DIR.join(entry)
+      destination = build_dir.join(entry)
+      FileUtils.cp_r(source, destination, preserve: true)
+    end
+  end
+
+  def workspace_prepared?
+    build_dir.join("Makefile").exist? &&
+      build_dir.join("src").directory? &&
+      build_dir.join("test").directory? &&
+      build_dir.join("interface").directory?
+  end
+>>>>>>> c8d6d78 (Rebuild silk library before encoder link)
 end
