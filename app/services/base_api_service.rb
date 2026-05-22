@@ -164,12 +164,22 @@ class BaseApiService
             return { error: true, status: response.code, message: response.message, body: body }
           end
 
-          response.read_body { |chunk| file.write(chunk) }
+          bytes_written = 0
+          response.read_body do |chunk|
+            bytes_written += chunk.bytesize
+            file.write(chunk)
+          end
+          if bytes_written <= 0
+            FileUtils.rm_f(file_path)
+            return { error: true, message: "empty file response" }
+          end
+
           return {
             success: true,
             path: file_path.to_s,
             content_type: response["content-type"],
-            filename: response["content-disposition"]
+            filename: response["content-disposition"],
+            bytes: bytes_written
           }
         end
       end

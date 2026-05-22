@@ -1,43 +1,3 @@
-# AGENTS.md
-
-本文件记录本仓库内 AI Agent 的工作约定。执行任务时优先遵守本文件，再结合用户的实时指令。
-
-## 协作原则
-
-- 默认用中文沟通，除非用户明确要求英文。
-- 优先做最小必要改动，不主动扩大重构范围。
-- 修改前先理解现有实现；不确定时先询问，不要猜测业务规则。
-- 不要主动提交、推送、打 tag，除非用户明确要求。
-
-## GitNexus 优先
-
-- 探索代码、追踪调用链、分析影响范围时，优先使用 GitNexus 工具。
-- 修改函数、类、方法等符号前，必须先做 GitNexus impact analysis，并向用户说明直接调用方、受影响流程和风险等级。
-- 提交前必须运行 GitNexus detect changes，确认影响范围符合预期。
-- 如果 GitNexus 提示索引过期，先运行 `npx gitnexus analyze` 后再继续。
-
-## 代码提交与版本
-
-- 当前分支 `869` 的版本号采用 `v5x.x.x` 形式，例如 `v50.8.7` 表示 `v5 0.8.7`。
-- tag 会自动触发 GitHub 构建脚本。
-- 只有在用户要求推送时，才在最后一个版本上打 tag 并推送。
-
-## Changelog
-
-- 每次做必要的代码、配置、行为变更时，都要维护 changelog。
-- Changelog 按时间分类，优先使用日期标题，例如 `## 2026-05-21`。
-- 每条记录简洁说明变更内容和原因，不记录临时调试过程。
-
-## 数据库
-
-- 当前环境变量里的数据库是用户家里的私有数据库，一般无法连接。
-- 测试或排查时不要长时间等待数据库连接；如果数据库不可用，明确说明该限制并继续做可离线验证的部分。
-
-## Ruby 环境
-
-- Ruby 使用 mise 管理的环境。
-- 不要直接依赖系统 Ruby；运行 Ruby/Rails 相关命令时优先通过 mise 环境执行。
-
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
@@ -81,9 +41,3 @@ This project is indexed by GitNexus as **wechat_rails** (5903 symbols, 10080 rel
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
-
-## Changelog
-
-### 2026-05-21
-
-- 生成并整理 AGENTS.md，明确 GitNexus 优先、Changelog、数据库连接限制和 mise Ruby 环境约定。

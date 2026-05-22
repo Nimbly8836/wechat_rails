@@ -1104,7 +1104,14 @@ class MessagesController < ApplicationController
   end
 
   def locate_cached_media(storage_dir, basename)
-    Dir.glob(storage_dir.join("#{basename}.*")).first
+    Dir.glob(storage_dir.join("#{basename}.*")).find do |path|
+      if File.size?(path)
+        true
+      else
+        FileUtils.rm_f(path)
+        false
+      end
+    end
   end
 
   def resolve_file_download_user_name(message, wx_message, file_meta)
