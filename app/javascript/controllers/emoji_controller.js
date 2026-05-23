@@ -248,7 +248,7 @@ export default class extends Controller {
 
       const actions = document.createElement("span")
       actions.className = "gif-sticker-actions"
-      const favorite = this.actionButton(sticker.favorite ? "已收藏" : "收藏")
+      const favorite = this.actionButton(sticker.favorite ? "favorite-filled" : "favorite", sticker.favorite ? "已收藏" : "收藏")
       favorite.dataset.folderId = this.favoritesFolder()?.id || ""
       favorite.dataset.stickerId = sticker.id
       favorite.addEventListener("click", (event) => this.toggleStickerFavorite(event))
@@ -256,12 +256,12 @@ export default class extends Controller {
 
       const folderId = this.activeStickerFolderId()
       if (folderId && folderId !== favorite.dataset.folderId) {
-        const folderAction = this.actionButton("移出")
+        const folderAction = this.actionButton("remove", "移出")
         folderAction.dataset.stickerId = sticker.id
         folderAction.addEventListener("click", (event) => this.toggleStickerInActiveFolder(event))
         actions.appendChild(folderAction)
       } else if (this.customFolders().length > 0) {
-        const addToFolder = this.actionButton("加入文件夹")
+        const addToFolder = this.actionButton("add", "加入文件夹")
         addToFolder.dataset.stickerId = sticker.id
         addToFolder.addEventListener("click", (event) => this.addStickerToFolder(event))
         actions.appendChild(addToFolder)
@@ -274,12 +274,24 @@ export default class extends Controller {
     if (this.hasStickerEmptyTarget) this.stickerEmptyTarget.classList.toggle("hidden", stickers.length > 0)
   }
 
-  actionButton(label) {
+  actionButton(icon, label) {
     const button = document.createElement("button")
     button.type = "button"
     button.className = "gif-sticker-action"
-    button.textContent = label
+    button.title = label
+    button.setAttribute("aria-label", label)
+    button.innerHTML = this.actionIcon(icon)
     return button
+  }
+
+  actionIcon(icon) {
+    const icons = {
+      favorite: `<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.4l2.1 4.2 4.6.7-3.3 3.2.8 4.6-4.2-2.2-4.2 2.2.8-4.6-3.3-3.2 4.6-.7L10 3.4z"/></svg>`,
+      "favorite-filled": `<svg viewBox="0 0 20 20" aria-hidden="true" fill="currentColor"><path d="M9.1 2.9a1 1 0 0 1 1.8 0l1.7 3.5 3.9.6a1 1 0 0 1 .55 1.7l-2.8 2.75.65 3.9a1 1 0 0 1-1.45 1.05L10 14.55 6.55 16.4a1 1 0 0 1-1.45-1.05l.65-3.9-2.8-2.75A1 1 0 0 1 3.5 7l3.9-.6 1.7-3.5z"/></svg>`,
+      add: `<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg>`,
+      remove: `<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 10h10"/></svg>`
+    }
+    return icons[icon] || icons.add
   }
 
   filteredStickers() {

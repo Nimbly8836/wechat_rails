@@ -128,8 +128,10 @@ export function buildQuoteActionButton(controller, wrapper, msg, senderInfo) {
 
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "pointer-events-none opacity-0 transition rounded-full border border-slate-200 bg-white/95 px-2 py-1 text-[11px] text-slate-500 shadow-sm group-hover:pointer-events-auto group-hover:opacity-100 hover:border-sky-200 hover:text-sky-700";
-  button.textContent = "引用";
+  button.className = "pointer-events-none grid h-7 w-7 place-items-center rounded-full border border-slate-200 bg-white/95 text-slate-500 opacity-0 shadow-sm transition group-hover:pointer-events-auto group-hover:opacity-100 hover:border-sky-200 hover:text-sky-700";
+  button.title = "引用";
+  button.setAttribute("aria-label", "引用消息");
+  button.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 7H5.8C4.8 7 4 7.8 4 8.8v1.7C4 12 5 13 6.5 13H8V7.8C8 5.7 6.9 4.4 5 4"/><path d="M15.5 7h-1.7c-1 0-1.8.8-1.8 1.8v1.7c0 1.5 1 2.5 2.5 2.5H16V7.8C16 5.7 14.9 4.4 13 4"/></svg>`;
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();

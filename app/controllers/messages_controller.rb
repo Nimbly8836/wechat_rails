@@ -5,6 +5,7 @@ require "stringio"
 
 class MessagesController < ApplicationController
   LARGE_RECORD_ITEM_THRESHOLD = 100.megabytes
+  MEDIA_EXTRA_KEYS = %w[base64 file_md5 md5 total_len voice_time].freeze
   skip_before_action :verify_authenticity_token, only: :callback
   skip_before_action :require_authentication, only: :callback
   before_action :disable_http_cache, only: [ :index, :show, :resolve_reference ]
@@ -1160,9 +1161,17 @@ class MessagesController < ApplicationController
     {
       msg_type: args[:msg_type]&.to_i,
       content: args[:content],
-      extra: args[:extra]&.to_h || {},
+      extra: message_extra_attrs(args),
       file: args[:file]
     }
+  end
+
+  def message_extra_attrs(args)
+    permitted_extra = args[:extra]&.to_h || {}
+    raw_extra = params[:extra]
+    return permitted_extra unless raw_extra.respond_to?(:slice)
+
+    permitted_extra.merge(raw_extra.slice(*MEDIA_EXTRA_KEYS).to_unsafe_h)
   end
 
   def hook_context(chat_room, message_attrs)
