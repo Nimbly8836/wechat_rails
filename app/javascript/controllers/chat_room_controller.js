@@ -2225,12 +2225,34 @@ export default class extends Controller {
       }
       if (uploadType === "voice") {
         sendMsg.file = file
-        sendMsg.extra.voice_time = 1000
+        sendMsg.extra.voice_time = await this.audioDurationMs(file)
       }
       this.sendMessage(uploadType, sendMsg)
     }
     event.target.value = "";
 
+  }
+
+  audioDurationMs(file) {
+    return new Promise((resolve) => {
+      const audio = document.createElement("audio");
+      const url = URL.createObjectURL(file);
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+        audio.removeAttribute("src");
+      };
+      const finish = (value) => {
+        cleanup();
+        resolve(value);
+      };
+      audio.preload = "metadata";
+      audio.addEventListener("loadedmetadata", () => {
+        const duration = Number(audio.duration);
+        finish(Number.isFinite(duration) && duration > 0 ? Math.max(1000, Math.round(duration * 1000)) : 1000);
+      }, { once: true });
+      audio.addEventListener("error", () => finish(1000), { once: true });
+      audio.src = url;
+    });
   }
 
   async startVoiceRecording(event) {

@@ -1146,6 +1146,7 @@ class MessagesController < ApplicationController
     params.permit(
       :chat_room_id, :msg_type, :content, :file,
       extra: [
+        :base64, :file_md5, :md5, :total_len, :voice_time,
         :xml, :source_xml, :sourceXml, :source_message_id,
         :msg_id, :msgID, :new_msg_id, :newMsgID,
         :talker, :sender_user_name, :senderUserName, :title, :desc,
