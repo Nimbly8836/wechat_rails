@@ -53,6 +53,33 @@ class BaseApiService
     make_request(path, params_with_wxid, :post)
   end
 
+  def post_without_body(path)
+    url = build_url(path)
+    uri = URI.parse(url)
+    request = Net::HTTP::Post.new(uri)
+    set_headers(request)
+
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = (uri.scheme == "https")
+    http.read_timeout = @config[:timeout] || 30
+
+    tries = 0
+    max_tries = @config[:retry_count] || 3
+
+    begin
+      tries += 1
+      response = http.request(request)
+      handle_response(response)
+    rescue => e
+      if tries < max_tries
+        sleep(1)
+        retry
+      end
+      Rails.logger.error("API请求失败 (#{url}): #{e.message}")
+      { error: true, message: "请求失败: #{e.message}" }
+    end
+  end
+
   def post_binary_to_file(path, params = {}, file_path:)
     params_with_wxid = { Wxid: @@wx_id }.merge(params.compact)
     make_binary_request(path, params_with_wxid, file_path: file_path)

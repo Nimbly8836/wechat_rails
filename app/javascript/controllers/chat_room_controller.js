@@ -45,8 +45,7 @@ import {
   renderSystemNoticeMessage,
   applyBubbleStyle,
   renderStatus,
-  addTimestamp,
-  inlineTimestampTargetForBubble
+  addTimestamp
 } from "controllers/chat_room/chat_room_message_bubbles";
 import {
   formatTimestamp,
@@ -819,7 +818,6 @@ export default class extends Controller {
   applyBubbleStyle(bubble, msg, isNewGroup = true, senderInfo = null, isFirstMessage = false) { return applyBubbleStyle(this, bubble, msg, isNewGroup, senderInfo, isFirstMessage); }
   renderStatus(m, bubble, msg) { return renderStatus(this, m, bubble, msg); }
   addTimestamp(bubble, wrapper, msg = null) { return addTimestamp(this, bubble, wrapper, msg); }
-  inlineTimestampTargetForBubble(bubble, msg = null) { return inlineTimestampTargetForBubble(this, bubble, msg); }
 
   formatTimestamp(value) { return formatTimestamp(this, value); }
 

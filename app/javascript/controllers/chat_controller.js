@@ -1266,52 +1266,41 @@ export default class extends Controller {
     }
 
     const roomKey = String(roomId)
-    const nextRooms = [...this.cachedChatRooms()]
-    const existingIndex = nextRooms.findIndex((room) => String(room.id) === roomKey)
-    const nextPreview = payload?.content_preview || "你有一条新消息"
-    const nextMessageTime = payload?.message_time || new Date().toISOString()
+    const sourceRooms = this.chatRooms.length ? this.chatRooms : this.cachedChatRooms()
+    const existingIndex = sourceRooms.findIndex((room) => String(room.id) === roomKey)
 
-    if (existingIndex >= 0) {
-      const existingRoom = nextRooms.splice(existingIndex, 1)[0]
-      nextRooms.unshift({
-        ...existingRoom,
-        name: payload?.chat_room_name || existingRoom.name,
-        latest_wx_message: {
-          ...(existingRoom.latest_wx_message || {}),
-          id: payload?.wx_messages_id || existingRoom.latest_wx_message?.id,
-          preview_content: nextPreview,
-          message_time: nextMessageTime
-        }
-      })
-    } else {
-      nextRooms.unshift({
-        id: roomId,
-        name: payload?.chat_room_name || `聊天室 ${roomId}`,
-        avatar_base64: "",
-        official_account: !!payload?.official_account,
-        group_chat: !!payload?.group_chat,
-        latest_wx_message: {
-          id: payload?.wx_messages_id || null,
-          preview_content: nextPreview,
-          message_time: nextMessageTime
-        }
-      })
-    }
-
-    this.cacheChatRooms(nextRooms)
-    this.renderFolderBar()
-
-    if (!payload?.chat_room_name || existingIndex < 0
-      || (existingIndex >= 0 && nextRooms[0]
-        && typeof nextRooms[0].official_account === "undefined")) {
+    if (existingIndex < 0) {
       this.loadChatRooms({ force: true })
       return
     }
 
+    const nextRooms = [...sourceRooms]
+    const existingRoom = nextRooms.splice(existingIndex, 1)[0]
+    const nextPreview = payload?.content_preview || "你有一条新消息"
+    const nextMessageTime = payload?.message_time || new Date().toISOString()
+
+    nextRooms.unshift({
+      ...existingRoom,
+      name: payload?.chat_room_name || existingRoom.name,
+      latest_wx_message: {
+        ...(existingRoom.latest_wx_message || {}),
+        id: payload?.wx_messages_id || existingRoom.latest_wx_message?.id,
+        preview_content: nextPreview,
+        message_time: nextMessageTime
+      }
+    })
+
+    this.cacheChatRooms(nextRooms)
+
     if (!this.messagesListTarget.classList.contains("hidden")) {
       this.renderChatRoomList(nextRooms)
     } else {
+      this.renderFolderBar()
       this.applyChatRoomNames(nextRooms)
+    }
+
+    if (!payload?.chat_room_name || typeof existingRoom.official_account === "undefined") {
+      this.loadChatRooms({ force: true })
     }
   }
 

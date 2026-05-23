@@ -993,32 +993,14 @@ export function addTimestamp(controller, bubble, wrapper, msg = null) {
   const time = document.createElement("span");
   const ts = wrapper.message_time || wrapper.created_at || wrapper.wx_message?.message_time;
   time.textContent = ts ? controller.formatTimestamp(ts) : "";
-  const isSelf = msg?.self_send;
-  const inlineTarget = inlineTimestampTargetForBubble(controller, bubble, msg);
-  if (inlineTarget) {
-    time.className = "float-right ml-2 mt-1 text-[10px] leading-none tracking-wide select-none";
-    time.style.color = isSelf ? "rgba(255,255,255,0.72)" : "rgba(100,116,139,0.92)";
-    inlineTarget.appendChild(time);
-    return;
-  }
-  time.className = "absolute bottom-2 right-3 text-[10px] leading-none tracking-wide";
-  if (!bubble.dataset.timestampPrepared) {
-    bubble.style.minWidth = bubble.style.minWidth || "140px";
-    bubble.style.minHeight = bubble.style.minHeight || "52px";
-    bubble.style.paddingBottom = bubble.style.paddingBottom || "28px";
-    bubble.dataset.timestampPrepared = "true";
-  }
-  time.style.padding = "3px 8px";
-  time.style.borderRadius = "9999px";
-  time.style.background = isSelf ? "rgba(255,255,255,0.18)" : "rgba(15,23,42,0.08)";
-  time.style.color = isSelf ? "rgba(255,255,255,0.85)" : "rgba(100,116,139,0.95)";
-  time.style.boxShadow = isSelf ? "0 4px 12px -8px rgba(15,23,42,0.45)" : "0 4px 10px -8px rgba(15,23,42,0.25)";
-  bubble.appendChild(time);
-}
+  const senderType = controller.isSystemNoticeMessage(msg) ? "system" : (msg?.self_send ? "self" : "other");
+  const bubbleStyle = effectiveBubbleStyle(controller, senderType);
+  time.className = "block self-end text-[10px] leading-none tracking-wide select-none opacity-80";
+  time.style.color = bubbleStyle.color;
 
-export function inlineTimestampTargetForBubble(controller, bubble, msg = null) {
-  const type = controller.normalizeMessageType(msg);
-  const inlineTypes = ["text", "quote", "refer", "xml_unparsed"];
-  if (!inlineTypes.includes(type)) return null;
-  return bubble.querySelector("[data-role='content']") || bubble.querySelector("[data-role='refer-body']") || bubble.querySelector("[data-role='xml-content']");
+  const footer = document.createElement("div");
+  footer.dataset.role = "message-time-footer";
+  footer.className = "mt-1 flex w-full justify-end px-3 pb-1";
+  footer.appendChild(time);
+  bubble.appendChild(footer);
 }

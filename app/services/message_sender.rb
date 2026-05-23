@@ -32,7 +32,10 @@ class MessageSender
     when MESSAGE_TYPES[:text]
       res = message_api_service.send_text(@chat_room.wx_id, @message_content, extra_value(:at) || "")
     when MESSAGE_TYPES[:image]
-      res = message_api_service.send_image(@chat_room.wx_id, extra_value(:base64))
+      image_payload = decode_base64_payload(extra_value(:base64))
+      return { success: false, message: "缺少图片文件" } if image_payload[:encoded].blank?
+
+      res = message_api_service.send_image(@chat_room.wx_id, image_payload[:encoded])
     when MESSAGE_TYPES[:emoji]
       payload = emoji_payload
       return payload if payload.is_a?(Hash) && payload[:success] == false

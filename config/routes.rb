@@ -12,7 +12,7 @@ Rails.application.routes.draw do
   get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   # Defines the root path route ("/")
-  # root "posts#index"
+  root "chat#index"
   get "login" => "login#index"
   post "login" => "login#show_wechat_qrcode"
   post "check_login_status" => "login#check_login_status"

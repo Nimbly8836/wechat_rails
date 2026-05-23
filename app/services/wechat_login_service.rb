@@ -84,7 +84,7 @@ class WechatLoginService
 
   def re_login(wxid)
     path = WechatApis::Base.re_login(wxid)
-    response = @api_service.post(path)
+    response = @api_service.post_without_body(path)
     if response[:error] or !response["Success"]
       @api_service.handle_error("二次登录失败", body: response)
     else
