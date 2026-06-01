@@ -75,9 +75,7 @@ class MessageSender
       raise ArgumentError, "Unsupported message_type: #{@message_type}"
     end
     Rails.logger.debug { "send message res: #{res.inspect}" }
-    unless res&.dig("success") || res&.dig("Success")
-      return res
-    end
+    return res unless successful_api_response?(res)
     result = save_send_message(res)
     save_send_image(result[:data]&.dig("id"), extra_value(:base64)) if @message_type.to_i ==
     MESSAGE_TYPES[:image]
@@ -157,6 +155,13 @@ class MessageSender
   end
 
   private
+
+  def successful_api_response?(res)
+    return false unless res.respond_to?(:dig)
+
+    code = res.dig("Code") || res.dig(:Code)
+    res.dig("success") || res.dig("Success") || code == 0 || code == "0"
+  end
 
   def extract_message_response_data(res)
     data = res&.dig("Data")
@@ -261,7 +266,7 @@ class MessageSender
   def send_file
     @tool_api_service ||= ToolsApiService.new(@chat_room.contact.own_wxid)
     file_res = @tool_api_service.upload_file(@file)
-    unless file_res&.dig("Code").to_i == 0
+    unless file_res&.dig("Code") == 0 || file_res&.dig("Code") == "0"
       return { success: false, message: "Error on upload file" }
     end
     size = file_res&.dig("Data", "totalLen").to_i
@@ -269,7 +274,7 @@ class MessageSender
     name = @file.original_filename&.to_s
     # set message content file original_filename
     @message_content = name
-    message_api_service.send_app_file(@chat_room.contact.user_name,
+    message_api_service.send_app_file(@chat_room.wx_id,
                                       name,
                                       size,
                                       id,
@@ -351,7 +356,7 @@ class MessageSender
 
   def send_emoji_payload(payload)
     res = message_api_service.send_emoji(@chat_room.wx_id, payload[:base64], md5: payload[:file_md5], total_len: payload[:total_len])
-    return res if res&.dig("success") || res&.dig("Success") || payload[:cached_path].blank? || payload[:base64].present?
+    return res if successful_api_response?(res) || payload[:cached_path].blank? || payload[:base64].present?
 
     payload[:base64] = EmojiCache.data_uri(payload[:cached_path])
     @extra[:base64] = payload[:base64]

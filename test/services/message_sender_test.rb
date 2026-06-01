@@ -33,7 +33,7 @@ class MessageSenderTest < ActiveSupport::TestCase
     reference_message = create_message_for(wx_message)
     sender = MessageSender.new(@chat_room, 49, "回复一下", {}, nil)
 
-    xml = sender.send(:build_quote_xml, reference_message, "回复一下")
+    xml = sender.__send__(:build_quote_xml, reference_message, "回复一下")
 
     assert_match(/\A<appmsg/, xml)
     assert_includes xml, "<type>57</type>"
@@ -57,7 +57,7 @@ class MessageSenderTest < ActiveSupport::TestCase
     )
     sender = MessageSender.new(@chat_room, 47, "", {}, uploaded)
 
-    payload = sender.send(:emoji_payload)
+    payload = sender.__send__(:emoji_payload)
 
     assert_equal "data:image/gif;base64,R0lGODlh", payload[:base64]
     assert_equal Digest::MD5.hexdigest("GIF89a"), payload[:file_md5]
@@ -73,7 +73,7 @@ class MessageSenderTest < ActiveSupport::TestCase
     File.binwrite(path, "GIF89a")
     sender = MessageSender.new(@chat_room, 47, "", { file_md5: md5 }, nil)
 
-    payload = sender.send(:emoji_payload)
+    payload = sender.__send__(:emoji_payload)
 
     assert_nil payload[:base64]
     assert_equal md5, payload[:file_md5]
@@ -135,6 +135,71 @@ class MessageSenderTest < ActiveSupport::TestCase
   ensure
     tempfile.close!
     FileUtils.rm_f(Rails.root.join("storage", "emojis", "#{expected_md5}.gif")) if defined?(expected_md5)
+  end
+
+  test "send accepts upstream code zero as success" do
+    service = CodeZeroMessageApiService.new
+    sender = MessageSender.new(@chat_room, 3, "", { base64: Base64.strict_encode64("image") }, nil)
+
+    sender.stub(:message_api_service, service) do
+      result = sender.send
+
+      assert_equal true, result[:success]
+    end
+
+    assert_equal @chat_room.wx_id, service.last_to_wxid
+  ensure
+    if (message_id = Message.order(:id).last&.id)
+      FileUtils.rm_f(Dir.glob(Rails.root.join("storage", "images", "#{message_id}.*")))
+    end
+  end
+
+  test "send file returns upload failure when upstream code is missing" do
+    uploaded = ActionDispatch::Http::UploadedFile.new(
+      tempfile: Tempfile.new(["document", ".txt"]),
+      filename: "document.txt",
+      type: "text/plain"
+    )
+    tools_service = FailedFileToolsApiService.new
+    message_service = FakeFileMessageApiService.new
+    sender = MessageSender.new(@chat_room, 6, "", {}, uploaded)
+
+    sender.instance_variable_set(:@tool_api_service, tools_service)
+    sender.stub(:message_api_service, message_service) do
+      result = sender.send
+
+      assert_equal false, result[:success]
+      assert_nil message_service.last_to_wxid
+    end
+  ensure
+    uploaded&.tempfile&.close! if defined?(uploaded)
+  end
+
+  test "send file targets the chat room wxid" do
+    tempfile = Tempfile.new(["document", ".txt"])
+    tempfile.write("hello")
+    tempfile.rewind
+
+    uploaded = ActionDispatch::Http::UploadedFile.new(
+      tempfile: tempfile,
+      filename: "document.txt",
+      type: "text/plain"
+    )
+    tools_service = FakeFileToolsApiService.new
+    message_service = FakeFileMessageApiService.new
+    sender = MessageSender.new(@chat_room, 6, "", {}, uploaded)
+
+    sender.instance_variable_set(:@tool_api_service, tools_service)
+    sender.stub(:message_api_service, message_service) do
+      result = sender.send
+
+      assert_equal true, result[:success]
+    end
+
+    assert_equal @chat_room.wx_id, message_service.last_to_wxid
+  ensure
+    tempfile.close! if defined?(tempfile)
+    FileUtils.rm_f(Rails.root.join("storage", "files", "#{Message.order(:id).last&.id}.txt"))
   end
 
   test "send voice uploads silk payload and stores mp3 preview" do
@@ -203,6 +268,23 @@ class MessageSenderTest < ActiveSupport::TestCase
     end
   end
 
+  class CodeZeroMessageApiService
+    attr_reader :last_to_wxid
+
+    def send_image(to_wxid, _base64)
+      @last_to_wxid = to_wxid
+      {
+        "Code" => 0,
+        "Data" => {
+          "Msgid" => 123_456,
+          "Newmsgid" => 789_012,
+          "ToUserName" => { "string" => to_wxid },
+          "CreateTime" => Time.current.to_i
+        }
+      }
+    end
+  end
+
   class FakeEmojiMessageApiService
     attr_reader :last_md5, :last_total_len
 
@@ -214,6 +296,41 @@ class MessageSenderTest < ActiveSupport::TestCase
       @last_md5 = md5
       @last_total_len = total_len
 
+      {
+        "success" => true,
+        "Data" => {
+          "Msgid" => 123_456,
+          "Newmsgid" => 789_012,
+          "ToUserName" => { "string" => to_wxid },
+          "CreateTime" => Time.current.to_i
+        }
+      }
+    end
+  end
+
+  class FailedFileToolsApiService
+    def upload_file(_file)
+      { error: true, message: "文件上传失败" }
+    end
+  end
+
+  class FakeFileToolsApiService
+    def upload_file(_file)
+      {
+        "Code" => 0,
+        "Data" => {
+          "totalLen" => 5,
+          "mediaId" => "media-id"
+        }
+      }
+    end
+  end
+
+  class FakeFileMessageApiService
+    attr_reader :last_to_wxid
+
+    def send_app_file(to_wxid, _name, _size, _id, _ext_name)
+      @last_to_wxid = to_wxid
       {
         "success" => true,
         "Data" => {

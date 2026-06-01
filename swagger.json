@@ -2156,11 +2156,12 @@
                     "Msg"
                 ],
                 "summary": "发送合并转发消息",
+                "description": "单条：传 Wxid、ToWxid、MsgID/NewMsgID 或 SourceXml；多条：传 Items 数组，每项可传 MsgID/NewMsgID 或 SourceXml，示例 {\"Wxid\":\"wxid_xxx\",\"ToWxid\":\"filehelper\",\"Items\":[{\"MsgID\":1,\"NewMsgID\":111},{\"MsgID\":2,\"NewMsgID\":222}]}。Xml 若已是 type19 则直接发送。\n\u003cbr\u003e",
                 "parameters": [
                     {
                         "in": "body",
                         "name": "body",
-                        "description": "Xml==type19则直接发送；否则从SourceXml或MsgID/NewMsgID查询本地消息推测构建",
+                        "description": "单条用根字段 MsgID/NewMsgID/SourceXml；多条用 Items 数组，Items 每项支持 MsgID/NewMsgID/SourceXml",
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/Msg.SendMergedForwardParam"
@@ -3004,6 +3005,30 @@
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/Tools.DownloadAppAttachParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/Tools/DownloadFileMessage": {
+            "post": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "文件消息下载",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "传原始文件消息 XML 或本地消息定位信息，自动推导下载参数并下载文件",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Tools.FileMessageDownloadParam"
                         }
                     }
                 ],
@@ -5001,6 +5026,93 @@
                 }
             }
         },
+        "Msg.SendMergedForwardItem": {
+            "title": "SendMergedForwardItem",
+            "type": "object",
+            "properties": {
+                "CdnDataKey": {
+                    "type": "string"
+                },
+                "CdnDataUrl": {
+                    "type": "string"
+                },
+                "DataFmt": {
+                    "type": "string"
+                },
+                "DataId": {
+                    "type": "string"
+                },
+                "DataSize": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "DataTitle": {
+                    "type": "string"
+                },
+                "FromNewMsgId": {
+                    "type": "string"
+                },
+                "FullMd5": {
+                    "type": "string"
+                },
+                "HtmlId": {
+                    "type": "string"
+                },
+                "Keyword": {
+                    "type": "string"
+                },
+                "LocalID": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MessageUuid": {
+                    "type": "string"
+                },
+                "MsgID": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgSeq": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgType": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "NewMsgID": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "SenderUserName": {
+                    "type": "string"
+                },
+                "SourceHeadUrl": {
+                    "type": "string"
+                },
+                "SourceName": {
+                    "type": "string"
+                },
+                "SourceTime": {
+                    "type": "string"
+                },
+                "SourceXml": {
+                    "type": "string"
+                },
+                "SrcMsgCreateTime": {
+                    "type": "string"
+                },
+                "SrcMsgLocalId": {
+                    "type": "string"
+                },
+                "Talker": {
+                    "type": "string"
+                },
+                "Xml": {
+                    "type": "string"
+                }
+            }
+        },
         "Msg.SendMergedForwardParam": {
             "title": "SendMergedForwardParam",
             "type": "object",
@@ -5035,6 +5147,12 @@
                 },
                 "HtmlId": {
                     "type": "string"
+                },
+                "Items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Msg.SendMergedForwardItem"
+                    }
                 },
                 "Keyword": {
                     "type": "string"
@@ -6055,6 +6173,53 @@
                     "format": "int64"
                 },
                 "Wxid": {
+                    "type": "string"
+                }
+            }
+        },
+        "Tools.FileMessageDownloadParam": {
+            "title": "FileMessageDownloadParam",
+            "type": "object",
+            "properties": {
+                "Diagnostic": {
+                    "type": "boolean"
+                },
+                "Keyword": {
+                    "type": "string"
+                },
+                "LocalID": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgID": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgSeq": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "MsgType": {
+                    "type": "integer",
+                    "format": "int32"
+                },
+                "NewMsgID": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "SenderUserName": {
+                    "type": "string"
+                },
+                "SourceXml": {
+                    "type": "string"
+                },
+                "Talker": {
+                    "type": "string"
+                },
+                "Wxid": {
+                    "type": "string"
+                },
+                "Xml": {
                     "type": "string"
                 }
             }
